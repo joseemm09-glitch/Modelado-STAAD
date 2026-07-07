@@ -113,10 +113,19 @@ def plot_model(model, show_supports=False):
             zaxis_title='Y (m)',
             aspectmode='data' # Keeps scale proportional
         ),
-        margin=dict(l=0, r=0, b=0, t=30),
+        margin=dict(l=0, r=0, b=0, t=0),
         title="",
         showlegend=True,
-        height=850
+        legend=dict(
+            bgcolor='rgba(255, 255, 255, 0.65)',
+            bordercolor='rgba(255, 255, 255, 0.9)',
+            borderwidth=1,
+            yanchor="top",
+            y=0.95,
+            xanchor="right",
+            x=0.95
+        ),
+        height=480
     )
 
     return fig

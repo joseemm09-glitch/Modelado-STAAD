@@ -86,8 +86,13 @@ st.markdown("""
     /* Reducir padding superior de la aplicación para aprovechar espacio */
     div.block-container {
         padding-top: 2rem !important;
-        padding-bottom: 1rem !important;
+        padding-bottom: 0rem !important;
+        padding-left: 2rem !important;
+        padding-right: 2rem !important;
     }
+    /* Ocultar footer y header por defecto de Streamlit que generan scroll vacío */
+    header {visibility: hidden !important; display: none !important;}
+    footer {visibility: hidden !important; display: none !important;}
     </style>
 """, unsafe_allow_html=True)
 
@@ -123,7 +128,21 @@ def update_larm():
     if needed % 2 != 0:
         needed += 1
     st.session_state.subdiv = max(2, int(needed))
+    st.session_state['_subdiv'] = st.session_state.subdiv
+    
     st.session_state.harm = math.ceil((length / 12.5) * 10) / 10.0
+    st.session_state['_harm'] = st.session_state.harm
+
+def update_c_viva():
+    st.session_state.c_viva = st.session_state._c_viva
+    st.session_state.cv_sismo = st.session_state.c_viva * 0.25
+    st.session_state['_cv_sismo'] = st.session_state.cv_sismo
+
+def update_c_muerta():
+    st.session_state.c_muerta = st.session_state._c_muerta
+    st.session_state.cm_sismo = st.session_state.c_muerta
+    st.session_state['_cm_sismo'] = st.session_state.cm_sismo
+
 
 with st.sidebar:
     panel = st.session_state.current_panel
@@ -171,9 +190,9 @@ with st.sidebar:
         st.button("⬅", type="secondary", on_click=go_panel, args=("Main",))
         st.header("Cargas")
         st.subheader("Gravitacionales")
-        st.session_state.c_muerta = st.number_input("Carga Muerta (kg/m²)", min_value=0.0, step=5.0, value=st.session_state.c_muerta)
-        st.session_state.c_viva = st.number_input("Carga Viva (kg/m²)", min_value=0.0, step=5.0, value=st.session_state.c_viva)
-        st.session_state.c_granizo = st.number_input("Granizo (kg/m²)", min_value=0.0, step=5.0, value=st.session_state.c_granizo)
+        st.number_input("Carga Muerta (kg/m²)", min_value=0.0, step=5.0, value=st.session_state.c_muerta, key="_c_muerta", on_change=update_c_muerta)
+        st.number_input("Carga Viva (kg/m²)", min_value=0.0, step=5.0, value=st.session_state.c_viva, key="_c_viva", on_change=update_c_viva)
+        st.number_input("Granizo (kg/m²)", min_value=0.0, step=5.0, value=st.session_state.c_granizo, key="_c_granizo", on_change=update_val, args=("c_granizo",))
         
         st.markdown("<hr style='border: none; border-top: 1px solid #d3d3d3; margin: 5px 0;'>", unsafe_allow_html=True)
         st.subheader("Viento")
@@ -187,11 +206,13 @@ with st.sidebar:
         st.session_state.coef_sismico = st.number_input("Coeficiente Sísmico", min_value=0.0, step=0.01, value=st.session_state.coef_sismico)
         st.session_state.ductilidad = st.number_input("Ductilidad", min_value=1.0, step=0.5, value=st.session_state.ductilidad)
         
-        default_cm_sismo = st.session_state.cm_sismo if st.session_state.cm_sismo is not None else st.session_state.c_muerta
-        default_cv_sismo = st.session_state.cv_sismo if st.session_state.cv_sismo is not None else st.session_state.c_viva * 0.25
-        
-        st.session_state.cm_sismo = st.number_input("Carga Muerta para Sismo (kg/m²)", min_value=0.0, step=5.0, value=default_cm_sismo)
-        st.session_state.cv_sismo = st.number_input("Carga Viva para Sismo (kg/m²)", min_value=0.0, step=5.0, value=default_cv_sismo)
+        if st.session_state.cm_sismo is None:
+            st.session_state.cm_sismo = st.session_state.c_muerta
+        if st.session_state.cv_sismo is None:
+            st.session_state.cv_sismo = st.session_state.c_viva * 0.25
+            
+        st.number_input("Carga Muerta para Sismo (kg/m²)", min_value=0.0, step=5.0, value=st.session_state.cm_sismo, key="_cm_sismo", on_change=update_val, args=("cm_sismo",))
+        st.number_input("Carga Viva para Sismo (kg/m²)", min_value=0.0, step=5.0, value=st.session_state.cv_sismo, key="_cv_sismo", on_change=update_val, args=("cv_sismo",))
 
     elif panel == "Diseño":
         st.button("⬅", type="secondary", on_click=go_panel, args=("Main",))
@@ -235,12 +256,14 @@ except Exception as e:
 col1, col2 = st.columns([3, 1])
 
 with col1:
+    st.markdown("<div style='margin-top: -30px;'></div>", unsafe_allow_html=True)
     st.subheader("Vista 3D")
     show_sup = (st.session_state.current_panel == "Geometría")
     fig = plot_model(model, show_supports=show_sup)
     st.plotly_chart(fig, use_container_width=True)
 
 with col2:
+    st.markdown("<div style='margin-top: -60px;'></div>", unsafe_allow_html=True)
     st.subheader("Exportación")
     
     project_name = st.text_input("Nombre del Proyecto:", value="Modelo")
@@ -300,10 +323,14 @@ with col2:
         except Exception as e:
             st.error(f"Error al guardar o abrir en '{full_path}': {e}")
     
-    st.markdown("---")
-    st.markdown("**Resumen de Elementos:**")
-    st.write(f"- Columnas: {(st.session_state.nbay + 1) * (st.session_state.nspan + 1)}")
-    st.write(f"- Armaduras: {(st.session_state.nbay + 1) * st.session_state.nspan}")
-    st.write(f"- Contravientos: {len(model.groups.get('_CVH', []))}")
-    st.write(f"- Largueros: {len(model.groups.get('_LARGUEROS', []))}")
+    st.markdown("<hr style='margin: 15px 0 10px 0;'>", unsafe_allow_html=True)
+    st.subheader("Elementos")
+    st.markdown(f"""
+    <div style='line-height: 1.8;'>
+        • Columnas: {(st.session_state.nbay + 1) * (st.session_state.nspan + 1)}<br>
+        • Armaduras: {(st.session_state.nbay + 1) * st.session_state.nspan}<br>
+        • Contravientos: {len(model.groups.get('_CVH', []))}<br>
+        • Largueros: {len(model.groups.get('_LARGUEROS', []))}
+    </div>
+    """, unsafe_allow_html=True)
 
