@@ -1,7 +1,5 @@
 import math
 
-import math
-
 class StaadModel:
     def __init__(self, Larm_m, Ljoist_m, nBay, nSpan, HArmad_m, HLibre_m, numSubdiv, roof_type="Plana", slope_pct=0.0, support_type="FIXED", c_muerta=30.0, c_viva=100.0, c_granizo=60.0, v_barlovento=86.0, v_sotavento=50.0, v_laterales=78.0, v_succion=95.0, coef_sismico=0.08, ductilidad=2.0, cm_sismo=None, cv_sismo=None):
         self.Larm_m = float(Larm_m)

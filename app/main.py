@@ -1,7 +1,6 @@
 import streamlit as st
 import math
 import os
-import tempfile
 import subprocess
 from model import StaadModel
 from staad_writer import write_staad
@@ -9,30 +8,65 @@ from visualizer import plot_model
 
 st.set_page_config(page_title="Generador STAAD", layout="wide")
 
+st.markdown("""
+<style>
+/* iOS Liquid Glass Effect for containers */
+div[data-testid="stVerticalBlock"]:has(> div.element-container div.ios-glass-marker) {
+    background: rgba(255, 255, 255, 0.45);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    border-radius: 16px;
+    padding: 15px 20px;
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    margin-bottom: 20px;
+    position: relative;
+    top: -95px;
+    z-index: 99;
+}
+/* Adjust spacing inside the glass card */
+div[data-testid="stVerticalBlock"]:has(> div.element-container div.ios-glass-marker) h3 {
+    margin-top: -10px;
+    font-weight: 600;
+}
+/* Tamaño de fuente reducido para la Ubicación */
+div[data-testid="stVerticalBlock"]:has(> div.element-container div.path-marker) input {
+    font-size: 11px !important;
+}
+/* Ocultar el contenedor del marcador para que no desalinee el input */
+div.element-container:has(div.path-marker) {
+    display: none !important;
+    margin: 0 !important;
+    height: 0 !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
+
 # CSS para botones
 st.markdown("""
     <style>
-    /* Botones principales (Ingeniería Clásica - Azul Acero/Marino) */
+    /* Botones principales (Azul oscurecido) */
     section[data-testid="stSidebar"] button[kind="primary"] {
-        background: linear-gradient(180deg, #2A4B7C 0%, #1A365D 100%) !important;
+        background: linear-gradient(180deg, #2472A6 0%, #17537A 100%) !important;
         color: white !important;
         font-weight: 600 !important;
         letter-spacing: 0.5px !important;
         border-radius: 6px !important;
-        width: 200% !important;
+        width: 100% !important;
         margin: 0 auto !important;
         display: block !important;
-        border: 1px solid #142A4A !important;
+        border: 1px solid #144769 !important;
         text-align: center !important;
         justify-content: center !important;
         box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.2) !important;
         transition: all 0.2s ease-in-out !important;
     }
     section[data-testid="stSidebar"] button[kind="primary"]:hover {
-        background: linear-gradient(180deg, #325A92 0%, #214371 100%) !important;
+        background: linear-gradient(180deg, #297FB8 0%, #1D6799 100%) !important;
         box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.3) !important;
         transform: translateY(-1px) !important;
-        border: 1px solid #1A365D !important;
+        border: 1px solid #17537A !important;
     }
     section[data-testid="stSidebar"] button[kind="primary"]:active {
         transform: translateY(1px) !important;
@@ -150,69 +184,66 @@ with st.sidebar:
     if panel == "Main":
         st.markdown("<br><br>", unsafe_allow_html=True)
         st.markdown("<h2 style='text-align: center;'>Menú Principal</h2>", unsafe_allow_html=True)
-        st.button("Geometría", type="primary", on_click=go_panel, args=("Geometría",))
-        st.button("Cargas", type="primary", on_click=go_panel, args=("Cargas",))
-        st.button("Diseño", type="primary", on_click=go_panel, args=("Diseño",))
+        st.button("Geometría", type="primary", use_container_width=True, on_click=go_panel, args=("Geometría",))
+        st.button("Cargas", type="primary", use_container_width=True, on_click=go_panel, args=("Cargas",))
+        st.button("Diseño", type="primary", use_container_width=True, on_click=go_panel, args=("Diseño",))
         
     elif panel == "Geometría":
         st.button("⬅", type="secondary", on_click=go_panel, args=("Main",))
         st.header("Geometría")
         
-        st.number_input("Longitud de Armaduras (m)", min_value=1.0, step=0.1, value=st.session_state.larm, key="_larm", on_change=update_larm)
-        st.number_input("Longitud de Joists (m)", min_value=1.0, step=0.1, value=st.session_state.ljoist, key="_ljoist", on_change=update_val, args=("ljoist",))
-        
-        st.number_input("Número de Bahías (Profundidad)", min_value=1, step=1, value=st.session_state.nbay, key="_nbay", on_change=update_val, args=("nbay",))
-        st.number_input("Número de Entre-ejes (Ancho)", min_value=1, step=1, value=st.session_state.nspan, key="_nspan", on_change=update_val, args=("nspan",))
-        
-        st.number_input("Altura de Armadura (Peralte) (m)", min_value=0.5, step=0.1, value=st.session_state.harm, key="_harm", on_change=update_val, args=("harm",))
-        
-        # Relaciones L/10 y L/15
-        l_10 = st.session_state.larm / 10.0
-        l_15 = st.session_state.larm / 15.0
-        st.markdown(f"<div style='font-size: 0.85em; color: gray; margin-top: -10px; margin-bottom: 10px;'>L/10 = {l_10:.2f} m.<br>L/15 = {l_15:.2f} m.</div>", unsafe_allow_html=True)
-        
-        st.number_input("Altura Libre (m)", min_value=1.0, step=0.1, value=st.session_state.hlib, key="_hlib", on_change=update_val, args=("hlib",))
-        st.number_input("Subdivisiones (Debe ser par)", min_value=2, step=2, value=st.session_state.subdiv, key="_subdiv", on_change=update_val, args=("subdiv",))
+        with st.expander("Dimensiones Generales", expanded=True):
+            st.number_input("Longitud de Armaduras (m)", min_value=1.0, step=0.1, value=st.session_state.larm, key="_larm", on_change=update_larm)
+            st.number_input("Longitud de Joists (m)", min_value=1.0, step=0.1, value=st.session_state.ljoist, key="_ljoist", on_change=update_val, args=("ljoist",))
+            
+            st.number_input("Número de Bahías (Profundidad)", min_value=1, step=1, value=st.session_state.nbay, key="_nbay", on_change=update_val, args=("nbay",))
+            st.number_input("Número de Entre-ejes (Ancho)", min_value=1, step=1, value=st.session_state.nspan, key="_nspan", on_change=update_val, args=("nspan",))
+            
+            st.number_input("Altura de Armadura (Peralte) (m)", min_value=0.5, step=0.1, value=st.session_state.harm, key="_harm", on_change=update_val, args=("harm",))
+            
+            # Relaciones L/10 y L/15
+            l_10 = st.session_state.larm / 10.0
+            l_15 = st.session_state.larm / 15.0
+            st.markdown(f"<div style='font-size: 0.85em; color: gray; margin-top: -10px; margin-bottom: 10px;'>L/10 = {l_10:.2f} m.<br>L/15 = {l_15:.2f} m.</div>", unsafe_allow_html=True)
+            
+            st.number_input("Altura Libre (m)", min_value=1.0, step=0.1, value=st.session_state.hlib, key="_hlib", on_change=update_val, args=("hlib",))
+            st.number_input("Subdivisiones (Debe ser par)", min_value=2, step=2, value=st.session_state.subdiv, key="_subdiv", on_change=update_val, args=("subdiv",))
 
-        st.markdown("<hr style='border: none; border-top: 1px solid #d3d3d3; margin: 15px 0;'>", unsafe_allow_html=True)
-        st.subheader("Cubierta")
-        rt = st.radio("Tipo de Cubierta", ["1 Agua", "2 Aguas"], index=["1 Agua", "2 Aguas"].index(st.session_state.roof_type) if st.session_state.roof_type in ["1 Agua", "2 Aguas"] else 1)
-        st.session_state.roof_type = rt
-        sp = st.number_input("Pendiente (%)", min_value=0.0, step=0.5, value=st.session_state.slope_pct)
-        st.session_state.slope_pct = sp
+        with st.expander("Cubierta", expanded=False):
+            rt = st.radio("Tipo de Cubierta", ["1 Agua", "2 Aguas"], index=["1 Agua", "2 Aguas"].index(st.session_state.roof_type) if st.session_state.roof_type in ["1 Agua", "2 Aguas"] else 1)
+            st.session_state.roof_type = rt
+            sp = st.number_input("Pendiente (%)", min_value=0.0, step=0.5, value=st.session_state.slope_pct)
+            st.session_state.slope_pct = sp
 
-        st.markdown("<hr style='border: none; border-top: 1px solid #d3d3d3; margin: 15px 0;'>", unsafe_allow_html=True)
-        st.subheader("Apoyos Base")
-        apoyo = st.radio("Tipo de Apoyo", ["Empotrado", "Articulado"], index=0 if st.session_state.support_type == "FIXED" else 1)
-        st.session_state.support_type = "FIXED" if apoyo == "Empotrado" else "PINNED"
+        with st.expander("Apoyos", expanded=False):
+            apoyo = st.radio("Tipo de Apoyo", ["Empotrado", "Articulado"], index=0 if st.session_state.support_type == "FIXED" else 1)
+            st.session_state.support_type = "FIXED" if apoyo == "Empotrado" else "PINNED"
 
     elif panel == "Cargas":
         st.button("⬅", type="secondary", on_click=go_panel, args=("Main",))
         st.header("Cargas")
-        st.subheader("Gravitacionales")
-        st.number_input("Carga Muerta (kg/m²)", min_value=0.0, step=5.0, value=st.session_state.c_muerta, key="_c_muerta", on_change=update_c_muerta)
-        st.number_input("Carga Viva (kg/m²)", min_value=0.0, step=5.0, value=st.session_state.c_viva, key="_c_viva", on_change=update_c_viva)
-        st.number_input("Granizo (kg/m²)", min_value=0.0, step=5.0, value=st.session_state.c_granizo, key="_c_granizo", on_change=update_val, args=("c_granizo",))
-        
-        st.markdown("<hr style='border: none; border-top: 1px solid #d3d3d3; margin: 5px 0;'>", unsafe_allow_html=True)
-        st.subheader("Viento")
-        st.session_state.v_barlovento = st.number_input("Barlovento (kg/m²)", min_value=0.0, step=1.0, value=st.session_state.v_barlovento)
-        st.session_state.v_sotavento = st.number_input("Sotavento (kg/m²)", min_value=0.0, step=1.0, value=st.session_state.v_sotavento)
-        st.session_state.v_laterales = st.number_input("Laterales (kg/m²)", min_value=0.0, step=1.0, value=st.session_state.v_laterales)
-        st.session_state.v_succion = st.number_input("Succión (kg/m²)", min_value=0.0, step=1.0, value=st.session_state.v_succion)
-
-        st.markdown("<hr style='border: none; border-top: 1px solid #d3d3d3; margin: 5px 0;'>", unsafe_allow_html=True)
-        st.subheader("Sismo")
-        st.session_state.coef_sismico = st.number_input("Coeficiente Sísmico", min_value=0.0, step=0.01, value=st.session_state.coef_sismico)
-        st.session_state.ductilidad = st.number_input("Ductilidad", min_value=1.0, step=0.5, value=st.session_state.ductilidad)
-        
-        if st.session_state.cm_sismo is None:
-            st.session_state.cm_sismo = st.session_state.c_muerta
-        if st.session_state.cv_sismo is None:
-            st.session_state.cv_sismo = st.session_state.c_viva * 0.25
+        with st.expander("Gravitacionales", expanded=True):
+            st.number_input("Carga Muerta (kg/m²)", min_value=0.0, step=5.0, value=st.session_state.c_muerta, key="_c_muerta", on_change=update_c_muerta)
+            st.number_input("Carga Viva (kg/m²)", min_value=0.0, step=5.0, value=st.session_state.c_viva, key="_c_viva", on_change=update_c_viva)
+            st.number_input("Granizo (kg/m²)", min_value=0.0, step=5.0, value=st.session_state.c_granizo, key="_c_granizo", on_change=update_val, args=("c_granizo",))
             
-        st.number_input("Carga Muerta para Sismo (kg/m²)", min_value=0.0, step=5.0, value=st.session_state.cm_sismo, key="_cm_sismo", on_change=update_val, args=("cm_sismo",))
-        st.number_input("Carga Viva para Sismo (kg/m²)", min_value=0.0, step=5.0, value=st.session_state.cv_sismo, key="_cv_sismo", on_change=update_val, args=("cv_sismo",))
+        with st.expander("Viento", expanded=False):
+            st.session_state.v_barlovento = st.number_input("Barlovento (kg/m²)", min_value=0.0, step=1.0, value=st.session_state.v_barlovento)
+            st.session_state.v_sotavento = st.number_input("Sotavento (kg/m²)", min_value=0.0, step=1.0, value=st.session_state.v_sotavento)
+            st.session_state.v_laterales = st.number_input("Laterales (kg/m²)", min_value=0.0, step=1.0, value=st.session_state.v_laterales)
+            st.session_state.v_succion = st.number_input("Succión (kg/m²)", min_value=0.0, step=1.0, value=st.session_state.v_succion)
+
+        with st.expander("Sismo", expanded=False):
+            st.session_state.coef_sismico = st.number_input("Coeficiente Sísmico", min_value=0.0, step=0.01, value=st.session_state.coef_sismico)
+            st.session_state.ductilidad = st.number_input("Ductilidad", min_value=1.0, step=0.5, value=st.session_state.ductilidad)
+            
+            if st.session_state.cm_sismo is None:
+                st.session_state.cm_sismo = st.session_state.c_muerta
+            if st.session_state.cv_sismo is None:
+                st.session_state.cv_sismo = st.session_state.c_viva * 0.25
+                
+            st.number_input("Carga Muerta para Sismo (kg/m²)", min_value=0.0, step=5.0, value=st.session_state.cm_sismo, key="_cm_sismo", on_change=update_val, args=("cm_sismo",))
+            st.number_input("Carga Viva para Sismo (kg/m²)", min_value=0.0, step=5.0, value=st.session_state.cv_sismo, key="_cv_sismo", on_change=update_val, args=("cv_sismo",))
 
     elif panel == "Diseño":
         st.button("⬅", type="secondary", on_click=go_panel, args=("Main",))
@@ -263,74 +294,73 @@ with col1:
     st.plotly_chart(fig, use_container_width=True)
 
 with col2:
-    st.markdown("<div style='margin-top: -60px;'></div>", unsafe_allow_html=True)
-    st.subheader("Exportación")
-    
-    project_name = st.text_input("Nombre del Proyecto:", value="Modelo")
-    file_name_export = f"{project_name.strip()}.std" if project_name.strip() else "Modelo.std"
-    
-    st.markdown("**Ubicación:**")
-    
-    if 'export_path' not in st.session_state:
-        import os
-        st.session_state.export_path = os.path.expanduser("~")
+    with st.container():
+        st.markdown("<div class='ios-glass-marker'></div>", unsafe_allow_html=True)
+        st.subheader("Exportación")
         
-    import os
-    parts = os.path.normpath(st.session_state.export_path).split(os.sep)
-    if len(parts) >= 2:
-        display_text = os.path.join(parts[-2], parts[-1])
-    else:
-        display_text = st.session_state.export_path
+        project_name = st.text_input("Nombre del Proyecto:", value="Modelo")
+        file_name_export = f"{project_name.strip()}.std" if project_name.strip() else "Modelo.std"
         
-    path_col, btn_col = st.columns([3, 1])
-    with path_col:
-        st.code(display_text, language="")
-    with btn_col:
-        if st.button("📁", help="Examinar..."):
-            import tkinter as tk
-            from tkinter import filedialog
-            root = tk.Tk()
-            root.withdraw()
-            root.attributes('-topmost', True)
-            folder_selected = filedialog.askdirectory(master=root, title="Seleccionar Carpeta de Exportación", initialdir=st.session_state.export_path)
-            root.destroy()
-            if folder_selected:
-                st.session_state.export_path = folder_selected
-                st.rerun()
-                
-    staad_text = write_staad(model)
-    
-    if st.button("Guardar Archivo .std", type="primary"):
-        import os
-        # Limpiar el nombre del archivo para evitar caracteres inválidos
-        clean_name = "".join(c for c in file_name_export if c.isalnum() or c in " ._-").strip()
-        if not clean_name.endswith(".std"):
-            clean_name += ".std"
+        st.markdown("**Ubicación:**")
+        
+        if 'export_path' not in st.session_state:
+            st.session_state.export_path = os.path.expanduser("~")
             
-        full_path = os.path.join(st.session_state.export_path, clean_name)
-        try:
-            with open(full_path, "w", encoding="utf-8") as f:
-                f.write(staad_text)
-            st.success(f"Guardado exitosamente en:\n{full_path}")
+        parts = os.path.normpath(st.session_state.export_path).split(os.sep)
+        if len(parts) >= 2:
+            display_text = os.path.join(parts[-2], parts[-1])
+        else:
+            display_text = st.session_state.export_path
             
-            # Abrir archivo automáticamente (en Windows usa la app predeterminada para .std)
-            if os.name == 'nt':
-                os.startfile(full_path)
-            else:
-                import subprocess
-                subprocess.call(('open', full_path))
+        path_col, btn_col = st.columns([3, 1])
+        with path_col:
+            st.markdown("<div class='path-marker'></div>", unsafe_allow_html=True)
+            st.text_input("ub", value=display_text, label_visibility="collapsed")
+        with btn_col:
+            if st.button("📁", help="Examinar..."):
+                import tkinter as tk
+                from tkinter import filedialog
+                root = tk.Tk()
+                root.withdraw()
+                root.attributes('-topmost', True)
+                folder_selected = filedialog.askdirectory(master=root, title="Seleccionar Carpeta de Exportación", initialdir=st.session_state.export_path)
+                root.destroy()
+                if folder_selected:
+                    st.session_state.export_path = folder_selected
+                    st.rerun()
+                    
+        staad_text = write_staad(model)
+        
+        if st.button("Guardar Archivo .std", type="primary"):
+            # Limpiar el nombre del archivo para evitar caracteres inválidos
+            clean_name = "".join(c for c in file_name_export if c.isalnum() or c in " ._-").strip()
+            if not clean_name.endswith(".std"):
+                clean_name += ".std"
                 
-        except Exception as e:
-            st.error(f"Error al guardar o abrir en '{full_path}': {e}")
-    
-    st.markdown("<hr style='margin: 15px 0 10px 0;'>", unsafe_allow_html=True)
-    st.subheader("Elementos")
-    st.markdown(f"""
-    <div style='line-height: 1.8;'>
-        • Columnas: {(st.session_state.nbay + 1) * (st.session_state.nspan + 1)}<br>
-        • Armaduras: {(st.session_state.nbay + 1) * st.session_state.nspan}<br>
-        • Contravientos: {len(model.groups.get('_CVH', []))}<br>
-        • Largueros: {len(model.groups.get('_LARGUEROS', []))}
-    </div>
-    """, unsafe_allow_html=True)
+            full_path = os.path.join(st.session_state.export_path, clean_name)
+            try:
+                with open(full_path, "w", encoding="utf-8") as f:
+                    f.write(staad_text)
+                st.success(f"Guardado exitosamente en:\n{full_path}")
+                
+                # Abrir archivo automáticamente (en Windows usa la app predeterminada para .std)
+                if os.name == 'nt':
+                    os.startfile(full_path)
+                else:
+                    subprocess.call(('open', full_path))
+                    
+            except Exception as e:
+                st.error(f"Error al guardar o abrir en '{full_path}': {e}")
 
+    with st.container():
+        st.markdown("<div class='ios-glass-marker'></div>", unsafe_allow_html=True)
+        st.subheader("Elementos")
+        st.markdown(f"""
+        <div style='line-height: 1.8;'>
+            • Columnas: {(st.session_state.nbay + 1) * (st.session_state.nspan + 1)}<br>
+            • Armaduras: {(st.session_state.nbay + 1) * st.session_state.nspan}<br>
+            • Contravientos: {len(model.groups.get('_CVH', []))}<br>
+            • Largueros: {len(model.groups.get('_LARGUEROS', []))}
+        </div>
+        <div style='height: 25px;'></div>
+        """, unsafe_allow_html=True)

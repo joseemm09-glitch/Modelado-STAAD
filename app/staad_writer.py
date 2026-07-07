@@ -1,5 +1,4 @@
-import textwrap
-import os
+import math
 from datetime import datetime
 
 def format_num(val):
@@ -386,7 +385,6 @@ def write_staad(model):
         
     ci_int_str = group_ranges(model.ci_int)
     if ci_int_str:
-        import math
         ly_val = math.ceil(3 * (model.Lx / model.numSubdiv))
         out.append(f"LY {ly_val} _CI_INT")
         

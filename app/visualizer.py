@@ -2,7 +2,7 @@ import plotly.graph_objects as go
 
 def get_group_color(group_name):
     colors = {
-        '_COL': 'blue',
+        '_COL': 'dodgerblue',
         '_CS': 'red',
         '_CI': 'orange',
         '_MONTANTES': 'green',
