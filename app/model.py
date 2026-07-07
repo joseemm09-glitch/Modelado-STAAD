@@ -112,7 +112,9 @@ class StaadModel:
             '_MONTANTES': [],
             '_DIAG': [],
             '_LARGUEROS': [],
-            '_CVH': []
+            '_CVH': [],
+            '_JOISTGRAL': [],
+            '_JPUNTAL': []
         }
         
         self.wind_cols = {
@@ -133,10 +135,17 @@ class StaadModel:
             'interior': []
         }
         
-        self.release_start = []
-        self.release_end = []
+        self.rel_csci_start = []
+        self.rel_csci_end = []
+        self.rel_horiz_start = []
+        self.rel_horiz_end = []
+        self.rel_larg_start = []
+        self.rel_larg_end = []
         self.release_end_fx = []
         self.horizontal_truss_members = []
+        self.split_purlin_first = []
+        self.split_purlin_last = []
+        self.split_purlin_middle = []
         
         self.col_heights = {}
         self.ci_int = []
@@ -294,11 +303,11 @@ class StaadModel:
                     
                     mid = self.add_member(prev, nid, '_CS')
                     if is_first:
-                        self.release_start.append(mid)
+                        self.rel_csci_start.append(mid)
                         is_first = False
                     prev = nid
                 mid2 = self.add_member(prev, nL3[(i, j + 1)], '_CS')
-                self.release_end.append(mid2)
+                self.rel_csci_end.append(mid2)
 
         # --- Cuerda Inferior (Nivel 2) ---
         L0 = self.Lx / self.numSubdiv
@@ -317,13 +326,13 @@ class StaadModel:
                     
                     mid = self.add_member(leftN, nid, '_CI')
                     if t == 1:
-                        self.release_start.append(mid)
+                        self.rel_csci_start.append(mid)
                     else:
                         self.ci_int.append(mid)
                     leftN = nid
 
                 mid2 = self.add_member(leftN, nL2[(i, j + 1)], '_CI')
-                self.release_end.append(mid2)
+                self.rel_csci_end.append(mid2)
 
         # --- Montantes ---
         for i in range(self.nBay + 1):
@@ -387,8 +396,8 @@ class StaadModel:
                             # Strut (Puntal horizontal)
                             mem_strut = self.add_member(nid_roof, nid_new, None)
                             self.horizontal_truss_members.append(mem_strut)
-                            self.release_start.append(mem_strut)
-                            self.release_end.append(mem_strut)
+                            self.rel_horiz_start.append(mem_strut)
+                            self.rel_horiz_end.append(mem_strut)
                             
                         # Connect horizontal truss diagonals
                         # Connect only to main columns (A[0]/A[N]) and wind column nodes (A[k]/B[k] for 1 <= k <= N-1).
@@ -397,17 +406,23 @@ class StaadModel:
                             if p + 1 < N:
                                 diag1 = self.add_member(A[p], B[p+1], None)
                                 self.horizontal_truss_members.append(diag1)
-                                self.release_start.append(diag1)
-                                self.release_end.append(diag1)
+                                self.rel_horiz_start.append(diag1)
+                                self.rel_horiz_end.append(diag1)
                             if p > 0:
                                 diag2 = self.add_member(B[p], A[p+1], None)
                                 self.horizontal_truss_members.append(diag2)
-                                self.release_start.append(diag2)
-                                self.release_end.append(diag2)
+                                self.rel_horiz_start.append(diag2)
+                                self.rel_horiz_end.append(diag2)
                             
                         # Add the perimetric purlin (larguero) segments
                         for p in range(N):
-                            self.add_member(A[p], A[p+1], '_LARGUEROS')
+                            mem_id = self.add_member(A[p], A[p+1], '_LARGUEROS')
+                            if p == 0:
+                                self.split_purlin_first.append(mem_id)
+                            elif p == N - 1:
+                                self.split_purlin_last.append(mem_id)
+                            else:
+                                self.split_purlin_middle.append(mem_id)
                     else:
                         self.add_member(nL3[(i, j)], nL3[(i + 1, j)], '_LARGUEROS')
             
@@ -507,3 +522,38 @@ class StaadModel:
                                 self.wind_cols['Z0_WINDCOL'].append(col_wind)
                             else:
                                 self.wind_cols['ZMAX_WINDCOL'].append(col_wind)
+
+        # Collect all nodes connected to a wind bracing or horizontal truss member
+        puntal_nodes = set()
+        for mem_id in self.groups.get('_CVH', []):
+            n1, n2 = self.members[mem_id]
+            puntal_nodes.add(n1)
+            puntal_nodes.add(n2)
+        for mem_id in self.horizontal_truss_members:
+            n1, n2 = self.members[mem_id]
+            puntal_nodes.add(n1)
+            puntal_nodes.add(n2)
+            
+        # Classify joists and set releases
+        for mem_id in self.groups.get('_LARGUEROS', []):
+            n1, n2 = self.members[mem_id]
+            is_puntal = (n1 in puntal_nodes or n2 in puntal_nodes)
+            
+            # Add to the correct group
+            if is_puntal:
+                self.groups['_JPUNTAL'].append(mem_id)
+            else:
+                self.groups['_JOISTGRAL'].append(mem_id)
+                
+            # Releases logic
+            if mem_id in self.split_purlin_first:
+                self.rel_larg_start.append(mem_id)
+            elif mem_id in self.split_purlin_last:
+                self.rel_larg_end.append(mem_id)
+            elif mem_id in self.split_purlin_middle:
+                # No release
+                pass
+            else:
+                # Not split: release both start and end
+                self.rel_larg_start.append(mem_id)
+                self.rel_larg_end.append(mem_id)

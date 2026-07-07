@@ -65,6 +65,26 @@ def build_lines(blocks, max_len=72, continuation_char=" -"):
         lines.append(current_line)
     return "\n".join(lines)
 
+def parse_upt_to_user_table(file_path, table_number):
+    import os
+    if not os.path.exists(file_path):
+        return ""
+    with open(file_path, "r", encoding="utf-8") as f:
+        lines = f.read().splitlines()
+    out = []
+    out.append(f"TABLE {table_number}")
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if stripped.lower().startswith("unit"):
+            out.append("UNIT CM KG")
+        elif stripped.lower() == "general":
+            out.append("GENERAL")
+        else:
+            out.append(stripped)
+    return "\n".join(out)
+
 def write_staad(model):
     """Generates the STAAD file content from a StaadModel object."""
     date_str = datetime.now().strftime("%d-%b-%y")
@@ -116,6 +136,8 @@ def write_staad(model):
             model.groups.get('_DIAG', [])
         ))),
         '_LARGUEROS': model.groups.get('_LARGUEROS', []),
+        '_JOISTGRAL': model.groups.get('_JOISTGRAL', []),
+        '_JPUNTAL': model.groups.get('_JPUNTAL', []),
         '_ARMADURA': sorted(list(set(
             model.groups.get('_CS', []) + 
             model.groups.get('_CI', []) + 
@@ -123,8 +145,12 @@ def write_staad(model):
             model.groups.get('_DIAG', [])
         ))),
         '_CVH': model.groups.get('_CVH', []),
-        '_REL_START': model.release_start,
-        '_REL_END': model.release_end,
+        '_REL_CSCI_START': model.rel_csci_start,
+        '_REL_CSCI_END': model.rel_csci_end,
+        '_REL_HORIZ_START': model.rel_horiz_start,
+        '_REL_HORIZ_END': model.rel_horiz_end,
+        '_REL_LARG_START': model.rel_larg_start,
+        '_REL_LARG_END': model.rel_larg_end,
         '_REL_END_FX': model.release_end_fx,
         '_CI_INT': model.ci_int
     }
@@ -139,7 +165,27 @@ def write_staad(model):
     # Propiedades (User Tables primero)
     # ------------------
     from templates import USER_TABLES_TEMPLATE, CARGAS_TEMPLATE
-    out.append(USER_TABLES_TEMPLATE.strip())
+    import os
+    user_tables_str = USER_TABLES_TEMPLATE.strip()
+    if "END USER TABLE" in user_tables_str:
+        user_tables_str = user_tables_str.replace("END USER TABLE", "").strip()
+    out.append(user_tables_str)
+    
+    app_dir = os.path.dirname(os.path.abspath(__file__))
+    workspace_dir = os.path.dirname(app_dir)
+    archivos_dir = os.path.join(workspace_dir, "Archivos")
+    
+    joist_gral_path = os.path.join(archivos_dir, "JOISTGRAL.UPT")
+    if not os.path.exists(joist_gral_path):
+        raise FileNotFoundError(f"No se encontro el archivo UPT para Joist General: {joist_gral_path}")
+    out.append(parse_upt_to_user_table(joist_gral_path, 2))
+        
+    joist_puntal_path = os.path.join(archivos_dir, "JPUNTAL.UPT")
+    if not os.path.exists(joist_puntal_path):
+        raise FileNotFoundError(f"No se encontro el archivo UPT para Joist Puntal: {joist_puntal_path}")
+    out.append(parse_upt_to_user_table(joist_puntal_path, 3))
+        
+    out.append("END USER TABLE")
     
     out.append("MEMBER PROPERTY AMERICAN")
     
@@ -155,10 +201,13 @@ def write_staad(model):
     if col_str:
         out.append(build_lines(col_str.split(" ") + ["TABLE", "ST", "HSST14X14X0.313"], 72))
     if colviento_str:
-        out.append(build_lines(colviento_str.split(" ") + ["TABLE", "ST", "W12X19"], 72))
-    if larg_str:
-        out.append("MEMBER PROPERTY SJIJOIST")
-        out.append(build_lines(larg_str.split(" ") + ["TABLE", "ST", "16K5"], 72))
+        out.append(build_lines(colviento_str.split(" ") + ["TABLE", "ST", "W12X26"], 72))
+    joistgral_str = group_ranges(group_map.get('_JOISTGRAL', []))
+    jpuntal_str = group_ranges(group_map.get('_JPUNTAL', []))
+    if joistgral_str:
+        out.append(build_lines(joistgral_str.split(" ") + ["UPT", "2", "JOIST30"], 72))
+    if jpuntal_str:
+        out.append(build_lines(jpuntal_str.split(" ") + ["UPT", "3", "JPUNTAL"], 72))
         
     if cs_str:
         out.append(build_lines(cs_str.split(" ") + ["UPT", "1", "33"], 72))
@@ -206,12 +255,23 @@ def write_staad(model):
     # ------------------
     # Specifications
     # ------------------
-    if model.release_start or model.release_end or model.release_end_fx:
+    if (model.rel_csci_start or model.rel_csci_end or 
+        model.rel_horiz_start or model.rel_horiz_end or 
+        model.rel_larg_start or model.rel_larg_end or 
+        model.release_end_fx):
         out.append("MEMBER RELEASE")
-        if model.release_start:
-            out.append("_REL_START START MY MZ")
-        if model.release_end:
-            out.append("_REL_END END MY MZ")
+        if model.rel_csci_start:
+            out.append("_REL_CSCI_START START MY MZ")
+        if model.rel_csci_end:
+            out.append("_REL_CSCI_END END MY MZ")
+        if model.rel_horiz_start:
+            out.append("_REL_HORIZ_START START MY MZ")
+        if model.rel_horiz_end:
+            out.append("_REL_HORIZ_END END MY MZ")
+        if model.rel_larg_start:
+            out.append("_REL_LARG_START START MY MZ")
+        if model.rel_larg_end:
+            out.append("_REL_LARG_END END MY MZ")
         if model.release_end_fx:
             out.append("_REL_END_FX END FX MY MZ")
             

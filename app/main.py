@@ -135,7 +135,8 @@ st.markdown("""
         padding-right: 2rem !important;
     }
     /* Ocultar footer y header por defecto de Streamlit que generan scroll vacío */
-    header {visibility: hidden !important; display: none !important;}
+    /* Descomentar para ocultar el header (Deploy/Menu) en producción: */
+    /* header {visibility: hidden !important; display: none !important;} */
     footer {visibility: hidden !important; display: none !important;}
     </style>
 """, unsafe_allow_html=True)
@@ -323,7 +324,7 @@ with col2:
         st.markdown("**Ubicación:**")
         
         if 'export_path' not in st.session_state:
-            st.session_state.export_path = os.path.expanduser("~")
+            st.session_state.export_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
             
         parts = os.path.normpath(st.session_state.export_path).split(os.sep)
         if len(parts) >= 2:
@@ -376,12 +377,13 @@ with col2:
         st.subheader("Elementos")
         num_wind_cols = len(model.groups.get('_COLVIENTO', []))
         wind_cols_line = f"&emsp;• Columnas (Viento): {num_wind_cols}<br>" if num_wind_cols > 0 else ""
+        num_purlins = (st.session_state.nspan + 1) * st.session_state.nbay + st.session_state.nspan * (st.session_state.subdiv - 1) * st.session_state.nbay
         st.markdown(f"""
         <div style='line-height: 1.8;'>
             • Columnas: {(st.session_state.nbay + 1) * (st.session_state.nspan + 1)}<br>
             {wind_cols_line}• Armaduras: {(st.session_state.nbay + 1) * st.session_state.nspan}<br>
             • Contravientos: {len(model.groups.get('_CVH', []))}<br>
-            • Largueros: {len(model.groups.get('_LARGUEROS', []))}
+            • Largueros: {num_purlins}
         </div>
         <div style='height: 25px;'></div>
         """, unsafe_allow_html=True)
