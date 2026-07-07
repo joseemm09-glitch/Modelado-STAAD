@@ -65,6 +65,12 @@ st.markdown("""
         min-width: 220px !important;
         max-width: 240px !important;
     }
+    
+    /* Reducir padding superior de la aplicación para aprovechar espacio */
+    div.block-container {
+        padding-top: 2rem !important;
+        padding-bottom: 1rem !important;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -189,12 +195,15 @@ with col1:
 with col2:
     st.subheader("Exportación")
     
+    project_name = st.text_input("Nombre del Proyecto:", value="Modelo")
+    file_name_export = f"{project_name.strip()}.std" if project_name.strip() else "Modelo.std"
+    
     staad_text = write_staad(model)
     
     st.download_button(
         label="Descargar Archivo .std",
         data=staad_text,
-        file_name="Modelo_Nave_Industrial.std",
+        file_name=file_name_export,
         mime="text/plain",
         type="primary"
     )
