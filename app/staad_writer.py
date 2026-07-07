@@ -106,6 +106,7 @@ def write_staad(model):
     # Group names mapping
     group_map = {
         '_COL': model.groups.get('_COL', []),
+        '_COLVIENTO': model.groups.get('_COLVIENTO', []),
         '_CS': model.groups.get('_CS', []),
         '_CI': model.groups.get('_CI', []),
         '_MONTANTES': model.groups.get('_MONTANTES', []),
@@ -124,6 +125,7 @@ def write_staad(model):
         '_CVH': model.groups.get('_CVH', []),
         '_REL_START': model.release_start,
         '_REL_END': model.release_end,
+        '_REL_END_FX': model.release_end_fx,
         '_CI_INT': model.ci_int
     }
     
@@ -142,6 +144,7 @@ def write_staad(model):
     out.append("MEMBER PROPERTY AMERICAN")
     
     col_str = group_ranges(group_map.get('_COL', []))
+    colviento_str = group_ranges(group_map.get('_COLVIENTO', []))
     larg_str = group_ranges(group_map.get('_LARGUEROS', []))
     cs_str = group_ranges(group_map.get('_CS', []))
     ci_str = group_ranges(group_map.get('_CI', []))
@@ -151,6 +154,8 @@ def write_staad(model):
     
     if col_str:
         out.append(build_lines(col_str.split(" ") + ["TABLE", "ST", "HSST14X14X0.313"], 72))
+    if colviento_str:
+        out.append(build_lines(colviento_str.split(" ") + ["TABLE", "ST", "W12X19"], 72))
     if larg_str:
         out.append("MEMBER PROPERTY SJIJOIST")
         out.append(build_lines(larg_str.split(" ") + ["TABLE", "ST", "16K5"], 72))
@@ -159,6 +164,10 @@ def write_staad(model):
         out.append(build_lines(cs_str.split(" ") + ["UPT", "1", "33"], 72))
     if ci_str:
         out.append(build_lines(ci_str.split(" ") + ["UPT", "1", "33"], 72))
+        
+    horiz_truss_str = group_ranges(getattr(model, 'horizontal_truss_members', []))
+    if horiz_truss_str:
+        out.append(build_lines(horiz_truss_str.split(" ") + ["UPT", "1", "33"], 72))
         
     if celosia_str:
         out.append(build_lines(celosia_str.split(" ") + ["UPT", "1", "12"], 72))
@@ -197,12 +206,14 @@ def write_staad(model):
     # ------------------
     # Specifications
     # ------------------
-    if model.release_start or model.release_end:
+    if model.release_start or model.release_end or model.release_end_fx:
         out.append("MEMBER RELEASE")
         if model.release_start:
             out.append("_REL_START START MY MZ")
         if model.release_end:
             out.append("_REL_END END MY MZ")
+        if model.release_end_fx:
+            out.append("_REL_END_FX END FX MY MZ")
             
     if model.groups.get('_CVH', []):
         out.append("MEMBER TENSION")
@@ -212,11 +223,16 @@ def write_staad(model):
     # ------------------
     # Supports
     # ------------------
-    if model.base_nodes:
+    if model.base_nodes or model.wind_base_nodes:
         out.append("SUPPORTS")
-        base_str = group_ranges(model.base_nodes)
-        support_line = f"{base_str} {model.support_type}"
-        out.append(build_lines([support_line], 72))
+        if model.base_nodes:
+            base_str = group_ranges(model.base_nodes)
+            support_line = f"{base_str} {model.support_type}"
+            out.append(build_lines([support_line], 72))
+        if model.wind_base_nodes:
+            w_base_str = group_ranges(model.wind_base_nodes)
+            support_line = f"{w_base_str} PINNED"
+            out.append(build_lines([support_line], 72))
         
     # ------------------
     # Cargas y Combinaciones
@@ -252,54 +268,70 @@ def write_staad(model):
             lines.append(f"******BARLOVENTO: {model.v_barlovento} KG/M2******")
             lines.append(gl(model.wind_cols['X0_CORNER'], 'GX', model.w_barl_x_co, 1))
             lines.append(gl(model.wind_cols['X0_INNER'], 'GX', model.w_barl_x_in, 1))
+            lines.append(gl(model.wind_cols.get('X0_WINDCOL', []), 'GX', model.w_barl_x_in, 1))
             lines.append(f"******SOTAVENTO: {model.v_sotavento} KG/M2******")
             lines.append(gl(model.wind_cols['XMAX_CORNER'], 'GX', model.w_sot_x_co, 1))
             lines.append(gl(model.wind_cols['XMAX_INNER'], 'GX', model.w_sot_x_in, 1))
+            lines.append(gl(model.wind_cols.get('XMAX_WINDCOL', []), 'GX', model.w_sot_x_in, 1))
             lines.append(f"******LATERALES 1: {model.v_laterales} KG/M2******")
             lines.append(gl(model.wind_cols['Z0_CORNER'], 'GZ', model.w_lat_z_co, -1))
             lines.append(gl(model.wind_cols['Z0_INNER'], 'GZ', model.w_lat_z_in, -1))
+            lines.append(gl(model.wind_cols.get('Z0_WINDCOL', []), 'GZ', model.w_lat_z_in, -1))
             lines.append(f"******LATERALES 2: {model.v_laterales} KG/M2******")
             lines.append(gl(model.wind_cols['ZMAX_CORNER'], 'GZ', model.w_lat_z_co, 1))
             lines.append(gl(model.wind_cols['ZMAX_INNER'], 'GZ', model.w_lat_z_in, 1))
+            lines.append(gl(model.wind_cols.get('ZMAX_WINDCOL', []), 'GZ', model.w_lat_z_in, 1))
         elif wind_type == "X-":
             lines.append(f"******BARLOVENTO: {model.v_barlovento} KG/M2******")
             lines.append(gl(model.wind_cols['XMAX_CORNER'], 'GX', model.w_barl_x_co, -1))
             lines.append(gl(model.wind_cols['XMAX_INNER'], 'GX', model.w_barl_x_in, -1))
+            lines.append(gl(model.wind_cols.get('XMAX_WINDCOL', []), 'GX', model.w_barl_x_in, -1))
             lines.append(f"******SOTAVENTO: {model.v_sotavento} KG/M2******")
             lines.append(gl(model.wind_cols['X0_CORNER'], 'GX', model.w_sot_x_co, -1))
             lines.append(gl(model.wind_cols['X0_INNER'], 'GX', model.w_sot_x_in, -1))
+            lines.append(gl(model.wind_cols.get('X0_WINDCOL', []), 'GX', model.w_sot_x_in, -1))
             lines.append(f"******LATERALES 1: {model.v_laterales} KG/M2******")
             lines.append(gl(model.wind_cols['Z0_CORNER'], 'GZ', model.w_lat_z_co, -1))
             lines.append(gl(model.wind_cols['Z0_INNER'], 'GZ', model.w_lat_z_in, -1))
+            lines.append(gl(model.wind_cols.get('Z0_WINDCOL', []), 'GZ', model.w_lat_z_in, -1))
             lines.append(f"******LATERALES 2: {model.v_laterales} KG/M2******")
             lines.append(gl(model.wind_cols['ZMAX_CORNER'], 'GZ', model.w_lat_z_co, 1))
             lines.append(gl(model.wind_cols['ZMAX_INNER'], 'GZ', model.w_lat_z_in, 1))
+            lines.append(gl(model.wind_cols.get('ZMAX_WINDCOL', []), 'GZ', model.w_lat_z_in, 1))
         elif wind_type == "Z+":
             lines.append(f"******BARLOVENTO: {model.v_barlovento} KG/M2******")
             lines.append(gl(model.wind_cols['Z0_CORNER'], 'GZ', model.w_barl_z_co, 1))
             lines.append(gl(model.wind_cols['Z0_INNER'], 'GZ', model.w_barl_z_in, 1))
+            lines.append(gl(model.wind_cols.get('Z0_WINDCOL', []), 'GZ', model.w_barl_z_in, 1))
             lines.append(f"******SOTAVENTO: {model.v_sotavento} KG/M2******")
             lines.append(gl(model.wind_cols['ZMAX_CORNER'], 'GZ', model.w_sot_z_co, 1))
             lines.append(gl(model.wind_cols['ZMAX_INNER'], 'GZ', model.w_sot_z_in, 1))
+            lines.append(gl(model.wind_cols.get('ZMAX_WINDCOL', []), 'GZ', model.w_sot_z_in, 1))
             lines.append(f"******LATERALES 1: {model.v_laterales} KG/M2******")
             lines.append(gl(model.wind_cols['X0_CORNER'], 'GX', model.w_lat_x_co, -1))
             lines.append(gl(model.wind_cols['X0_INNER'], 'GX', model.w_lat_x_in, -1))
+            lines.append(gl(model.wind_cols.get('X0_WINDCOL', []), 'GX', model.w_lat_x_in, -1))
             lines.append(f"******LATERALES 2: {model.v_laterales} KG/M2******")
             lines.append(gl(model.wind_cols['XMAX_CORNER'], 'GX', model.w_lat_x_co, 1))
             lines.append(gl(model.wind_cols['XMAX_INNER'], 'GX', model.w_lat_x_in, 1))
+            lines.append(gl(model.wind_cols.get('XMAX_WINDCOL', []), 'GX', model.w_lat_x_in, 1))
         elif wind_type == "Z-":
             lines.append(f"******BARLOVENTO: {model.v_barlovento} KG/M2******")
             lines.append(gl(model.wind_cols['ZMAX_CORNER'], 'GZ', model.w_barl_z_co, -1))
             lines.append(gl(model.wind_cols['ZMAX_INNER'], 'GZ', model.w_barl_z_in, -1))
+            lines.append(gl(model.wind_cols.get('ZMAX_WINDCOL', []), 'GZ', model.w_barl_z_in, -1))
             lines.append(f"******SOTAVENTO: {model.v_sotavento} KG/M2******")
             lines.append(gl(model.wind_cols['Z0_CORNER'], 'GZ', model.w_sot_z_co, -1))
             lines.append(gl(model.wind_cols['Z0_INNER'], 'GZ', model.w_sot_z_in, -1))
+            lines.append(gl(model.wind_cols.get('Z0_WINDCOL', []), 'GZ', model.w_sot_z_in, -1))
             lines.append(f"******LATERALES 1: {model.v_laterales} KG/M2******")
             lines.append(gl(model.wind_cols['X0_CORNER'], 'GX', model.w_lat_x_co, -1))
             lines.append(gl(model.wind_cols['X0_INNER'], 'GX', model.w_lat_x_in, -1))
+            lines.append(gl(model.wind_cols.get('X0_WINDCOL', []), 'GX', model.w_lat_x_in, -1))
             lines.append(f"******LATERALES 2: {model.v_laterales} KG/M2******")
             lines.append(gl(model.wind_cols['XMAX_CORNER'], 'GX', model.w_lat_x_co, 1))
             lines.append(gl(model.wind_cols['XMAX_INNER'], 'GX', model.w_lat_x_in, 1))
+            lines.append(gl(model.wind_cols.get('XMAX_WINDCOL', []), 'GX', model.w_lat_x_in, 1))
         
         lines.append(f"**** SUCCIÓN : {model.v_succion} KG/M2 *****")
         lines.append(build_lines(["_LARGUEROS", "UNI", "GY", format_num(model.load_succion)], 72))
@@ -316,14 +348,17 @@ def write_staad(model):
     # Función auxiliar para sismo
     def seismic_block(direction, model):
         col_str = group_ranges(model.groups.get('_COL', []))
+        colviento_str = group_ranges(model.groups.get('_COLVIENTO', []))
         lines = []
         
         axis = "X" if "X" in direction else "Z"
         sign = -1 if "-" in direction else 1
         
         # SELFWEIGHT
-        if col_str:
-            lines.append(f"SELFWEIGHT {axis} {format_num(sign * model.seismic_v)} LIST {col_str}")
+        all_cols = model.groups.get('_COL', []) + model.groups.get('_COLVIENTO', [])
+        all_cols_str = group_ranges(all_cols)
+        if all_cols_str:
+            lines.append(f"SELFWEIGHT {axis} {format_num(sign * model.seismic_v)} LIST {all_cols_str}")
             
         lines.append("JOINT LOAD")
         
@@ -379,6 +414,12 @@ def write_staad(model):
                 m_str = group_ranges(members)
                 out.append(build_lines(["LY", str(h_rounded), "MEMB"] + m_str.split(" "), 72))
                 
+    if colviento_str:
+        out.append("** COLUMNAS DE VIENTO **")
+        out.append(build_lines(["FYLD", "3515", "MEMB"] + colviento_str.split(" "), 72))
+        out.append(build_lines(["KY", "1.4", "MEMB"] + colviento_str.split(" "), 72))
+        out.append(build_lines(["KZ", "1.4", "MEMB"] + colviento_str.split(" "), 72))
+
     if armadura_str:
         out.append("** ARMADURAS **")
         out.append(build_lines(["FYLD", "3515", "MEMB"] + armadura_str.split(" "), 72))
@@ -397,6 +438,8 @@ def write_staad(model):
     # Check code for specific groups separately to avoid overly long lines
     if col_str:
         out.append(build_lines(["CHECK", "CODE", "MEMB"] + col_str.split(" "), 72))
+    if colviento_str:
+        out.append(build_lines(["CHECK", "CODE", "MEMB"] + colviento_str.split(" "), 72))
     if armadura_str:
         out.append(build_lines(["CHECK", "CODE", "MEMB"] + armadura_str.split(" "), 72))
     if cv_str:
@@ -404,6 +447,8 @@ def write_staad(model):
     out.append("STEEL TAKE OFF ALL")
     if col_str:
         out.append(build_lines(["STEEL", "TAKE", "OFF", "LIST"] + col_str.split(" "), 72))
+    if colviento_str:
+        out.append(build_lines(["STEEL", "TAKE", "OFF", "LIST"] + colviento_str.split(" "), 72))
     if armadura_str:
         out.append(build_lines(["STEEL", "TAKE", "OFF", "LIST"] + armadura_str.split(" "), 72))
     if cv_str:

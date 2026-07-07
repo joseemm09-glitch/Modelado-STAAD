@@ -2,6 +2,16 @@ import streamlit as st
 import math
 import os
 import subprocess
+import importlib
+
+# Force reload of custom modules to ensure Streamlit hot-reloads them
+import model
+import staad_writer
+import visualizer
+importlib.reload(model)
+importlib.reload(staad_writer)
+importlib.reload(visualizer)
+
 from model import StaadModel
 from staad_writer import write_staad
 from visualizer import plot_model
@@ -142,6 +152,8 @@ defaults = {
     "c_muerta": 30.0, "c_viva": 100.0, "c_granizo": 60.0,
     "v_barlovento": 86.0, "v_sotavento": 50.0, "v_laterales": 78.0, "v_succion": 95.0,
     "coef_sismico": 0.08, "ductilidad": 2.0, "cm_sismo": None, "cv_sismo": None,
+    "add_wind_cols": True,
+    "max_wind_dist": 8.0,
     "current_panel": "Main"
 }
 for k, v in defaults.items():
@@ -219,6 +231,11 @@ with st.sidebar:
             apoyo = st.radio("Tipo de Apoyo", ["Empotrado", "Articulado"], index=0 if st.session_state.support_type == "FIXED" else 1)
             st.session_state.support_type = "FIXED" if apoyo == "Empotrado" else "PINNED"
 
+        with st.expander("Columnas de Viento", expanded=False):
+            st.session_state.add_wind_cols = st.checkbox("Agregar Columnas de Viento", value=st.session_state.add_wind_cols)
+            if st.session_state.add_wind_cols:
+                st.session_state.max_wind_dist = st.number_input("Separación Máxima (m)", min_value=1.0, step=0.1, value=float(st.session_state.max_wind_dist))
+
     elif panel == "Cargas":
         st.button("⬅", type="secondary", on_click=go_panel, args=("Main",))
         st.header("Cargas")
@@ -278,7 +295,9 @@ try:
         st.session_state.coef_sismico,
         st.session_state.ductilidad,
         st.session_state.cm_sismo,
-        st.session_state.cv_sismo
+        st.session_state.cv_sismo,
+        st.session_state.add_wind_cols,
+        st.session_state.max_wind_dist
     )
 except Exception as e:
     st.error(f"Error generando la geometría: {e}")
@@ -355,10 +374,12 @@ with col2:
     with st.container():
         st.markdown("<div class='ios-glass-marker'></div>", unsafe_allow_html=True)
         st.subheader("Elementos")
+        num_wind_cols = len(model.groups.get('_COLVIENTO', []))
+        wind_cols_line = f"&emsp;• Columnas (Viento): {num_wind_cols}<br>" if num_wind_cols > 0 else ""
         st.markdown(f"""
         <div style='line-height: 1.8;'>
             • Columnas: {(st.session_state.nbay + 1) * (st.session_state.nspan + 1)}<br>
-            • Armaduras: {(st.session_state.nbay + 1) * st.session_state.nspan}<br>
+            {wind_cols_line}• Armaduras: {(st.session_state.nbay + 1) * st.session_state.nspan}<br>
             • Contravientos: {len(model.groups.get('_CVH', []))}<br>
             • Largueros: {len(model.groups.get('_LARGUEROS', []))}
         </div>

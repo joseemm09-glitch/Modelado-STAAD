@@ -3,6 +3,7 @@ import plotly.graph_objects as go
 def get_group_color(group_name):
     colors = {
         '_COL': 'dodgerblue',
+        '_COLVIENTO': 'limegreen',
         '_CS': 'red',
         '_CI': 'orange',
         '_MONTANTES': 'green',
@@ -24,9 +25,11 @@ def plot_model(model, show_supports=False):
         for m in mem_list:
             member_to_group[m] = grp_name
 
-    # We can group lines by color to make plotting faster
-    # instead of adding one trace per member.
-    lines_by_color = {}
+    # We group lines by group to draw them in a consistent order in the legend.
+    # We initialize lines for each group to ensure they are added in the correct order.
+    group_order = ['_COL', '_COLVIENTO', '_CS', '_CI', '_MONTANTES', '_DIAG', '_LARGUEROS', '_CVH']
+    lines_by_group = {grp: {'x': [], 'y': [], 'z': [], 'color': get_group_color(grp)} for grp in group_order}
+    lines_by_group['unknown'] = {'x': [], 'y': [], 'z': [], 'color': 'black'}
 
     for mid, (n1, n2) in model.members.items():
         if n1 not in model.nodes or n2 not in model.nodes:
@@ -40,23 +43,34 @@ def plot_model(model, show_supports=False):
         x1, y1, z1 = x1 / 100.0, y1 / 100.0, z1 / 100.0
         
         grp = member_to_group.get(mid, 'unknown')
-        color = get_group_color(grp)
-        
-        if color not in lines_by_color:
-            lines_by_color[color] = {'x': [], 'y': [], 'z': [], 'name': grp}
+        if grp not in lines_by_group:
+            grp = 'unknown'
             
-        lines_by_color[color]['x'].extend([x0, x1, None])
-        lines_by_color[color]['y'].extend([y0, y1, None])
-        lines_by_color[color]['z'].extend([z0, z1, None])
+        lines_by_group[grp]['x'].extend([x0, x1, None])
+        lines_by_group[grp]['y'].extend([y0, y1, None])
+        lines_by_group[grp]['z'].extend([z0, z1, None])
 
-    for color, data in lines_by_color.items():
+    for grp in group_order:
+        data = lines_by_group[grp]
+        if data['x']:
+            fig.add_trace(go.Scatter3d(
+                x=data['x'],
+                y=data['z'], # Plotly Z is up by default in some views, but we'll map Y to Z for better default camera
+                z=data['y'],
+                mode='lines',
+                line=dict(color=data['color'], width=4),
+                name=grp
+            ))
+            
+    if lines_by_group['unknown']['x']:
+        data = lines_by_group['unknown']
         fig.add_trace(go.Scatter3d(
             x=data['x'],
-            y=data['z'], # Plotly Z is up by default in some views, but we'll map Y to Z for better default camera
+            y=data['z'],
             z=data['y'],
             mode='lines',
-            line=dict(color=color, width=4),
-            name=data['name']
+            line=dict(color=data['color'], width=4),
+            name='Otros'
         ))
 
     # Also plot nodes as small dots
@@ -106,6 +120,31 @@ def plot_model(model, show_supports=False):
             showlegend=True
         ))
 
+    # Plot wind column supports (Articulaciones / Triángulos rojo oscuro)
+    if show_supports and getattr(model, 'wind_base_nodes', None):
+        wsup_x, wsup_y, wsup_z = [], [], []
+        w = 1.2
+        h = 1.0
+        for nid in model.wind_base_nodes:
+            nx = model.nodes[nid][0] / 100.0
+            ny = model.nodes[nid][2] / 100.0 # Plotly Y is Model Z
+            nz = model.nodes[nid][1] / 100.0 # Plotly Z is Model Y
+            
+            # Triángulo hueco. W=1.2, H=1.0
+            wsup_x.extend([nx, nx + w/2, nx - w/2, nx, None])
+            wsup_y.extend([ny, ny, ny, ny, None])
+            wsup_z.extend([nz, nz - h, nz - h, nz, None])
+            
+        fig.add_trace(go.Scatter3d(
+            x=wsup_x,
+            y=wsup_y,
+            z=wsup_z,
+            mode='lines',
+            line=dict(color='darkred', width=3),
+            name='Apoyos (Viento)',
+            showlegend=True
+        ))
+
     fig.update_layout(
         scene=dict(
             xaxis_title='X (m)',
@@ -125,7 +164,7 @@ def plot_model(model, show_supports=False):
             xanchor="right",
             x=0.95
         ),
-        height=480
+        height=680
     )
 
     return fig

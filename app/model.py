@@ -1,7 +1,7 @@
 import math
 
 class StaadModel:
-    def __init__(self, Larm_m, Ljoist_m, nBay, nSpan, HArmad_m, HLibre_m, numSubdiv, roof_type="Plana", slope_pct=0.0, support_type="FIXED", c_muerta=30.0, c_viva=100.0, c_granizo=60.0, v_barlovento=86.0, v_sotavento=50.0, v_laterales=78.0, v_succion=95.0, coef_sismico=0.08, ductilidad=2.0, cm_sismo=None, cv_sismo=None):
+    def __init__(self, Larm_m, Ljoist_m, nBay, nSpan, HArmad_m, HLibre_m, numSubdiv, roof_type="Plana", slope_pct=0.0, support_type="FIXED", c_muerta=30.0, c_viva=100.0, c_granizo=60.0, v_barlovento=86.0, v_sotavento=50.0, v_laterales=78.0, v_succion=95.0, coef_sismico=0.08, ductilidad=2.0, cm_sismo=None, cv_sismo=None, add_wind_cols=False, max_wind_dist_m=8.0):
         self.Larm_m = float(Larm_m)
         self.Ljoist_m = float(Ljoist_m)
         self.nBay = int(nBay)
@@ -42,24 +42,39 @@ class StaadModel:
         self.load_succion = (self.v_succion * self.dist_largueros_m) / 100.0
         
         # Anchos tributarios para columnas
-        trib_x = self.Ljoist_m
-        trib_z = self.Larm_m
+        self.add_wind_cols = bool(add_wind_cols)
+        self.max_wind_dist_m = float(max_wind_dist_m)
+        if self.add_wind_cols and self.Ljoist_m > self.max_wind_dist_m:
+            self.wind_col_N = math.ceil(self.Ljoist_m / self.max_wind_dist_m)
+        else:
+            self.wind_col_N = 1
+
+        if self.add_wind_cols and self.Larm_m > self.max_wind_dist_m:
+            self.wind_col_Z_M = math.ceil(self.Larm_m / self.max_wind_dist_m)
+        else:
+            self.wind_col_Z_M = 1
+
+        trib_x_in = self.Ljoist_m / self.wind_col_N
+        trib_x_co = self.Ljoist_m / (2.0 * self.wind_col_N)
+        
+        trib_z_in = self.Larm_m / self.wind_col_Z_M
+        trib_z_co = self.Larm_m / (2.0 * self.wind_col_Z_M)
         
         # Cargas lineales de viento en columnas (kg/cm)
-        self.w_barl_x_in = (self.v_barlovento * trib_x) / 100.0
-        self.w_barl_x_co = (self.v_barlovento * (trib_x / 2.0)) / 100.0
-        self.w_barl_z_in = (self.v_barlovento * trib_z) / 100.0
-        self.w_barl_z_co = (self.v_barlovento * (trib_z / 2.0)) / 100.0
+        self.w_barl_x_in = (self.v_barlovento * trib_x_in) / 100.0
+        self.w_barl_x_co = (self.v_barlovento * trib_x_co) / 100.0
+        self.w_barl_z_in = (self.v_barlovento * trib_z_in) / 100.0
+        self.w_barl_z_co = (self.v_barlovento * trib_z_co) / 100.0
         
-        self.w_sot_x_in = (self.v_sotavento * trib_x) / 100.0
-        self.w_sot_x_co = (self.v_sotavento * (trib_x / 2.0)) / 100.0
-        self.w_sot_z_in = (self.v_sotavento * trib_z) / 100.0
-        self.w_sot_z_co = (self.v_sotavento * (trib_z / 2.0)) / 100.0
+        self.w_sot_x_in = (self.v_sotavento * trib_x_in) / 100.0
+        self.w_sot_x_co = (self.v_sotavento * trib_x_co) / 100.0
+        self.w_sot_z_in = (self.v_sotavento * trib_z_in) / 100.0
+        self.w_sot_z_co = (self.v_sotavento * trib_z_co) / 100.0
         
-        self.w_lat_x_in = (self.v_laterales * trib_x) / 100.0
-        self.w_lat_x_co = (self.v_laterales * (trib_x / 2.0)) / 100.0
-        self.w_lat_z_in = (self.v_laterales * trib_z) / 100.0
-        self.w_lat_z_co = (self.v_laterales * (trib_z / 2.0)) / 100.0
+        self.w_lat_x_in = (self.v_laterales * trib_x_in) / 100.0
+        self.w_lat_x_co = (self.v_laterales * trib_x_co) / 100.0
+        self.w_lat_z_in = (self.v_laterales * trib_z_in) / 100.0
+        self.w_lat_z_co = (self.v_laterales * trib_z_co) / 100.0
         
         # Cargas nodales de Sismo (kg)
         w_sismo = self.cm_sismo + self.cv_sismo
@@ -91,6 +106,7 @@ class StaadModel:
         self.members = {}  # member_id: (node1_id, node2_id)
         self.groups = {
             '_COL': [],
+            '_COLVIENTO': [],
             '_CS': [],
             '_CI': [],
             '_MONTANTES': [],
@@ -101,9 +117,13 @@ class StaadModel:
         
         self.wind_cols = {
             'X0_CORNER': [], 'X0_INNER': [],
+            'X0_WINDCOL': [],
             'XMAX_CORNER': [], 'XMAX_INNER': [],
+            'XMAX_WINDCOL': [],
             'Z0_CORNER': [], 'Z0_INNER': [],
-            'ZMAX_CORNER': [], 'ZMAX_INNER': []
+            'Z0_WINDCOL': [],
+            'ZMAX_CORNER': [], 'ZMAX_INNER': [],
+            'ZMAX_WINDCOL': []
         }
         
         self.seismic_nodes = {
@@ -115,22 +135,28 @@ class StaadModel:
         
         self.release_start = []
         self.release_end = []
+        self.release_end_fx = []
+        self.horizontal_truss_members = []
         
         self.col_heights = {}
         self.ci_int = []
         
         self.base_nodes = [] # Nodos en la base para asignar SUPPORTS FIXED
+        self.wind_base_nodes = []
 
         self.node_id = 0
         self.mem_id = 0
         
         self.generate()
 
-    def add_node(self, x, y, z):
+    def add_node(self, x, y, z, is_wind_base=False):
         self.node_id += 1
         self.nodes[self.node_id] = (x, y, z)
         if y == 0:
-            self.base_nodes.append(self.node_id)
+            if is_wind_base:
+                self.wind_base_nodes.append(self.node_id)
+            else:
+                self.base_nodes.append(self.node_id)
         return self.node_id
 
     def add_member(self, n1, n2, group):
@@ -320,8 +346,70 @@ class StaadModel:
         # --- Largueros ---
         if self.nBay >= 1:
             for j in range(self.nSpan + 1):
+                is_wind_col_axis = (self.add_wind_cols and self.wind_col_N > 1 and (j == 0 or j == self.nSpan))
                 for i in range(self.nBay):
-                    self.add_member(nL3[(i, j)], nL3[(i + 1, j)], '_LARGUEROS')
+                    if is_wind_col_axis:
+                        # Split larguero and create wind columns and horizontal wind trusses
+                        N = self.wind_col_N
+                        
+                        # Initialize nodes arrays for this bay segment
+                        A = [None] * (N + 1)
+                        B = [None] * (N + 1)
+                        
+                        A[0] = nL3[(i, j)]
+                        A[N] = nL3[(i + 1, j)]
+                        
+                        # Generate intermediate wind columns and horizontal truss nodes/struts
+                        for k in range(1, N):
+                            x = j * self.Lx
+                            y = self.HtLibre + self.HtArmad + self.get_y_offset(x)
+                            z = (i + k / N) * self.Lz
+                            
+                            nid_roof = self.add_node(x, y, z)
+                            nid_base = self.add_node(x, 0.0, z, is_wind_base=True)
+                            
+                            col_wind = self.add_member(nid_base, nid_roof, '_COLVIENTO')
+                            
+                            if j == 0:
+                                self.wind_cols['X0_WINDCOL'].append(col_wind)
+                            else:
+                                self.wind_cols['XMAX_WINDCOL'].append(col_wind)
+                                
+                            A[k] = nid_roof
+                            
+                            # Generate horizontal truss node
+                            x_next = L0 if j == 0 else (self.total_width - L0)
+                            y_next = self.HtLibre + self.HtArmad + self.get_y_offset(x_next)
+                            
+                            nid_new = self.add_node(x_next, y_next, z)
+                            B[k] = nid_new
+                            
+                            # Strut (Puntal horizontal)
+                            mem_strut = self.add_member(nid_roof, nid_new, None)
+                            self.horizontal_truss_members.append(mem_strut)
+                            self.release_start.append(mem_strut)
+                            self.release_end.append(mem_strut)
+                            
+                        # Connect horizontal truss diagonals
+                        # Connect only to main columns (A[0]/A[N]) and wind column nodes (A[k]/B[k] for 1 <= k <= N-1).
+                        # Never connect to main truss nodes (B[0]/B[N]).
+                        for p in range(N):
+                            if p + 1 < N:
+                                diag1 = self.add_member(A[p], B[p+1], None)
+                                self.horizontal_truss_members.append(diag1)
+                                self.release_start.append(diag1)
+                                self.release_end.append(diag1)
+                            if p > 0:
+                                diag2 = self.add_member(B[p], A[p+1], None)
+                                self.horizontal_truss_members.append(diag2)
+                                self.release_start.append(diag2)
+                                self.release_end.append(diag2)
+                            
+                        # Add the perimetric purlin (larguero) segments
+                        for p in range(N):
+                            self.add_member(A[p], A[p+1], '_LARGUEROS')
+                    else:
+                        self.add_member(nL3[(i, j)], nL3[(i + 1, j)], '_LARGUEROS')
             
             for j in range(self.nSpan):
                 for k in range(1, self.numSubdiv):
@@ -379,3 +467,43 @@ class StaadModel:
                         
                         self.add_member(n1, n2, '_CVH')
                         self.add_member(n3, n4, '_CVH')
+
+        # --- Columnas de Viento en Cabeceras (Eje Z primero y último) ---
+        if self.add_wind_cols and self.wind_col_Z_M > 1:
+            for i in [0, self.nBay]:
+                for j in range(self.nSpan):
+                    # Existing nodes on Cuerda Inferior in this span j and bay i
+                    ci_nodes_in_span = []
+                    # 1. Start node
+                    ci_nodes_in_span.append((nL2[(i, j)], j * self.Lx))
+                    # 2. Intermediate lowerInter nodes
+                    for t in range(1, halfSub + 1):
+                        oddK = 2 * t - 1
+                        x_coord = j * self.Lx + oddK * L0
+                        if (i, j, t) in lowerInter:
+                            ci_nodes_in_span.append((lowerInter[(i, j, t)], x_coord))
+                    # 3. End node
+                    ci_nodes_in_span.append((nL2[(i, j+1)], (j+1) * self.Lx))
+                    
+                    # For each wind column position
+                    for k in range(1, self.wind_col_Z_M):
+                        x_wind = j * self.Lx + k * (self.Lx / self.wind_col_Z_M)
+                        
+                        # Find the closest existing node on the Cuerda Inferior
+                        closest_node, x_node = min(ci_nodes_in_span, key=lambda node_info: abs(node_info[1] - x_wind))
+                        
+                        # Only add wind column if the closest node is not a main column (i.e. not at j*Lx or (j+1)*Lx)
+                        if closest_node not in [nL2[(i, j)], nL2[(i, j+1)]]:
+                            # Create base node at ground level (y=0) at x_node
+                            nid_base = self.add_node(x_node, 0.0, i * self.Lz, is_wind_base=True)
+                            
+                            col_wind = self.add_member(nid_base, closest_node, '_COLVIENTO')
+                            
+                            # Release at the top: MY, MZ, FX
+                            self.release_end_fx.append(col_wind)
+                            
+                            # Classify for wind loading
+                            if i == 0:
+                                self.wind_cols['Z0_WINDCOL'].append(col_wind)
+                            else:
+                                self.wind_cols['ZMAX_WINDCOL'].append(col_wind)
