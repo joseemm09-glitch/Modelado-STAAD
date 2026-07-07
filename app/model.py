@@ -1,7 +1,9 @@
 import math
 
+import math
+
 class StaadModel:
-    def __init__(self, Larm_m, Ljoist_m, nBay, nSpan, HArmad_m, HLibre_m, numSubdiv, roof_type="Plana", slope_pct=0.0, support_type="FIXED", c_muerta=30.0, c_viva=100.0, c_granizo=60.0, v_barlovento=86.0, v_sotavento=50.0, v_laterales=78.0, v_succion=95.0):
+    def __init__(self, Larm_m, Ljoist_m, nBay, nSpan, HArmad_m, HLibre_m, numSubdiv, roof_type="Plana", slope_pct=0.0, support_type="FIXED", c_muerta=30.0, c_viva=100.0, c_granizo=60.0, v_barlovento=86.0, v_sotavento=50.0, v_laterales=78.0, v_succion=95.0, coef_sismico=0.08, ductilidad=2.0, cm_sismo=None, cv_sismo=None):
         self.Larm_m = float(Larm_m)
         self.Ljoist_m = float(Ljoist_m)
         self.nBay = int(nBay)
@@ -23,6 +25,14 @@ class StaadModel:
         self.v_sotavento = float(v_sotavento)
         self.v_laterales = float(v_laterales)
         self.v_succion = float(v_succion)
+        
+        # Sismo
+        self.coef_sismico = float(coef_sismico)
+        self.ductilidad = float(ductilidad)
+        self.cm_sismo = float(cm_sismo) if cm_sismo is not None else self.c_muerta
+        self.cv_sismo = float(cv_sismo) if cv_sismo is not None else (self.c_viva * 0.25)
+        
+        self.seismic_v = self.coef_sismico / self.ductilidad
         
         # Cálculo de Cargas Lineales gravitacionales (kg/cm) para los largueros
         self.dist_largueros_m = self.Larm_m / self.numSubdiv
@@ -53,6 +63,21 @@ class StaadModel:
         self.w_lat_z_in = (self.v_laterales * trib_z) / 100.0
         self.w_lat_z_co = (self.v_laterales * (trib_z / 2.0)) / 100.0
         
+        # Cargas nodales de Sismo (kg)
+        w_sismo = self.cm_sismo + self.cv_sismo
+        w_total = self.cm_sismo + self.cv_sismo
+        a_corner = (self.Larm_m / 2.0) * (self.Ljoist_m / 2.0)
+        a_edge_x = self.Larm_m * (self.Ljoist_m / 2.0)
+        a_edge_z = (self.Larm_m / 2.0) * self.Ljoist_m
+        a_interior = self.Larm_m * self.Ljoist_m
+        
+        self.seismic_loads = {
+            'corner': math.ceil((a_corner * w_total * self.seismic_v) * 10) / 10.0,
+            'edge_x': math.ceil((a_edge_x * w_total * self.seismic_v) * 10) / 10.0,
+            'edge_z': math.ceil((a_edge_z * w_total * self.seismic_v) * 10) / 10.0,
+            'interior': math.ceil((a_interior * w_total * self.seismic_v) * 10) / 10.0
+        }
+        
         if self.numSubdiv < 2 or self.numSubdiv % 2 != 0:
             raise ValueError("Las subdivisiones deben ser un número par mayor o igual a 2.")
 
@@ -82,6 +107,20 @@ class StaadModel:
             'Z0_CORNER': [], 'Z0_INNER': [],
             'ZMAX_CORNER': [], 'ZMAX_INNER': []
         }
+        
+        self.seismic_nodes = {
+            'corner': [],
+            'edge_x': [],
+            'edge_z': [],
+            'interior': []
+        }
+        
+        self.release_start = []
+        self.release_end = []
+        
+        self.col_heights = {}
+        self.ci_int = []
+        
         self.base_nodes = [] # Nodos en la base para asignar SUPPORTS FIXED
 
         self.node_id = 0
@@ -153,11 +192,19 @@ class StaadModel:
                 z = i * self.Lz
                 nL3[(i, j)] = self.add_node(x, y, z)
 
-        # --- Members: Columnas ---
+        # --- Columnas (Niveles 1 -> 2 y 2 -> 3) ---
         for j in range(self.nSpan + 1):
             for i in range(self.nBay + 1):
                 col1 = self.add_member(nL1[(i, j)], nL2[(i, j)], '_COL')
                 col2 = self.add_member(nL2[(i, j)], nL3[(i, j)], '_COL')
+                
+                # Height calculation
+                x = j * self.Lx
+                total_h = self.HtLibre + self.HtArmad + self.get_y_offset(x)
+                h_rounded = math.ceil(total_h)
+                if h_rounded not in self.col_heights:
+                    self.col_heights[h_rounded] = []
+                self.col_heights[h_rounded].extend([col1, col2])
                 
                 # Face X0
                 if j == 0:
@@ -186,11 +233,34 @@ class StaadModel:
                         self.wind_cols['ZMAX_CORNER'].extend([col1, col2])
                     else:
                         self.wind_cols['ZMAX_INNER'].extend([col1, col2])
+                
+                # Clasificación para Sismo en nodos superiores (Nivel 3)
+                top_node = nL3[(i, j)]
+                is_x_edge = (j == 0 or j == self.nSpan)
+                is_z_edge = (i == 0 or i == self.nBay)
+                
+                if is_x_edge and is_z_edge:
+                    self.seismic_nodes['corner'].append(top_node)
+                elif is_x_edge and not is_z_edge:
+                    self.seismic_nodes['edge_z'].append(top_node) # Borde en X (j=0, j=nSpan), varía i (dirección Z) -> Su área tributaria se reduce en Z, oh wait.
+                    # Corrección: si estamos en el borde X (j=0 o j=nSpan), el ancho en X es Larm_m/2. 
+                    # Entonces corresponde a edge_z (donde usamos Larm_m/2 * Ljoist_m). 
+                    # El nombre edge_z aquí significa que el área tributaria se basa en el perímetro en Z. 
+                    # Vamos a llamarlo correctamente según la fórmula:
+                    # Si is_x_edge, estamos en j=0 o j=nSpan. Aquí el ancho tributario en X es (self.Lx / scale / 2) = Larm_m/2. 
+                    # En Z es completo = Ljoist_m.
+                    # a_edge_z era (self.Larm_m / 2.0) * self.Ljoist_m. Esto coincide.
+                elif is_z_edge and not is_x_edge:
+                    self.seismic_nodes['edge_x'].append(top_node) # Borde en Z (i=0, i=nBay).
+                else:
+                    self.seismic_nodes['interior'].append(top_node)
+
 
         # --- Cuerda Superior (Nivel 3) e intermedios ---
         for i in range(self.nBay + 1):
             for j in range(self.nSpan):
                 prev = nL3[(i, j)]
+                is_first = True
                 for k in range(1, self.numSubdiv):
                     xn = j * self.Lx + k * (self.Lx / self.numSubdiv)
                     yn = self.HtLibre + self.HtArmad + self.get_y_offset(xn)
@@ -198,9 +268,13 @@ class StaadModel:
                     nid = self.add_node(xn, yn, zn)
                     upperSub[(i, j, k)] = nid
                     
-                    self.add_member(prev, nid, '_CS')
+                    mid = self.add_member(prev, nid, '_CS')
+                    if is_first:
+                        self.release_start.append(mid)
+                        is_first = False
                     prev = nid
-                self.add_member(prev, nL3[(i, j + 1)], '_CS')
+                mid2 = self.add_member(prev, nL3[(i, j + 1)], '_CS')
+                self.release_end.append(mid2)
 
         # --- Cuerda Inferior (Nivel 2) ---
         L0 = self.Lx / self.numSubdiv
@@ -217,10 +291,15 @@ class StaadModel:
                     nid = self.add_node(x, yn, z2)
                     lowerInter[(i, j, t)] = nid
                     
-                    self.add_member(leftN, nid, '_CI')
+                    mid = self.add_member(leftN, nid, '_CI')
+                    if t == 1:
+                        self.release_start.append(mid)
+                    else:
+                        self.ci_int.append(mid)
                     leftN = nid
 
-                self.add_member(leftN, nL2[(i, j + 1)], '_CI')
+                mid2 = self.add_member(leftN, nL2[(i, j + 1)], '_CI')
+                self.release_end.append(mid2)
 
         # --- Montantes ---
         for i in range(self.nBay + 1):

@@ -12,22 +12,31 @@ st.set_page_config(page_title="Generador STAAD", layout="wide")
 # CSS para botones
 st.markdown("""
     <style>
-    /* Botones principales (Navy Blue) */
+    /* Botones principales (Ingeniería Clásica - Azul Acero/Marino) */
     section[data-testid="stSidebar"] button[kind="primary"] {
-        background-color: navy !important;
+        background: linear-gradient(180deg, #2A4B7C 0%, #1A365D 100%) !important;
         color: white !important;
-        font-weight: bold !important;
-        border-radius: 10px !important;
+        font-weight: 600 !important;
+        letter-spacing: 0.5px !important;
+        border-radius: 6px !important;
         width: 200% !important;
         margin: 0 auto !important;
         display: block !important;
-        border: none !important;
+        border: 1px solid #142A4A !important;
         text-align: center !important;
         justify-content: center !important;
+        box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.2) !important;
+        transition: all 0.2s ease-in-out !important;
     }
     section[data-testid="stSidebar"] button[kind="primary"]:hover {
-        background-color: #1a1a99 !important;
-        opacity: 0.9 !important;
+        background: linear-gradient(180deg, #325A92 0%, #214371 100%) !important;
+        box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.3) !important;
+        transform: translateY(-1px) !important;
+        border: 1px solid #1A365D !important;
+    }
+    section[data-testid="stSidebar"] button[kind="primary"]:active {
+        transform: translateY(1px) !important;
+        box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.2) !important;
     }
     
     /* Botón de retroceso (Flecha gris) */
@@ -46,18 +55,26 @@ st.markdown("""
         background-color: transparent !important;
     }
 
-    /* Botón de Exportar (Rojo oscuro STAAD) */
+    /* Botón de Guardar/Acciones en Panel Derecho (Rojo Premium STAAD) */
     div[data-testid="stMainBlockContainer"] button[kind="primary"] {
-        background-color: darkred !important;
-        border-color: darkred !important;
+        background: linear-gradient(180deg, #991B1B 0%, #7F1D1D 100%) !important;
+        border: 1px solid #7F1D1D !important;
         color: white !important;
-        font-weight: bold !important;
-        border-radius: 10px !important;
+        font-weight: 600 !important;
+        border-radius: 6px !important;
+        box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.2) !important;
+        transition: all 0.2s ease-in-out !important;
+        letter-spacing: 0.5px !important;
     }
     div[data-testid="stMainBlockContainer"] button[kind="primary"]:hover {
-        background-color: firebrick !important;
-        border-color: firebrick !important;
-        opacity: 0.9 !important;
+        background: linear-gradient(180deg, #DC2626 0%, #B91C1C 100%) !important;
+        box-shadow: 0px 5px 10px rgba(220, 38, 38, 0.25) !important;
+        transform: translateY(-2px) !important;
+        border: 1px solid #B91C1C !important;
+    }
+    div[data-testid="stMainBlockContainer"] button[kind="primary"]:active {
+        transform: translateY(1px) !important;
+        box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.2) !important;
     }
     
     /* Reducir ancho de la barra lateral */
@@ -85,6 +102,7 @@ defaults = {
     "roof_type": "2 Aguas", "slope_pct": 3.0, "support_type": "FIXED",
     "c_muerta": 30.0, "c_viva": 100.0, "c_granizo": 60.0,
     "v_barlovento": 86.0, "v_sotavento": 50.0, "v_laterales": 78.0, "v_succion": 95.0,
+    "coef_sismico": 0.08, "ductilidad": 2.0, "cm_sismo": None, "cv_sismo": None,
     "current_panel": "Main"
 }
 for k, v in defaults.items():
@@ -114,9 +132,8 @@ with st.sidebar:
         st.markdown("<br><br>", unsafe_allow_html=True)
         st.markdown("<h2 style='text-align: center;'>Menú Principal</h2>", unsafe_allow_html=True)
         st.button("Geometría", type="primary", on_click=go_panel, args=("Geometría",))
-        st.button("Pendiente", type="primary", on_click=go_panel, args=("Pendiente",))
-        st.button("Apoyos", type="primary", on_click=go_panel, args=("Apoyos",))
         st.button("Cargas", type="primary", on_click=go_panel, args=("Cargas",))
+        st.button("Diseño", type="primary", on_click=go_panel, args=("Diseño",))
         
     elif panel == "Geometría":
         st.button("⬅", type="secondary", on_click=go_panel, args=("Main",))
@@ -138,17 +155,15 @@ with st.sidebar:
         st.number_input("Altura Libre (m)", min_value=1.0, step=0.1, value=st.session_state.hlib, key="_hlib", on_change=update_val, args=("hlib",))
         st.number_input("Subdivisiones (Debe ser par)", min_value=2, step=2, value=st.session_state.subdiv, key="_subdiv", on_change=update_val, args=("subdiv",))
 
-    elif panel == "Pendiente":
-        st.button("⬅", type="secondary", on_click=go_panel, args=("Main",))
-        st.header("Cubierta")
+        st.markdown("<hr style='border: none; border-top: 1px solid #d3d3d3; margin: 15px 0;'>", unsafe_allow_html=True)
+        st.subheader("Cubierta")
         rt = st.radio("Tipo de Cubierta", ["1 Agua", "2 Aguas"], index=["1 Agua", "2 Aguas"].index(st.session_state.roof_type) if st.session_state.roof_type in ["1 Agua", "2 Aguas"] else 1)
         st.session_state.roof_type = rt
         sp = st.number_input("Pendiente (%)", min_value=0.0, step=0.5, value=st.session_state.slope_pct)
         st.session_state.slope_pct = sp
 
-    elif panel == "Apoyos":
-        st.button("⬅", type="secondary", on_click=go_panel, args=("Main",))
-        st.header("Apoyos Base")
+        st.markdown("<hr style='border: none; border-top: 1px solid #d3d3d3; margin: 15px 0;'>", unsafe_allow_html=True)
+        st.subheader("Apoyos Base")
         apoyo = st.radio("Tipo de Apoyo", ["Empotrado", "Articulado"], index=0 if st.session_state.support_type == "FIXED" else 1)
         st.session_state.support_type = "FIXED" if apoyo == "Empotrado" else "PINNED"
 
@@ -160,11 +175,28 @@ with st.sidebar:
         st.session_state.c_viva = st.number_input("Carga Viva (kg/m²)", min_value=0.0, step=5.0, value=st.session_state.c_viva)
         st.session_state.c_granizo = st.number_input("Granizo (kg/m²)", min_value=0.0, step=5.0, value=st.session_state.c_granizo)
         
+        st.markdown("<hr style='border: none; border-top: 1px solid #d3d3d3; margin: 5px 0;'>", unsafe_allow_html=True)
         st.subheader("Viento")
         st.session_state.v_barlovento = st.number_input("Barlovento (kg/m²)", min_value=0.0, step=1.0, value=st.session_state.v_barlovento)
         st.session_state.v_sotavento = st.number_input("Sotavento (kg/m²)", min_value=0.0, step=1.0, value=st.session_state.v_sotavento)
         st.session_state.v_laterales = st.number_input("Laterales (kg/m²)", min_value=0.0, step=1.0, value=st.session_state.v_laterales)
         st.session_state.v_succion = st.number_input("Succión (kg/m²)", min_value=0.0, step=1.0, value=st.session_state.v_succion)
+
+        st.markdown("<hr style='border: none; border-top: 1px solid #d3d3d3; margin: 5px 0;'>", unsafe_allow_html=True)
+        st.subheader("Sismo")
+        st.session_state.coef_sismico = st.number_input("Coeficiente Sísmico", min_value=0.0, step=0.01, value=st.session_state.coef_sismico)
+        st.session_state.ductilidad = st.number_input("Ductilidad", min_value=1.0, step=0.5, value=st.session_state.ductilidad)
+        
+        default_cm_sismo = st.session_state.cm_sismo if st.session_state.cm_sismo is not None else st.session_state.c_muerta
+        default_cv_sismo = st.session_state.cv_sismo if st.session_state.cv_sismo is not None else st.session_state.c_viva * 0.25
+        
+        st.session_state.cm_sismo = st.number_input("Carga Muerta para Sismo (kg/m²)", min_value=0.0, step=5.0, value=default_cm_sismo)
+        st.session_state.cv_sismo = st.number_input("Carga Viva para Sismo (kg/m²)", min_value=0.0, step=5.0, value=default_cv_sismo)
+
+    elif panel == "Diseño":
+        st.button("⬅", type="secondary", on_click=go_panel, args=("Main",))
+        st.header("Diseño")
+        st.info("Opciones de diseño en construcción...")
 
 # Ensure even subdivisions
 if st.session_state.subdiv % 2 != 0:
@@ -190,7 +222,11 @@ try:
         st.session_state.v_barlovento,
         st.session_state.v_sotavento,
         st.session_state.v_laterales,
-        st.session_state.v_succion
+        st.session_state.v_succion,
+        st.session_state.coef_sismico,
+        st.session_state.ductilidad,
+        st.session_state.cm_sismo,
+        st.session_state.cv_sismo
     )
 except Exception as e:
     st.error(f"Error generando la geometría: {e}")
@@ -200,7 +236,7 @@ col1, col2 = st.columns([3, 1])
 
 with col1:
     st.subheader("Vista 3D")
-    show_sup = (st.session_state.current_panel == "Apoyos")
+    show_sup = (st.session_state.current_panel == "Geometría")
     fig = plot_model(model, show_supports=show_sup)
     st.plotly_chart(fig, use_container_width=True)
 
@@ -210,20 +246,64 @@ with col2:
     project_name = st.text_input("Nombre del Proyecto:", value="Modelo")
     file_name_export = f"{project_name.strip()}.std" if project_name.strip() else "Modelo.std"
     
+    st.markdown("**Ubicación:**")
+    
+    if 'export_path' not in st.session_state:
+        import os
+        st.session_state.export_path = os.path.expanduser("~")
+        
+    import os
+    parts = os.path.normpath(st.session_state.export_path).split(os.sep)
+    if len(parts) >= 2:
+        display_text = os.path.join(parts[-2], parts[-1])
+    else:
+        display_text = st.session_state.export_path
+        
+    path_col, btn_col = st.columns([3, 1])
+    with path_col:
+        st.code(display_text, language="")
+    with btn_col:
+        if st.button("📁", help="Examinar..."):
+            import tkinter as tk
+            from tkinter import filedialog
+            root = tk.Tk()
+            root.withdraw()
+            root.attributes('-topmost', True)
+            folder_selected = filedialog.askdirectory(master=root, title="Seleccionar Carpeta de Exportación", initialdir=st.session_state.export_path)
+            root.destroy()
+            if folder_selected:
+                st.session_state.export_path = folder_selected
+                st.rerun()
+                
     staad_text = write_staad(model)
     
-    st.download_button(
-        label="Descargar Archivo .std",
-        data=staad_text,
-        file_name=file_name_export,
-        mime="text/plain",
-        type="primary"
-    )
+    if st.button("Guardar Archivo .std", type="primary"):
+        import os
+        # Limpiar el nombre del archivo para evitar caracteres inválidos
+        clean_name = "".join(c for c in file_name_export if c.isalnum() or c in " ._-").strip()
+        if not clean_name.endswith(".std"):
+            clean_name += ".std"
+            
+        full_path = os.path.join(st.session_state.export_path, clean_name)
+        try:
+            with open(full_path, "w", encoding="utf-8") as f:
+                f.write(staad_text)
+            st.success(f"Guardado exitosamente en:\n{full_path}")
+            
+            # Abrir archivo automáticamente (en Windows usa la app predeterminada para .std)
+            if os.name == 'nt':
+                os.startfile(full_path)
+            else:
+                import subprocess
+                subprocess.call(('open', full_path))
+                
+        except Exception as e:
+            st.error(f"Error al guardar o abrir en '{full_path}': {e}")
     
     st.markdown("---")
     st.markdown("**Resumen de Elementos:**")
-    st.write(f"- Nodos: {model.node_id}")
-    st.write(f"- Miembros: {model.mem_id}")
-    for k, v in model.groups.items():
-        if v:
-            st.write(f"  - {k}: {len(v)}")
+    st.write(f"- Columnas: {(st.session_state.nbay + 1) * (st.session_state.nspan + 1)}")
+    st.write(f"- Armaduras: {(st.session_state.nbay + 1) * st.session_state.nspan}")
+    st.write(f"- Contravientos: {len(model.groups.get('_CVH', []))}")
+    st.write(f"- Largueros: {len(model.groups.get('_LARGUEROS', []))}")
+

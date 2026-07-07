@@ -38,21 +38,30 @@ def group_ranges(numbers):
         
     return " ".join(ranges)
 
-def build_lines(blocks, max_len=79):
+def build_lines(blocks, max_len=72, continuation_char=" -"):
     """
     Groups string blocks into lines, ensuring no line exceeds max_len.
     A block will not be broken across lines.
+    If a line wraps, the continuation_char is appended.
     """
     lines = []
     current_line = ""
-    for block in blocks:
+    for i, block in enumerate(blocks):
         if not current_line:
             current_line = block
-        elif len(current_line) + 1 + len(block) <= max_len:
+            continue
+            
+        # If this is the last block, it won't be followed by a continuation,
+        # otherwise we must reserve space for the continuation character.
+        is_last = (i == len(blocks) - 1)
+        allowed_len = max_len if is_last else (max_len - len(continuation_char))
+        
+        if len(current_line) + 1 + len(block) <= allowed_len:
             current_line += " " + block
         else:
-            lines.append(current_line)
+            lines.append(current_line + continuation_char)
             current_line = block
+            
     if current_line:
         lines.append(current_line)
     return "\n".join(lines)
@@ -77,7 +86,7 @@ def write_staad(model):
     for nid, (x, y, z) in model.nodes.items():
         nodes_blocks.append(f"{nid} {format_num(x)} {format_num(y)} {format_num(z)};")
     
-    out.append(build_lines(nodes_blocks, 79))
+    out.append(build_lines(nodes_blocks, 72, continuation_char=""))
     
     # ------------------
     # MEMBER INCIDENCES
@@ -87,7 +96,7 @@ def write_staad(model):
     for mid, (n1, n2) in model.members.items():
         members_blocks.append(f"{mid} {n1} {n2};")
     
-    out.append(build_lines(members_blocks, 79))
+    out.append(build_lines(members_blocks, 72, continuation_char=""))
     
     # ------------------
     # Groups
@@ -113,15 +122,17 @@ def write_staad(model):
             model.groups.get('_MONTANTES', []) + 
             model.groups.get('_DIAG', [])
         ))),
-        '_CVH': model.groups.get('_CVH', [])
+        '_CVH': model.groups.get('_CVH', []),
+        '_REL_START': model.release_start,
+        '_REL_END': model.release_end,
+        '_CI_INT': model.ci_int
     }
     
     for name, members in group_map.items():
         if members:
             range_str = group_ranges(members)
             if range_str:
-                line = f"{name} {range_str}"
-                out.append(build_lines([line], 79))
+                out.append(build_lines([name] + range_str.split(" "), 72))
                 
     # ------------------
     # Propiedades (User Tables primero)
@@ -140,22 +151,22 @@ def write_staad(model):
     cv_str = group_ranges(group_map.get('_CVH', []))
     
     if col_str:
-        out.append(build_lines(col_str.split(" ") + ["TABLE", "ST", "HSST14X14X0.313"], 79))
+        out.append(build_lines(col_str.split(" ") + ["TABLE", "ST", "HSST14X14X0.313"], 72))
     if larg_str:
         out.append("MEMBER PROPERTY SJIJOIST")
-        out.append(build_lines(larg_str.split(" ") + ["TABLE", "ST", "16K5"], 79))
+        out.append(build_lines(larg_str.split(" ") + ["TABLE", "ST", "16K5"], 72))
         
     if cs_str:
-        out.append(build_lines(cs_str.split(" ") + ["UPT", "1", "33"], 79))
+        out.append(build_lines(cs_str.split(" ") + ["UPT", "1", "33"], 72))
     if ci_str:
-        out.append(build_lines(ci_str.split(" ") + ["UPT", "1", "33"], 79))
+        out.append(build_lines(ci_str.split(" ") + ["UPT", "1", "33"], 72))
         
     if celosia_str:
-        out.append(build_lines(celosia_str.split(" ") + ["UPT", "1", "12"], 79))
+        out.append(build_lines(celosia_str.split(" ") + ["UPT", "1", "12"], 72))
         
     if cv_str:
         out.append("MEMBER PROPERTY AMERICAN")
-        out.append(build_lines(cv_str.split(" ") + ["TABLE", "ST", "PIPE", "OD", "1.905", "ID", "0"], 79))
+        out.append(build_lines(cv_str.split(" ") + ["TABLE", "ST", "PIPE", "OD", "1.905", "ID", "0"], 72))
         
     # ------------------
     # Material Constants
@@ -185,13 +196,28 @@ def write_staad(model):
     out.append("MATERIAL STEEL ALL")
     
     # ------------------
+    # Specifications
+    # ------------------
+    if model.release_start or model.release_end:
+        out.append("MEMBER RELEASE")
+        if model.release_start:
+            out.append("_REL_START START MY MZ")
+        if model.release_end:
+            out.append("_REL_END END MY MZ")
+            
+    if model.groups.get('_CVH', []):
+        out.append("MEMBER TENSION")
+        out.append("_CVH")
+
+        
+    # ------------------
     # Supports
     # ------------------
     if model.base_nodes:
         out.append("SUPPORTS")
         base_str = group_ranges(model.base_nodes)
         support_line = f"{base_str} {model.support_type}"
-        out.append(build_lines([support_line], 79))
+        out.append(build_lines([support_line], 72))
         
     # ------------------
     # Cargas y Combinaciones
@@ -220,7 +246,7 @@ def write_staad(model):
             rng = group_ranges(members)
             if not rng: return ""
             tokens = rng.split(" ") + ["UNI", d_str, format_num(val * mult)]
-            return build_lines(tokens, 79)
+            return build_lines(tokens, 72)
             
         lines = []
         if wind_type == "X+":
@@ -277,7 +303,7 @@ def write_staad(model):
             lines.append(gl(model.wind_cols['XMAX_INNER'], 'GX', model.w_lat_x_in, 1))
         
         lines.append(f"**** SUCCIÓN : {model.v_succion} KG/M2 *****")
-        lines.append(build_lines(["_LARGUEROS", "UNI", "GY", format_num(model.load_succion)], 79))
+        lines.append(build_lines(["_LARGUEROS", "UNI", "GY", format_num(model.load_succion)], 72))
         
         return "\n".join([x for x in lines if x])
         
@@ -288,41 +314,102 @@ def write_staad(model):
     cargas_text = cargas_text.replace(f"LOAD 9 LOADTYPE None  TITLE VIENTO Z+\nMEMBER LOAD\n{old_wind_block}", f"LOAD 9 LOADTYPE None  TITLE VIENTO Z+\nMEMBER LOAD\n{wind_block('Z+', model)}")
     cargas_text = cargas_text.replace(f"LOAD 10 LOADTYPE None  TITLE VIENTO Z-\nMEMBER LOAD\n{old_wind_block}", f"LOAD 10 LOADTYPE None  TITLE VIENTO Z-\nMEMBER LOAD\n{wind_block('Z-', model)}")
 
-    
+    # Función auxiliar para sismo
+    def seismic_block(direction, model):
+        col_str = group_ranges(model.groups.get('_COL', []))
+        lines = []
+        
+        axis = "X" if "X" in direction else "Z"
+        sign = -1 if "-" in direction else 1
+        
+        # SELFWEIGHT
+        if col_str:
+            lines.append(f"SELFWEIGHT {axis} {format_num(sign * model.seismic_v)} LIST {col_str}")
+            
+        lines.append("JOINT LOAD")
+        
+        def joint_load(nodes, load_val):
+            rng = group_ranges(nodes)
+            if not rng: return ""
+            tokens = rng.split(" ") + [f"F{axis}", format_num(sign * load_val)]
+            return build_lines(tokens, 72)
+            
+        lines.append(joint_load(model.seismic_nodes['corner'], model.seismic_loads['corner']))
+        lines.append(joint_load(model.seismic_nodes['edge_x'], model.seismic_loads['edge_x']))
+        lines.append(joint_load(model.seismic_nodes['edge_z'], model.seismic_loads['edge_z']))
+        lines.append(joint_load(model.seismic_nodes['interior'], model.seismic_loads['interior']))
+        
+        return "\n".join([x for x in lines if x])
+        
+    cargas_text = cargas_text.replace("**** SISMO X+ BLOCK ****", seismic_block('X+', model))
+    cargas_text = cargas_text.replace("**** SISMO X- BLOCK ****", seismic_block('X-', model))
+    cargas_text = cargas_text.replace("**** SISMO Z+ BLOCK ****", seismic_block('Z+', model))
+    cargas_text = cargas_text.replace("**** SISMO Z- BLOCK ****", seismic_block('Z-', model))
+     
     # Cambiar el tipo de carga sismica a Seismic-H según petición
     cargas_text = cargas_text.replace("LOADTYPE Seismic", "LOADTYPE Seismic-H")
     
-    # Parámetros de Diseño Análisis 1
-    fyld_celosia = build_lines(["FYLD", "3515", "MEMB"] + celosia_str.split(" "), 79)
-    select_celosia = build_lines(["SELECT", "MEMB"] + celosia_str.split(" "), 79)
-    
-    cargas_text = cargas_text.replace("FYLD 3520 MEMB 1", fyld_celosia)
-    cargas_text = cargas_text.replace("SELECT MEMB 1", select_celosia)
-    
-    # Parámetros de Diseño Análisis 2
-    # El archivo termina en "CODE AISC", así que lo anexamos al final
-    cargas_text = cargas_text.strip()
-    if cargas_text.endswith("CODE AISC"):
-        fyld_cols = build_lines(["FYLD", "3200", "MEMB"] + col_str.split(" "), 79)
-        fyld_arm = build_lines(["FYLD", "3515", "MEMB"] + armadura_str.split(" "), 79)
-        cargas_text += f"\n{fyld_cols}\n{fyld_arm}\n"
-        
-        if cv_str:
-            tmain_cv = build_lines(["TMAIN", "10000", "MEMB"] + cv_str.split(" "), 79)
-            main_cv = build_lines(["MAIN", "10000", "MEMB"] + cv_str.split(" "), 79)
-            fyld_cv = build_lines(["FYLD", "2530", "MEMB"] + cv_str.split(" "), 79)
-            cargas_text += f"{tmain_cv}\n{main_cv}\n{fyld_cv}\n"
-            
-        # Build check code commands to avoid >79 chars
-        cc_cols = build_lines(["CHECK", "CODE", "MEMB"] + col_str.split(" "), 79)
-        cc_arm = build_lines(["CHECK", "CODE", "MEMB"] + armadura_str.split(" "), 79)
-        cargas_text += f"{cc_cols}\n{cc_arm}\n"
-        
-        if cv_str:
-            cc_cv = build_lines(["CHECK", "CODE", "MEMB"] + cv_str.split(" "), 79)
-            cargas_text += f"{cc_cv}\n"
-    
+    # Append the base cargas text
     out.append(cargas_text.strip())
+    
+    # ------------------
+    # Analysis & Design
+    # ------------------
+    out.append("PERFORM ANALYSIS")
+    out.append("LOAD LIST 17 TO 54")
+    out.append("PARAMETER 1")
+    out.append("CODE AISC")
+    
+    if celosia_str:
+        out.append("** CELOSIA **")
+        out.append(build_lines(["FYLD", "3515", "MEMB"] + celosia_str.split(" "), 72))
+        out.append(build_lines(["SELECT", "MEMB"] + celosia_str.split(" "), 72))
+        
+    out.append("PERFORM ANALYSIS")
+    out.append("LOAD LIST 17 TO 54")
+    out.append("PARAMETER 2")
+    out.append("CODE AISC")
+    
+    if col_str:
+        out.append("** COLUMNAS **")
+        out.append(build_lines(["FYLD", "3200", "MEMB"] + col_str.split(" "), 72))
+        out.append(build_lines(["KY", "1.4", "MEMB"] + col_str.split(" "), 72))
+        out.append(build_lines(["KZ", "1.7", "MEMB"] + col_str.split(" "), 72))
+        for h_rounded, members in model.col_heights.items():
+            if members:
+                m_str = group_ranges(members)
+                out.append(build_lines(["LY", str(h_rounded), "MEMB"] + m_str.split(" "), 72))
+                
+    if armadura_str:
+        out.append("** ARMADURAS **")
+        out.append(build_lines(["FYLD", "3515", "MEMB"] + armadura_str.split(" "), 72))
+        
+    ci_int_str = group_ranges(model.ci_int)
+    if ci_int_str:
+        import math
+        ly_val = math.ceil(3 * (model.Lx / model.numSubdiv))
+        out.append(f"LY {ly_val} _CI_INT")
+        
+    if cv_str:
+        out.append("** CVH **")
+        out.append(build_lines(["FYLD", "2530", "MEMB"] + cv_str.split(" "), 72))
+        out.append(build_lines(["TMAIN", "10000", "MEMB"] + cv_str.split(" "), 72))
+        out.append(build_lines(["MAIN", "10000", "MEMB"] + cv_str.split(" "), 72))
+        
+    # Check code for specific groups separately to avoid overly long lines
+    if col_str:
+        out.append(build_lines(["CHECK", "CODE", "MEMB"] + col_str.split(" "), 72))
+    if armadura_str:
+        out.append(build_lines(["CHECK", "CODE", "MEMB"] + armadura_str.split(" "), 72))
+    if cv_str:
+        out.append(build_lines(["CHECK", "CODE", "MEMB"] + cv_str.split(" "), 72))
+    out.append("STEEL TAKE OFF ALL")
+    if col_str:
+        out.append(build_lines(["STEEL", "TAKE", "OFF", "LIST"] + col_str.split(" "), 72))
+    if armadura_str:
+        out.append(build_lines(["STEEL", "TAKE", "OFF", "LIST"] + armadura_str.split(" "), 72))
+    if cv_str:
+        out.append(build_lines(["STEEL", "TAKE", "OFF", "LIST"] + cv_str.split(" "), 72))
 
     out.append("FINISH")
     
