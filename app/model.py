@@ -1,7 +1,7 @@
 import math
 
 class StaadModel:
-    def __init__(self, Larm_m, Ljoist_m, nBay, nSpan, HArmad_m, HLibre_m, numSubdiv, roof_type="Plana", slope_pct=0.0, support_type="FIXED", c_muerta=30.0, c_viva=100.0, c_granizo=60.0):
+    def __init__(self, Larm_m, Ljoist_m, nBay, nSpan, HArmad_m, HLibre_m, numSubdiv, roof_type="Plana", slope_pct=0.0, support_type="FIXED", c_muerta=30.0, c_viva=100.0, c_granizo=60.0, v_barlovento=86.0, v_sotavento=50.0, v_laterales=78.0, v_succion=95.0):
         self.Larm_m = float(Larm_m)
         self.Ljoist_m = float(Ljoist_m)
         self.nBay = int(nBay)
@@ -19,11 +19,39 @@ class StaadModel:
         self.c_viva = float(c_viva)
         self.c_granizo = float(c_granizo)
         
-        # Cálculo de Cargas Lineales (kg/cm) para los largueros
+        self.v_barlovento = float(v_barlovento)
+        self.v_sotavento = float(v_sotavento)
+        self.v_laterales = float(v_laterales)
+        self.v_succion = float(v_succion)
+        
+        # Cálculo de Cargas Lineales gravitacionales (kg/cm) para los largueros
         self.dist_largueros_m = self.Larm_m / self.numSubdiv
         self.load_cm = (self.c_muerta * self.dist_largueros_m) / 100.0
         self.load_cv = (self.c_viva * self.dist_largueros_m) / 100.0
         self.load_granizo = (self.c_granizo * self.dist_largueros_m) / 100.0
+        
+        # Carga lineal de viento en largueros
+        self.load_succion = (self.v_succion * self.dist_largueros_m) / 100.0
+        
+        # Anchos tributarios para columnas
+        trib_x = self.Ljoist_m
+        trib_z = self.Larm_m
+        
+        # Cargas lineales de viento en columnas (kg/cm)
+        self.w_barl_x_in = (self.v_barlovento * trib_x) / 100.0
+        self.w_barl_x_co = (self.v_barlovento * (trib_x / 2.0)) / 100.0
+        self.w_barl_z_in = (self.v_barlovento * trib_z) / 100.0
+        self.w_barl_z_co = (self.v_barlovento * (trib_z / 2.0)) / 100.0
+        
+        self.w_sot_x_in = (self.v_sotavento * trib_x) / 100.0
+        self.w_sot_x_co = (self.v_sotavento * (trib_x / 2.0)) / 100.0
+        self.w_sot_z_in = (self.v_sotavento * trib_z) / 100.0
+        self.w_sot_z_co = (self.v_sotavento * (trib_z / 2.0)) / 100.0
+        
+        self.w_lat_x_in = (self.v_laterales * trib_x) / 100.0
+        self.w_lat_x_co = (self.v_laterales * (trib_x / 2.0)) / 100.0
+        self.w_lat_z_in = (self.v_laterales * trib_z) / 100.0
+        self.w_lat_z_co = (self.v_laterales * (trib_z / 2.0)) / 100.0
         
         if self.numSubdiv < 2 or self.numSubdiv % 2 != 0:
             raise ValueError("Las subdivisiones deben ser un número par mayor o igual a 2.")
@@ -46,6 +74,13 @@ class StaadModel:
             '_DIAG': [],
             '_LARGUEROS': [],
             '_CVH': []
+        }
+        
+        self.wind_cols = {
+            'X0_CORNER': [], 'X0_INNER': [],
+            'XMAX_CORNER': [], 'XMAX_INNER': [],
+            'Z0_CORNER': [], 'Z0_INNER': [],
+            'ZMAX_CORNER': [], 'ZMAX_INNER': []
         }
         self.base_nodes = [] # Nodos en la base para asignar SUPPORTS FIXED
 
@@ -121,8 +156,36 @@ class StaadModel:
         # --- Members: Columnas ---
         for j in range(self.nSpan + 1):
             for i in range(self.nBay + 1):
-                self.add_member(nL1[(i, j)], nL2[(i, j)], '_COL')
-                self.add_member(nL2[(i, j)], nL3[(i, j)], '_COL')
+                col1 = self.add_member(nL1[(i, j)], nL2[(i, j)], '_COL')
+                col2 = self.add_member(nL2[(i, j)], nL3[(i, j)], '_COL')
+                
+                # Face X0
+                if j == 0:
+                    if i == 0 or i == self.nBay:
+                        self.wind_cols['X0_CORNER'].extend([col1, col2])
+                    else:
+                        self.wind_cols['X0_INNER'].extend([col1, col2])
+                
+                # Face XMAX
+                if j == self.nSpan:
+                    if i == 0 or i == self.nBay:
+                        self.wind_cols['XMAX_CORNER'].extend([col1, col2])
+                    else:
+                        self.wind_cols['XMAX_INNER'].extend([col1, col2])
+                        
+                # Face Z0
+                if i == 0:
+                    if j == 0 or j == self.nSpan:
+                        self.wind_cols['Z0_CORNER'].extend([col1, col2])
+                    else:
+                        self.wind_cols['Z0_INNER'].extend([col1, col2])
+                        
+                # Face ZMAX
+                if i == self.nBay:
+                    if j == 0 or j == self.nSpan:
+                        self.wind_cols['ZMAX_CORNER'].extend([col1, col2])
+                    else:
+                        self.wind_cols['ZMAX_INNER'].extend([col1, col2])
 
         # --- Cuerda Superior (Nivel 3) e intermedios ---
         for i in range(self.nBay + 1):

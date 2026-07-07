@@ -74,7 +74,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.markdown("<div style='color: gray; margin-bottom: -15px;'>&emsp;&emsp;M.I. José Ramón Márquez Montes</div>", unsafe_allow_html=True)
+st.markdown("<div style='color: gray; margin-top: 15px; margin-bottom: -10px;'>&emsp;&emsp;M.I. José Ramón Márquez Montes</div>", unsafe_allow_html=True)
 st.title("Generador Paramétrico STAAD.Pro")
 st.markdown("Generador automático de naves industriales para STAAD.Pro")
 
@@ -84,6 +84,7 @@ defaults = {
     "harm": 1.30, "hlib": 9.75, "subdiv": 10,
     "roof_type": "2 Aguas", "slope_pct": 3.0, "support_type": "FIXED",
     "c_muerta": 30.0, "c_viva": 100.0, "c_granizo": 60.0,
+    "v_barlovento": 86.0, "v_sotavento": 50.0, "v_laterales": 78.0, "v_succion": 95.0,
     "current_panel": "Main"
 }
 for k, v in defaults.items():
@@ -154,9 +155,16 @@ with st.sidebar:
     elif panel == "Cargas":
         st.button("⬅", type="secondary", on_click=go_panel, args=("Main",))
         st.header("Cargas")
+        st.subheader("Gravitacionales")
         st.session_state.c_muerta = st.number_input("Carga Muerta (kg/m²)", min_value=0.0, step=5.0, value=st.session_state.c_muerta)
         st.session_state.c_viva = st.number_input("Carga Viva (kg/m²)", min_value=0.0, step=5.0, value=st.session_state.c_viva)
         st.session_state.c_granizo = st.number_input("Granizo (kg/m²)", min_value=0.0, step=5.0, value=st.session_state.c_granizo)
+        
+        st.subheader("Viento")
+        st.session_state.v_barlovento = st.number_input("Barlovento (kg/m²)", min_value=0.0, step=1.0, value=st.session_state.v_barlovento)
+        st.session_state.v_sotavento = st.number_input("Sotavento (kg/m²)", min_value=0.0, step=1.0, value=st.session_state.v_sotavento)
+        st.session_state.v_laterales = st.number_input("Laterales (kg/m²)", min_value=0.0, step=1.0, value=st.session_state.v_laterales)
+        st.session_state.v_succion = st.number_input("Succión (kg/m²)", min_value=0.0, step=1.0, value=st.session_state.v_succion)
 
 # Ensure even subdivisions
 if st.session_state.subdiv % 2 != 0:
@@ -178,7 +186,11 @@ try:
         st.session_state.support_type,
         st.session_state.c_muerta,
         st.session_state.c_viva,
-        st.session_state.c_granizo
+        st.session_state.c_granizo,
+        st.session_state.v_barlovento,
+        st.session_state.v_sotavento,
+        st.session_state.v_laterales,
+        st.session_state.v_succion
     )
 except Exception as e:
     st.error(f"Error generando la geometría: {e}")

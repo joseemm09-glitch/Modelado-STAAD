@@ -115,7 +115,8 @@ def plot_model(model, show_supports=False):
         ),
         margin=dict(l=0, r=0, b=0, t=30),
         title="",
-        showlegend=True
+        showlegend=True,
+        height=850
     )
 
     return fig

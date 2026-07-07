@@ -200,19 +200,94 @@ def write_staad(model):
             
     # Reemplazar Carga Muerta (LOAD 1)
     cargas_text = cargas_text.replace(
-        "LOAD 1 LOADTYPE Dead  TITLE CM\n",
-        f"LOAD 1 LOADTYPE Dead  TITLE CM\n******* CM: {model.c_muerta} Kg/m2 *******\nMEMBER LOAD\n_LARGUEROS UNI GY -{format_num(model.load_cm)}\n"
+        "**** CM CUBIERTA: 39.50 KG/M² *****",
+        f"**** CM CUBIERTA: {model.c_muerta} KG/M2 *****\nMEMBER LOAD\n_LARGUEROS UNI GY -{format_num(model.load_cm)}"
     )
-    # Añadir Carga Viva (LOAD 2)
+    # Añadir Carga Viva (LOAD 5)
     cargas_text = cargas_text.replace(
-        "LOAD 2 LOADTYPE Live  TITLE CV\n",
-        f"LOAD 2 LOADTYPE Live  TITLE CV\n******* CV: {model.c_viva} Kg/m2 *******\nMEMBER LOAD\n_LARGUEROS UNI GY -{format_num(model.load_cv)}\n"
+        "**** CV CUBIERTA: 100 KG/M2 *****\nMEMBER LOAD",
+        f"**** CV CUBIERTA: {model.c_viva} KG/M2 *****\nMEMBER LOAD\n_LARGUEROS UNI GY -{format_num(model.load_cv)}"
     )
-    # Añadir Granizo (LOAD 11)
+    # Añadir Granizo (LOAD 15)
     cargas_text = cargas_text.replace(
-        "LOAD 11 LOADTYPE None  TITLE GRANIZO\n",
-        f"LOAD 11 LOADTYPE None  TITLE GRANIZO\n******* GRANIZO: {model.c_granizo} Kg/m2 *******\nMEMBER LOAD\n_LARGUEROS UNI GY -{format_num(model.load_granizo)}\n"
+        "**** CARGA DE GRANIZO: 60 KG/M2 *****",
+        f"**** CARGA DE GRANIZO: {model.c_granizo} KG/M2 *****\nMEMBER LOAD\n_LARGUEROS UNI GY -{format_num(model.load_granizo)}"
     )
+    
+    # Función auxiliar para viento
+    def wind_block(wind_type, model):
+        def gl(members, d_str, val, mult):
+            rng = group_ranges(members)
+            if not rng: return ""
+            tokens = rng.split(" ") + ["UNI", d_str, format_num(val * mult)]
+            return build_lines(tokens, 79)
+            
+        lines = []
+        if wind_type == "X+":
+            lines.append(f"******BARLOVENTO: {model.v_barlovento} KG/M2******")
+            lines.append(gl(model.wind_cols['X0_CORNER'], 'GX', model.w_barl_x_co, 1))
+            lines.append(gl(model.wind_cols['X0_INNER'], 'GX', model.w_barl_x_in, 1))
+            lines.append(f"******SOTAVENTO: {model.v_sotavento} KG/M2******")
+            lines.append(gl(model.wind_cols['XMAX_CORNER'], 'GX', model.w_sot_x_co, 1))
+            lines.append(gl(model.wind_cols['XMAX_INNER'], 'GX', model.w_sot_x_in, 1))
+            lines.append(f"******LATERALES 1: {model.v_laterales} KG/M2******")
+            lines.append(gl(model.wind_cols['Z0_CORNER'], 'GZ', model.w_lat_z_co, -1))
+            lines.append(gl(model.wind_cols['Z0_INNER'], 'GZ', model.w_lat_z_in, -1))
+            lines.append(f"******LATERALES 2: {model.v_laterales} KG/M2******")
+            lines.append(gl(model.wind_cols['ZMAX_CORNER'], 'GZ', model.w_lat_z_co, 1))
+            lines.append(gl(model.wind_cols['ZMAX_INNER'], 'GZ', model.w_lat_z_in, 1))
+        elif wind_type == "X-":
+            lines.append(f"******BARLOVENTO: {model.v_barlovento} KG/M2******")
+            lines.append(gl(model.wind_cols['XMAX_CORNER'], 'GX', model.w_barl_x_co, -1))
+            lines.append(gl(model.wind_cols['XMAX_INNER'], 'GX', model.w_barl_x_in, -1))
+            lines.append(f"******SOTAVENTO: {model.v_sotavento} KG/M2******")
+            lines.append(gl(model.wind_cols['X0_CORNER'], 'GX', model.w_sot_x_co, -1))
+            lines.append(gl(model.wind_cols['X0_INNER'], 'GX', model.w_sot_x_in, -1))
+            lines.append(f"******LATERALES 1: {model.v_laterales} KG/M2******")
+            lines.append(gl(model.wind_cols['Z0_CORNER'], 'GZ', model.w_lat_z_co, -1))
+            lines.append(gl(model.wind_cols['Z0_INNER'], 'GZ', model.w_lat_z_in, -1))
+            lines.append(f"******LATERALES 2: {model.v_laterales} KG/M2******")
+            lines.append(gl(model.wind_cols['ZMAX_CORNER'], 'GZ', model.w_lat_z_co, 1))
+            lines.append(gl(model.wind_cols['ZMAX_INNER'], 'GZ', model.w_lat_z_in, 1))
+        elif wind_type == "Z+":
+            lines.append(f"******BARLOVENTO: {model.v_barlovento} KG/M2******")
+            lines.append(gl(model.wind_cols['Z0_CORNER'], 'GZ', model.w_barl_z_co, 1))
+            lines.append(gl(model.wind_cols['Z0_INNER'], 'GZ', model.w_barl_z_in, 1))
+            lines.append(f"******SOTAVENTO: {model.v_sotavento} KG/M2******")
+            lines.append(gl(model.wind_cols['ZMAX_CORNER'], 'GZ', model.w_sot_z_co, 1))
+            lines.append(gl(model.wind_cols['ZMAX_INNER'], 'GZ', model.w_sot_z_in, 1))
+            lines.append(f"******LATERALES 1: {model.v_laterales} KG/M2******")
+            lines.append(gl(model.wind_cols['X0_CORNER'], 'GX', model.w_lat_x_co, -1))
+            lines.append(gl(model.wind_cols['X0_INNER'], 'GX', model.w_lat_x_in, -1))
+            lines.append(f"******LATERALES 2: {model.v_laterales} KG/M2******")
+            lines.append(gl(model.wind_cols['XMAX_CORNER'], 'GX', model.w_lat_x_co, 1))
+            lines.append(gl(model.wind_cols['XMAX_INNER'], 'GX', model.w_lat_x_in, 1))
+        elif wind_type == "Z-":
+            lines.append(f"******BARLOVENTO: {model.v_barlovento} KG/M2******")
+            lines.append(gl(model.wind_cols['ZMAX_CORNER'], 'GZ', model.w_barl_z_co, -1))
+            lines.append(gl(model.wind_cols['ZMAX_INNER'], 'GZ', model.w_barl_z_in, -1))
+            lines.append(f"******SOTAVENTO: {model.v_sotavento} KG/M2******")
+            lines.append(gl(model.wind_cols['Z0_CORNER'], 'GZ', model.w_sot_z_co, -1))
+            lines.append(gl(model.wind_cols['Z0_INNER'], 'GZ', model.w_sot_z_in, -1))
+            lines.append(f"******LATERALES 1: {model.v_laterales} KG/M2******")
+            lines.append(gl(model.wind_cols['X0_CORNER'], 'GX', model.w_lat_x_co, -1))
+            lines.append(gl(model.wind_cols['X0_INNER'], 'GX', model.w_lat_x_in, -1))
+            lines.append(f"******LATERALES 2: {model.v_laterales} KG/M2******")
+            lines.append(gl(model.wind_cols['XMAX_CORNER'], 'GX', model.w_lat_x_co, 1))
+            lines.append(gl(model.wind_cols['XMAX_INNER'], 'GX', model.w_lat_x_in, 1))
+        
+        lines.append(f"**** SUCCIÓN : {model.v_succion} KG/M2 *****")
+        lines.append(build_lines(["_LARGUEROS", "UNI", "GY", format_num(model.load_succion)], 79))
+        
+        return "\n".join([x for x in lines if x])
+        
+    old_wind_block = "******BARLOVENTO: 86 KG/M2******\n******SOTAVENTO: 50 KG/M2******\n******LATERALES 1: 78 KG/M2******\n******LATERALES 2: 78 KG/M2******\n**** SUCCIÓN : 95 KG/M2 *****"
+    
+    cargas_text = cargas_text.replace(f"LOAD 7 LOADTYPE None  TITLE VIENTO X+\nMEMBER LOAD\n{old_wind_block}", f"LOAD 7 LOADTYPE None  TITLE VIENTO X+\nMEMBER LOAD\n{wind_block('X+', model)}")
+    cargas_text = cargas_text.replace(f"LOAD 8 LOADTYPE None  TITLE VIENTO X-\nMEMBER LOAD\n{old_wind_block}", f"LOAD 8 LOADTYPE None  TITLE VIENTO X-\nMEMBER LOAD\n{wind_block('X-', model)}")
+    cargas_text = cargas_text.replace(f"LOAD 9 LOADTYPE None  TITLE VIENTO Z+\nMEMBER LOAD\n{old_wind_block}", f"LOAD 9 LOADTYPE None  TITLE VIENTO Z+\nMEMBER LOAD\n{wind_block('Z+', model)}")
+    cargas_text = cargas_text.replace(f"LOAD 10 LOADTYPE None  TITLE VIENTO Z-\nMEMBER LOAD\n{old_wind_block}", f"LOAD 10 LOADTYPE None  TITLE VIENTO Z-\nMEMBER LOAD\n{wind_block('Z-', model)}")
+
     
     # Cambiar el tipo de carga sismica a Seismic-H según petición
     cargas_text = cargas_text.replace("LOADTYPE Seismic", "LOADTYPE Seismic-H")

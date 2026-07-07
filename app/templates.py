@@ -138,77 +138,307 @@ DOUBLE ANGLE
 END USER TABLE
 """
 
-CARGAS_TEMPLATE = """LOAD 1 LOADTYPE Dead  TITLE CM
-LOAD 2 LOADTYPE Live  TITLE CV
-LOAD 3 LOADTYPE Wind  TITLE WX >>>
-LOAD 4 LOADTYPE Wind  TITLE WX <<<
-LOAD 5 LOADTYPE Wind  TITLE WZ >>>
-LOAD 6 LOADTYPE Wind  TITLE WZ <<<
-LOAD 7 LOADTYPE Seismic-H  TITLE SX ( + )
-LOAD 8 LOADTYPE Seismic-H  TITLE SX ( - )
-LOAD 9 LOADTYPE Seismic-H  TITLE SZ ( + )
-LOAD 10 LOADTYPE Seismic-H  TITLE SZ ( - )
-LOAD 11 LOADTYPE None  TITLE GRANIZO
-LOAD COMB 12 CM + CV
-1 1.0 2 1.0 
-LOAD COMB 13 CM + GRANIZO
-1 1.0 11 1.0 
-LOAD COMB 14 CM + WX >>>
+CARGAS_TEMPLATE = """****************************CASOS DE CARGA***********************************
+*****************************************************************************
+LOAD 1 LOADTYPE None  TITLE CARGA MUERTA (CM)
+**** CM CUBIERTA: 39.50 KG/M² *****
+*******************************************************************************
+LOAD 2 LOADTYPE None  TITLE CARGA MUERTA PROPIA (CMP)
+REPEAT LOAD
+1 0.6 
+*******************************************************************************
+LOAD 3 LOADTYPE None  TITLE CARGA VIVA (CV)
+**** CV ENTREPISO: 200 KG/M2 *****
+*******************************************************************************
+LOAD 4 LOADTYPE None  TITLE CARGA VIVA (CVR)
+*******************************************************************************
+LOAD 5 LOADTYPE None  TITLE CARGA VIVA DE TECHO (CVT)
+**** CV CUBIERTA: 100 KG/M2 *****
+MEMBER LOAD
+*******************************************************************************
+LOAD 6 LOADTYPE None  TITLE CARGA VIVA REDUDUCIDA DE TECHO (CVRT)
+REPEAT LOAD
+5 0.7 
+*******************************************************************************
+LOAD 7 LOADTYPE None  TITLE VIENTO X+
+MEMBER LOAD
+******BARLOVENTO: 86 KG/M2******
+******SOTAVENTO: 50 KG/M2******
+******LATERALES 1: 78 KG/M2******
+******LATERALES 2: 78 KG/M2******
+**** SUCCIÓN : 95 KG/M2 *****
+*******************************************************************************
+LOAD 8 LOADTYPE None  TITLE VIENTO X-
+MEMBER LOAD
+******BARLOVENTO: 86 KG/M2******
+******SOTAVENTO: 50 KG/M2******
+******LATERALES 1: 78 KG/M2******
+******LATERALES 2: 78 KG/M2******
+**** SUCCIÓN : 95 KG/M2 *****
+*******************************************************************************
+LOAD 9 LOADTYPE None  TITLE VIENTO Z+
+MEMBER LOAD
+******BARLOVENTO: 86 KG/M2******
+******SOTAVENTO: 50 KG/M2******
+******LATERALES 1: 78 KG/M2******
+******LATERALES 2: 78 KG/M2******
+**** SUCCIÓN : 95 KG/M2 *****
+*******************************************************************************
+LOAD 10 LOADTYPE None  TITLE VIENTO Z-
+MEMBER LOAD
+******BARLOVENTO: 86 KG/M2******
+******SOTAVENTO: 50 KG/M2******
+******LATERALES 1: 78 KG/M2******
+******LATERALES 2: 78 KG/M2******
+**** SUCCIÓN : 95 KG/M2 *****
+*******************************************************************************
+LOAD 11 LOADTYPE None  TITLE SISMO X+
+*******************************************************************************
+LOAD 12 LOADTYPE None  TITLE SISMO X-
+SELFWEIGHT X (coeficiente sísmico) LIST (nodos)
+JOINT LOAD
+(nodos) FX (carga nodal)
+********************************************************************************
+LOAD 13 LOADTYPE None  TITLE SISMO Z+
+*******************************************************************************
+LOAD 14 LOADTYPE None  TITLE SISMO Z-
+*******************************************************************************
+LOAD 15 LOADTYPE None  TITLE CARGA DE GRANIZO(N)
+**** CARGA DE GRANIZO: 60 KG/M2 *****
+*******************************************************************************
+LOAD 16 LOADTYPE None  TITLE MASA DE SISMO
+REPEAT LOAD
+1 1.0 4 1.0 6 1.0 
+*****************************************************************************************
+**************************************COMBINACIONES DE CARGAS****************************
+*****************************************************************************************
+*****COMBINACIONES REGLAMENTO DE CHIHUAHUA*****
+*****COMBINACIONES PARA CARGAS GRAVITACINALES*****
+LOAD COMB 17 CM
+1 1.0 
+************************************************************************************
+LOAD COMB 18 CM+CV
 1 1.0 3 1.0 
-LOAD COMB 15 CM + WX <<<
-1 1.0 4 1.0 
-LOAD COMB 16 CM + WZ >>>
+*************************************************************************************
+LOAD COMB 19 CM+CVT
 1 1.0 5 1.0 
-LOAD COMB 17 CM + WZ <<<
-1 1.0 6 1.0 
-LOAD COMB 18 CM + SX ( + ) + 0.3 SZ ( + )
-1 1.0 7 1.0 9 0.3 
-LOAD COMB 19 CM + SX ( - ) + 0.3 SZ ( + )
-1 1.0 8 1.0 9 0.3 
-LOAD COMB 20 CM + SZ ( + ) + 0.3 SX ( + )
-1 1.0 9 1.0 7 0.3 
-LOAD COMB 21 CM + SZ ( - ) + 0.3 SX ( + )
-1 1.0 10 1.0 7 0.3 
-LOAD COMB 22 CM + 0.75 CV + 0.75 WX >>>
-1 1.0 2 0.75 3 0.75 
-LOAD COMB 23 CM + 0.75 CV + 0.75 WX <<<
-1 1.0 2 0.75 4 0.75 
-LOAD COMB 24 CM + 0.75 CV + 0.75 WZ >>>
-1 1.0 2 0.75 5 0.75 
-LOAD COMB 25 CM + 0.75 CV + 0.75 WZ <<<
-1 1.0 2 0.75 6 0.75 
-LOAD COMB 26 CM + 0.75 CV + SX ( + ) + 0.3 SZ ( + )
-1 1.0 2 0.75 7 1.0 9 0.3 
-LOAD COMB 27 CM + 0.75 CV + SX ( - ) + 0.3 SZ ( + )
-1 1.0 2 0.75 8 1.0 9 0.3 
-LOAD COMB 28 CM + 0.75 CV + SZ ( + ) + 0.3 SX ( + )
-1 1.0 2 0.75 9 1.0 7 0.3 
-LOAD COMB 29 CM + 0.75 CV + SZ ( - ) + 0.3 SX ( + )
-1 1.0 2 0.75 10 1.0 7 0.3 
-LOAD COMB 30 0.6 CM + WX >>>
-1 0.6 3 1.0 
-LOAD COMB 31 0.6 CM + WX <<<
-1 0.6 4 1.0 
-LOAD COMB 32 0.6 CM + WZ >>>
-1 0.6 5 1.0 
-LOAD COMB 33 0.6 CM + WZ <<<
-1 0.6 6 1.0 
-LOAD COMB 34 0.6 CM + 0.7 SX ( + )
-1 0.6 7 0.7 
-LOAD COMB 35 0.6 CM + 0.7 SX ( - )
-1 0.6 8 0.7 
-LOAD COMB 36 0.6 CM + 0.7 SZ ( + )
-1 0.6 9 0.7 
-LOAD COMB 37 0.6 CM + 0.7 SZ ( - )
-1 0.6 10 0.7 
-PERFORM ANALYSIS
-LOAD LIST 12 TO 37
-PARAMETER 1
-CODE AISC
-FYLD 3520 MEMB 1
-SELECT MEMB 1
+*************************************************************************************
+LOAD COMB 20 CM+N
+1 1.0 15 1.0 
+*************************************************************************************
+LOAD COMB 21 CM+0.75CV+0.75CVT
+1 1.0 3 0.75 5 0.75 
+*************************************************************************************
+LOAD COMB 22 CM+0.75CV+0.75N
+1 1.0 3 0.75 15 0.75 
+*COMBINACIONES PARA CARGAS POR VIENTO
+LOAD COMB 23 CM+(VX+)
+1 1.0 7 1.0 
+**********************************************************************************
+LOAD COMB 24 CM+(VX-)
+1 1.0 8 1.0 
+*********************************************************************************
+LOAD COMB 25 CM+(VZ+)
+1 1.0 9 1.0 
+********************************************************************************
+LOAD COMB 26 CM+(VZ-)
+1 1.0 10 1.0 
+*
+LOAD COMB 27 CM+0.75CV+0.75CVT+0.75(VX+)
+1 1.0 3 0.75 5 0.75 7 0.75 
+*
+LOAD COMB 28 CM+0.75CV+0.75CVT+0.75(VX-)
+1 1.0 3 0.75 5 0.75 8 0.75 
+*
+LOAD COMB 29 CM+0.75CV+0.75CVT+0.75(VZ+)
+1 1.0 3 0.75 5 0.75 9 0.75 
+*
+LOAD COMB 30 CM+0.75CV+0.75CVT+0.75(VZ-)
+1 1.0 3 0.75 5 0.75 10 0.75 
+*
+LOAD COMB 31 CM+0.75CV+0.75N+0.75(VX+)
+1 1.0 3 0.75 15 0.75 7 0.75 
+*
+LOAD COMB 32 CM+0.75CV+0.75N+0.75(VX-)
+1 1.0 3 0.75 15 0.75 8 0.75 
+*
+LOAD COMB 33 CM+0.75CV+0.75N+0.75(VZ+)
+1 1.0 3 0.75 15 0.75 9 0.75 
+*
+LOAD COMB 34 CM+0.75CV+0.75N+0.75(VZ-)
+1 1.0 3 0.75 15 0.75 10 0.75 
+*
+LOAD COMB 35 0.60CM+(VX+)
+1 0.6 7 1.0 
+*
+LOAD COMB 36 0.60CM+(VX-)
+1 0.6 8 1.0 
+*
+LOAD COMB 37 0.60CM+(VZ+)
+1 0.6 9 1.0 
+*
+LOAD COMB 38 0.60CM+(VZ-)
+1 0.6 10 1.0 
+*
+*
+*********************************************************************************
+*COMBINACIONES PARA CARGAS POR SISMO
+LOAD COMB 39 CM+0.70SX+
+1 1.0 11 0.7 
+*
+LOAD COMB 40 CM+0.70SX-
+1 1.0 12 0.7 
+*
+LOAD COMB 41 CM+0.70SZ+
+1 1.0 13 0.7 
+*
+LOAD COMB 42 CM+0.70SZ-
+1 1.0 14 0.7 
+*
+LOAD COMB 43 CM+0.75CV+0.75CVT+0.70(SX+)
+1 1.0 3 0.75 5 0.75 11 0.7 
+*
+LOAD COMB 44 CM+0.75CV+0.75CVT+0.70(SX-)
+1 1.0 3 0.75 5 0.75 12 0.7 
+*
+LOAD COMB 45 CM+0.75CV+0.75CVT+0.70(SZ+)
+1 1.0 3 0.75 5 0.75 13 0.7 
+*
+LOAD COMB 46 CM+0.75CV+0.75CVT+0.70(SZ-)
+1 1.0 3 0.75 5 0.75 14 0.7 
+*
+LOAD COMB 47 CM+0.75CV+0.75N+0.70(SX+)
+1 1.0 3 0.75 15 0.75 11 0.7 
+*
+LOAD COMB 48 CM+0.75CV+0.75N+0.70(SX-)
+1 1.0 3 0.75 15 0.75 12 0.7 
+*
+LOAD COMB 49 CM+0.75CV+0.75N+0.70(SZ+)
+1 1.0 3 0.75 15 0.75 13 0.7 
+*
+LOAD COMB 50 CM+0.75CV+0.75N+0.70(SZ-)
+1 1.0 3 0.75 15 0.75 14 0.7 
+*
+LOAD COMB 51 0.60CM+0.70SX+
+1 0.6 11 0.7 
+*
+LOAD COMB 52 0.60CM+0.70SX-
+1 0.6 12 0.7 
+*
+LOAD COMB 53 0.60CM+0.70SZ+
+1 0.6 13 0.7 
+*
+LOAD COMB 54 0.60CM+0.70SZ-
+1 0.6 14 0.7 
+*
+**********************************CARGAS ULTIMAS*********************************
+*LOAD COMB 55 1.4CM
+*1 1.4
 **
+*LOAD COMB 56 1.2CM+1.6CV+0.5CVT
+*1 1.2 3 1.6 5 0.5
+**
+*LOAD COMB 57 1.2CM+1.6CV+0.5N
+*1 1.2 3 1.6 15 0.5
+**
+*LOAD COMB 58 1.2CM+1.6CVT+1.0CV
+*1 1.2 5 1.6 3 1.0
+**
+*LOAD COMB 59 1.2CM+1.6N+1.0CV
+*1 1.2 15 1.6 3 1.0
+**
+**COMBINACIONES PARA CARGAS POR VIENTO
+**
+*LOAD COMB 60 1.2CM+1.6CVT+0.8(VX+)
+*1 1.2 5 1.6 7 0.8
+**
+*LOAD COMB 61 1.2CM+1.6CVT+0.8(VX-)
+*1 1.2 5 1.6 8 0.8
+**
+*LOAD COMB 62 1.2CM+1.6CVT+0.8(VZ+)
+*1 1.2 5 1.6 9 0.8
+**
+*LOAD COMB 63 1.2CM+1.6CVT+0.8(VZ-)
+*1 1.2 5 1.6 10 0.8
+**
+*LOAD COMB 64 1.2CM+1.6N+0.8(VX+)
+*1 1.2 15 1.6 7 0.8
+**
+*LOAD COMB 65 1.2CM+1.6N+0.8(VX-)
+*1 1.2 15 1.6 8 0.8
+**
+*LOAD COMB 66 1.2CM+1.6N+0.8(VZ+)
+*1 1.2 15 1.6 9 0.8
+**
+*LOAD COMB 67 1.2CM+1.6N+0.8(VZ-)
+*1 1.2 15 1.6 10 0.8
+**
+*LOAD COMB 68 1.2CM+1.6(VX+)+1.0CV+0.5CVT
+*1 1.2 7 1.6 3 1.0 5 0.5
+**
+*LOAD COMB 69 1.2CM+1.6(VX-)+1.0CV+0.5CVT
+*1 1.2 8 1.6 3 1.0 5 0.5
+**
+*LOAD COMB 70 1.2CM+1.6(VZ+)+1.0CV+0.5CVT
+*1 1.2 9 1.6 3 1.0 5 0.5
+**
+*LOAD COMB 71 1.2CM+1.6(VZ-)+1.0CV+0.5CVT
+*1 1.2 10 1.6 3 1.0 5 0.5
+**
+*LOAD COMB 72 1.2CM+1.6(VX+)+1.0CV+0.5N
+*1 1.2 7 1.6 3 1.0 15 0.5
+**
+*LOAD COMB 73 1.2CM+1.6(VX-)+1.0CV+0.5N
+*1 1.2 8 1.6 3 1.0 15 0.5
+**
+*LOAD COMB 74 1.2CM+1.6(VZ+)+1.0CV+0.5N
+*1 1.2 9 1.6 3 1.0 15 0.5
+**
+*LOAD COMB 75 1.2CM+1.6(VZ-)+1.0CV+0.5N
+*1 1.2 10 1.6 3 1.0 15 0.5
+**
+*LOAD COMB 76 0.9CM+1.6(VX+)
+*1 0.9 7 1.6
+**
+*LOAD COMB 77 0.9CM+1.6(VX-)
+*1 0.9 8 1.6
+**
+*LOAD COMB 78 0.9CM+1.6(VZ+)
+*1 0.9 9 1.6
+**
+*LOAD COMB 79 0.9CM+1.6(VZ-)
+*1 0.9 10 1.6
+**
+**COMBINACIONES PARA CARGAS POR SISMO
+**
+*LOAD COMB 80 1.2CM+1.0(SX+)+1.0CV+0.2N
+*1 1.2 11 1.0 3 1.0 15 0.2
+**
+*LOAD COMB 81 1.2CM+1.0(SX-)+1.0CV+0.2N
+*1 1.2 12 1.0 3 1.0 15 0.2
+**
+*LOAD COMB 82 1.2CM+1.0(SZ+)+1.0CV+0.2N
+*1 1.2 13 1.0 3 1.0 15 0.2
+**
+*LOAD COMB 83 1.2CM+1.0(SZ-)+1.0CV+0.2N
+*1 1.2 14 1.0 3 1.0 15 0.2
+**
+*LOAD COMB 84 0.9CM+1.0(SX+)
+*1 0.9 11 1.0
+**
+*LOAD COMB 85 0.9CM+1.0(SX-)
+*1 0.9 12 1.0
+**
+*LOAD COMB 86 0.9CM+1.0(SZ+)
+*1 0.9 13 1.0
+**
+*LOAD COMB 87 0.9CM+1.0(SZ-)
+*1 0.9 14 1.0
+**
+*************************************************************************
+*********************PRIMER ANALYIS Y DISEÑO*****************************
+*************************************************************************
 PERFORM ANALYSIS
-LOAD LIST 12 TO 37
-PARAMETER 2
+LOAD LIST 17 TO 54
+PARAMETER 1
 CODE AISC"""
