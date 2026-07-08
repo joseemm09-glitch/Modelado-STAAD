@@ -351,7 +351,10 @@ with col1:
     st.subheader("Vista 3D")
     show_sup = (st.session_state.current_panel == "Geometría")
     fig = plot_model(model, show_supports=show_sup)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, use_container_width=True, config={
+        'displaylogo': False,
+        'modeBarButtonsToRemove': ['resetCameraDefault3d', 'resetCameraLastSave3d', 'hoverClosest3d', 'tableRotation']
+    })
 
 with col2:
     with st.container():

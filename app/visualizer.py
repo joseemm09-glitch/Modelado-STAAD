@@ -9,7 +9,13 @@ def get_group_color(group_name):
         '_MONTANTES': 'green',
         '_DIAG': 'purple',
         '_LARGUEROS': 'gray',
-        '_CVH': 'black'
+        '_JOISTGRAL': 'gray',
+        '_JPUNTAL': 'dimgray',
+        '_CVH': 'black',
+        '_CS_SEC': 'red',
+        '_CI_SEC': 'orange',
+        '_MONTANTES_SEC': 'green',
+        '_DIAG_SEC': 'purple'
     }
     return colors.get(group_name, 'black')
 
@@ -27,7 +33,7 @@ def plot_model(model, show_supports=False):
 
     # We group lines by group to draw them in a consistent order in the legend.
     # We initialize lines for each group to ensure they are added in the correct order.
-    group_order = ['_COL', '_COLVIENTO', '_CS', '_CI', '_MONTANTES', '_DIAG', '_LARGUEROS', '_CVH']
+    group_order = ['_COL', '_COLVIENTO', '_CS', '_CI', '_MONTANTES', '_DIAG', '_LARGUEROS', '_JOISTGRAL', '_JPUNTAL', '_CVH', '_CS_SEC', '_CI_SEC', '_MONTANTES_SEC', '_DIAG_SEC']
     lines_by_group = {grp: {'x': [], 'y': [], 'z': [], 'color': get_group_color(grp)} for grp in group_order}
     lines_by_group['unknown'] = {'x': [], 'y': [], 'z': [], 'color': 'black'}
 
@@ -53,12 +59,13 @@ def plot_model(model, show_supports=False):
     for grp in group_order:
         data = lines_by_group[grp]
         if data['x']:
+            lw = 3 if grp in ['_LARGUEROS', '_JOISTGRAL', '_JPUNTAL'] else 4
             fig.add_trace(go.Scatter3d(
                 x=data['x'],
                 y=data['z'], # Plotly Z is up by default in some views, but we'll map Y to Z for better default camera
                 z=data['y'],
                 mode='lines',
-                line=dict(color=data['color'], width=4),
+                line=dict(color=data['color'], width=lw),
                 name=grp
             ))
             
@@ -155,6 +162,25 @@ def plot_model(model, show_supports=False):
         margin=dict(l=0, r=0, b=0, t=0),
         title="",
         showlegend=True,
+        updatemenus=[
+            dict(
+                type="buttons",
+                direction="right",
+                x=0.01,
+                y=0.99,
+                xanchor="left",
+                yanchor="top",
+                bgcolor="rgba(255, 255, 255, 0.7)",
+                bordercolor="rgba(0, 0, 0, 0.2)",
+                showactive=True,
+                buttons=[
+                    dict(label="Iso", method="relayout", args=["scene.camera", dict(eye=dict(x=1.5, y=1.5, z=1.2), up=dict(x=0, y=0, z=1))]),
+                    dict(label="Planta", method="relayout", args=["scene.camera", dict(eye=dict(x=0, y=0, z=2.5), up=dict(x=0, y=1, z=0))]),
+                    dict(label="Lat. X", method="relayout", args=["scene.camera", dict(eye=dict(x=0, y=-2.5, z=0), up=dict(x=0, y=0, z=1))]),
+                    dict(label="Lat. Z", method="relayout", args=["scene.camera", dict(eye=dict(x=-2.5, y=0, z=0), up=dict(x=0, y=0, z=1))])
+                ]
+            )
+        ],
         legend=dict(
             bgcolor='rgba(255, 255, 255, 0.65)',
             bordercolor='rgba(255, 255, 255, 0.9)',
