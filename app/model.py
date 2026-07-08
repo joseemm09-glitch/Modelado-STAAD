@@ -1,7 +1,7 @@
 import math
 
 class StaadModel:
-    def __init__(self, Larm_m, Ljoist_m, nBay, nSpan, HArmad_m, HLibre_m, numSubdiv, roof_type="Plana", slope_pct=0.0, support_type="FIXED", c_muerta=30.0, c_viva=100.0, c_granizo=60.0, v_barlovento=86.0, v_sotavento=50.0, v_laterales=78.0, v_succion=95.0, coef_sismico=0.08, ductilidad=2.0, cm_sismo=None, cv_sismo=None, add_wind_cols=False, max_wind_dist_m=8.0):
+    def __init__(self, Larm_m, Ljoist_m, nBay, nSpan, HArmad_m, HLibre_m, numSubdiv, roof_type="Plana", slope_pct=0.0, support_type="FIXED", c_muerta=30.0, c_viva=100.0, c_granizo=60.0, v_barlovento=86.0, v_sotavento=50.0, v_laterales=78.0, v_succion=95.0, coef_sismico=0.08, ductilidad=2.0, cm_sismo=None, cv_sismo=None, add_wind_cols=False, max_wind_dist_m=8.0, sec_trusses_j=None):
         self.Larm_m = float(Larm_m)
         self.Ljoist_m = float(Ljoist_m)
         self.nBay = int(nBay)
@@ -13,6 +13,15 @@ class StaadModel:
         self.roof_type = roof_type
         self.slope_pct = float(slope_pct)
         self.support_type = support_type
+        
+        self.sec_trusses_j = sec_trusses_j if sec_trusses_j else []
+        if self.sec_trusses_j:
+            min_n = self.Ljoist_m / 1.60
+            n = math.ceil(min_n)
+            if n % 2 != 0: n += 1
+            self.numSubdiv_sec = int(max(2, n))
+        else:
+            self.numSubdiv_sec = 0
         
         # Cargas (kg/m2)
         self.c_muerta = float(c_muerta)
@@ -114,7 +123,11 @@ class StaadModel:
             '_LARGUEROS': [],
             '_CVH': [],
             '_JOISTGRAL': [],
-            '_JPUNTAL': []
+            '_JPUNTAL': [],
+            '_CS_SEC': [],
+            '_CI_SEC': [],
+            '_MONTANTES_SEC': [],
+            '_DIAG_SEC': []
         }
         
         self.wind_cols = {
@@ -141,6 +154,10 @@ class StaadModel:
         self.rel_horiz_end = []
         self.rel_larg_start = []
         self.rel_larg_end = []
+        self.rel_cs_sec_start = []
+        self.rel_cs_sec_end = []
+        self.rel_ci_sec_start = []
+        self.rel_ci_sec_end = []
         self.release_end_fx = []
         self.horizontal_truss_members = []
         self.split_purlin_first = []
@@ -190,6 +207,74 @@ class StaadModel:
         elif self.roof_type == "2 Aguas":
             return min(global_x, self.total_width - global_x) * slope
         return 0.0
+
+
+
+    def get_or_create_node(self, x, y, z):
+        tol = 1e-4
+        for nid, (nx, ny, nz) in self.nodes.items():
+            if abs(nx - x) < tol and abs(ny - y) < tol and abs(nz - z) < tol:
+                return nid
+        return self.add_node(x, y, z)
+        
+    def _add_sec_truss_segment(self, j_span, top_start, top_end, bot_start, bot_end, base_z, L_segment, start_release, end_release):
+        min_n = L_segment / (1.60 * self.scale)
+        n = math.ceil(min_n)
+        if n % 2 != 0: n += 1
+        num_subdiv = int(max(2, n))
+        L0_sec = L_segment / num_subdiv
+        
+        sec_upper = {0: top_start}
+        for k in range(1, num_subdiv):
+            zn = base_z + k * L0_sec
+            xn = j_span * self.Lx
+            yn_roof = self.HtLibre + self.HtArmad + self.get_y_offset(xn)
+            sec_upper[k] = self.get_or_create_node(xn, yn_roof, zn)
+        sec_upper[num_subdiv] = top_end
+        
+        sec_lower = {}
+        halfSub = num_subdiv // 2
+        for t in range(1, halfSub + 1):
+            oddK = 2 * t - 1
+            zn = base_z + oddK * L0_sec
+            xn = j_span * self.Lx
+            yn_bot = self.HtLibre + self.get_y_offset(xn)
+            sec_lower[t] = self.get_or_create_node(xn, yn_bot, zn)
+            
+        # _CS_SEC
+        prev = sec_upper[0]
+        for k in range(1, num_subdiv + 1):
+            nid = sec_upper[k]
+            mid = self.add_member(prev, nid, '_CS_SEC')
+            if k == 1 and start_release:
+                self.rel_cs_sec_start.append(mid)
+            if k == num_subdiv and end_release:
+                self.rel_cs_sec_end.append(mid)
+            prev = nid
+            
+        # _CI_SEC
+        leftN = bot_start
+        for t in range(1, halfSub + 1):
+            nid = sec_lower[t]
+            mid = self.add_member(leftN, nid, '_CI_SEC')
+            if t == 1 and start_release:
+                self.rel_ci_sec_start.append(mid)
+            leftN = nid
+        mid2 = self.add_member(leftN, bot_end, '_CI_SEC')
+        if end_release:
+            self.rel_ci_sec_end.append(mid2)
+            
+        # _MONTANTES_SEC
+        for t in range(1, halfSub + 1):
+            oddK = 2 * t - 1
+            self.add_member(sec_lower[t], sec_upper[oddK], '_MONTANTES_SEC')
+            
+        # _DIAG_SEC
+        for t in range(1, halfSub + 1):
+            u_left = sec_upper[2 * (t - 1)]
+            self.add_member(u_left, sec_lower[t], '_DIAG_SEC')
+            u_right = sec_upper[2 * t]
+            self.add_member(u_right, sec_lower[t], '_DIAG_SEC')
 
     def generate(self):
         # Data structures to store node references
@@ -355,6 +440,7 @@ class StaadModel:
         # --- Largueros ---
         if self.nBay >= 1:
             for j in range(self.nSpan + 1):
+                has_sec_truss = (j in self.sec_trusses_j)
                 is_wind_col_axis = (self.add_wind_cols and self.wind_col_N > 1 and (j == 0 or j == self.nSpan))
                 for i in range(self.nBay):
                     if is_wind_col_axis:
@@ -400,8 +486,6 @@ class StaadModel:
                             self.rel_horiz_end.append(mem_strut)
                             
                         # Connect horizontal truss diagonals
-                        # Connect only to main columns (A[0]/A[N]) and wind column nodes (A[k]/B[k] for 1 <= k <= N-1).
-                        # Never connect to main truss nodes (B[0]/B[N]).
                         for p in range(N):
                             if p + 1 < N:
                                 diag1 = self.add_member(A[p], B[p+1], None)
@@ -414,16 +498,37 @@ class StaadModel:
                                 self.rel_horiz_start.append(diag2)
                                 self.rel_horiz_end.append(diag2)
                             
-                        # Add the perimetric purlin (larguero) segments
+                        # Add the perimetric purlin (larguero) segments OR secondary truss segments
+                        baseZ = i * self.Lz
+                        segment_length = self.Lz / N
                         for p in range(N):
-                            mem_id = self.add_member(A[p], A[p+1], '_LARGUEROS')
-                            if p == 0:
-                                self.split_purlin_first.append(mem_id)
-                            elif p == N - 1:
-                                self.split_purlin_last.append(mem_id)
+                            if has_sec_truss:
+                                xn = j * self.Lx
+                                yn_bot = self.HtLibre + self.get_y_offset(xn)
+                                
+                                bot_start = nL2[(i, j)] if p == 0 else self.get_or_create_node(xn, yn_bot, baseZ + p * segment_length)
+                                bot_end = nL2[(i+1, j)] if p == N - 1 else self.get_or_create_node(xn, yn_bot, baseZ + (p + 1) * segment_length)
+                                
+                                start_rel = True
+                                end_rel = True
+                                
+                                self._add_sec_truss_segment(j, A[p], A[p+1], bot_start, bot_end, baseZ + p * segment_length, segment_length, start_rel, end_rel)
                             else:
-                                self.split_purlin_middle.append(mem_id)
+                                mem_id = self.add_member(A[p], A[p+1], '_LARGUEROS')
+                                if p == 0:
+                                    self.split_purlin_first.append(mem_id)
+                                elif p == N - 1:
+                                    self.split_purlin_last.append(mem_id)
+                                else:
+                                    self.split_purlin_middle.append(mem_id)
+                    elif has_sec_truss:
+                        # Secondary truss on interior axis without wind columns
+                        baseZ = i * self.Lz
+                        start_rel = True
+                        end_rel = True
+                        self._add_sec_truss_segment(j, nL3[(i, j)], nL3[(i + 1, j)], nL2[(i, j)], nL2[(i + 1, j)], baseZ, self.Lz, start_rel, end_rel)
                     else:
+                        # Standard larguero
                         self.add_member(nL3[(i, j)], nL3[(i + 1, j)], '_LARGUEROS')
             
             for j in range(self.nSpan):
@@ -557,3 +662,5 @@ class StaadModel:
                 # Not split: release both start and end
                 self.rel_larg_start.append(mem_id)
                 self.rel_larg_end.append(mem_id)
+
+        return self

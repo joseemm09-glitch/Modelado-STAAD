@@ -236,6 +236,27 @@ with st.sidebar:
             st.session_state.add_wind_cols = st.checkbox("Agregar Columnas de Viento", value=st.session_state.add_wind_cols)
             if st.session_state.add_wind_cols:
                 st.session_state.max_wind_dist = st.number_input("Separación Máxima (m)", min_value=1.0, step=0.1, value=float(st.session_state.max_wind_dist))
+                
+        with st.expander("Armaduras Secundarias", expanded=False):
+            sec_mode = st.radio("", ["Ninguno", "Automático", "Todos los Ejes", "Personalizado"], 
+                                index=["Ninguno", "Automático", "Todos los Ejes", "Personalizado"].index(st.session_state.get('sec_truss_mode', 'Ninguno')),
+                                key="sec_truss_mode", label_visibility="collapsed")
+                                
+            if sec_mode == "Personalizado":
+                st.write("Ejes:")
+                # Ordenar del centro hacia afuera
+                mid_j = st.session_state.nspan / 2.0
+                interior_j = list(range(0, st.session_state.nspan + 1))
+                interior_j.sort(key=lambda j: (abs(j - mid_j), j))
+                interior_j = interior_j[:10] # Limitar a 10 ejes máximo
+                
+                selected_ejes = st.session_state.get('sec_truss_custom_ejes', [])
+                new_selected = []
+                for j in interior_j:
+                    chk = st.checkbox(f"X = {j * st.session_state.larm:.2f} m", value=(j in selected_ejes), key=f"sec_eje_{j}")
+                    if chk:
+                        new_selected.append(j)
+                st.session_state.sec_truss_custom_ejes = new_selected
 
     elif panel == "Cargas":
         st.button("⬅", type="secondary", on_click=go_panel, args=("Main",))
@@ -273,6 +294,24 @@ if st.session_state.subdiv % 2 != 0:
     st.sidebar.error("Las subdivisiones deben ser un número par.")
     st.stop()
 
+# Calculate sec_trusses_j
+sec_trusses_j = []
+sec_mode = st.session_state.get('sec_truss_mode', 'Ninguno')
+if sec_mode == "Automático":
+    total_width_m = st.session_state.nspan * st.session_state.larm
+    if total_width_m >= 91.44:
+        extra_width = total_width_m - 91.44
+        num_pares = int(extra_width / st.session_state.larm)
+        n_trusses = 1 + 2 * num_pares
+        mid_j = st.session_state.nspan / 2.0
+        interior_j = list(range(1, st.session_state.nspan))
+        interior_j.sort(key=lambda j: (abs(j - mid_j), j))
+        sec_trusses_j = interior_j[:n_trusses]
+elif sec_mode == "Todos los Ejes":
+    sec_trusses_j = list(range(0, st.session_state.nspan + 1))
+elif sec_mode == "Personalizado":
+    sec_trusses_j = st.session_state.get('sec_truss_custom_ejes', [])
+
 # Build Model
 try:
     model = StaadModel(
@@ -298,7 +337,8 @@ try:
         st.session_state.cm_sismo,
         st.session_state.cv_sismo,
         st.session_state.add_wind_cols,
-        st.session_state.max_wind_dist
+        st.session_state.max_wind_dist,
+        sec_trusses_j
     )
 except Exception as e:
     st.error(f"Error generando la geometría: {e}")
@@ -372,17 +412,26 @@ with col2:
             except Exception as e:
                 st.error(f"Error al guardar o abrir en '{full_path}': {e}")
 
+
     with st.container():
         st.markdown("<div class='ios-glass-marker'></div>", unsafe_allow_html=True)
         st.subheader("Elementos")
         num_wind_cols = len(model.groups.get('_COLVIENTO', []))
         wind_cols_line = f"&emsp;• Columnas (Viento): {num_wind_cols}<br>" if num_wind_cols > 0 else ""
         num_purlins = (st.session_state.nspan + 1) * st.session_state.nbay + st.session_state.nspan * (st.session_state.subdiv - 1) * st.session_state.nbay
+        
+        # Deduct purlins replaced by secondary trusses
+        num_sec_trusses_axes = len(model.sec_trusses_j)
+        num_purlins -= (num_sec_trusses_axes * st.session_state.nbay)
+        
+        num_sec_trusses_total = num_sec_trusses_axes * st.session_state.nbay
+        sec_trusses_line = f"&emsp;• Armaduras (Secundarias): {num_sec_trusses_total}<br>" if num_sec_trusses_total > 0 else ""
+        
         st.markdown(f"""
         <div style='line-height: 1.8;'>
             • Columnas: {(st.session_state.nbay + 1) * (st.session_state.nspan + 1)}<br>
             {wind_cols_line}• Armaduras: {(st.session_state.nbay + 1) * st.session_state.nspan}<br>
-            • Contravientos: {len(model.groups.get('_CVH', []))}<br>
+            {sec_trusses_line}• Contravientos: {len(model.groups.get('_CVH', []))}<br>
             • Largueros: {num_purlins}
         </div>
         <div style='height: 25px;'></div>

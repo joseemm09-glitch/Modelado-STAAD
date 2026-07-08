@@ -152,7 +152,23 @@ def write_staad(model):
         '_REL_LARG_START': model.rel_larg_start,
         '_REL_LARG_END': model.rel_larg_end,
         '_REL_END_FX': model.release_end_fx,
-        '_CI_INT': model.ci_int
+        '_CI_INT': model.ci_int,
+        '_CS_SEC': model.groups.get('_CS_SEC', []),
+        '_CI_SEC': model.groups.get('_CI_SEC', []),
+        '_MONTANTES_SEC': model.groups.get('_MONTANTES_SEC', []),
+        '_DIAG_SEC': model.groups.get('_DIAG_SEC', []),
+        '_REL_SEC_START': sorted(list(set(model.rel_cs_sec_start + model.rel_ci_sec_start))),
+        '_REL_SEC_END': sorted(list(set(model.rel_cs_sec_end + model.rel_ci_sec_end))),
+        '_CELOSIA_SEC': sorted(list(set(
+            model.groups.get('_MONTANTES_SEC', []) + 
+            model.groups.get('_DIAG_SEC', [])
+        ))),
+        '_ARMADURA_SEC': sorted(list(set(
+            model.groups.get('_CS_SEC', []) + 
+            model.groups.get('_CI_SEC', []) + 
+            model.groups.get('_MONTANTES_SEC', []) + 
+            model.groups.get('_DIAG_SEC', [])
+        )))
     }
     
     for name, members in group_map.items():
@@ -221,6 +237,17 @@ def write_staad(model):
     if celosia_str:
         out.append(build_lines(celosia_str.split(" ") + ["UPT", "1", "12"], 72))
         
+    cs_sec_str = group_ranges(group_map.get('_CS_SEC', []))
+    ci_sec_str = group_ranges(group_map.get('_CI_SEC', []))
+    celosia_sec_str = group_ranges(group_map.get('_CELOSIA_SEC', []))
+    
+    if cs_sec_str:
+        out.append(build_lines(cs_sec_str.split(" ") + ["UPT", "1", "27"], 72))
+    if ci_sec_str:
+        out.append(build_lines(ci_sec_str.split(" ") + ["UPT", "1", "27"], 72))
+    if celosia_sec_str:
+        out.append(build_lines(celosia_sec_str.split(" ") + ["UPT", "1", "12"], 72))
+        
     if cv_str:
         out.append("MEMBER PROPERTY AMERICAN")
         out.append(build_lines(cv_str.split(" ") + ["TABLE", "ST", "PIPE", "OD", "1.905", "ID", "0"], 72))
@@ -256,6 +283,8 @@ def write_staad(model):
     # Specifications
     # ------------------
     if (model.rel_csci_start or model.rel_csci_end or 
+        model.rel_cs_sec_start or model.rel_cs_sec_end or
+        model.rel_ci_sec_start or model.rel_ci_sec_end or
         model.rel_horiz_start or model.rel_horiz_end or 
         model.rel_larg_start or model.rel_larg_end or 
         model.release_end_fx):
@@ -264,6 +293,10 @@ def write_staad(model):
             out.append("_REL_CSCI_START START MY MZ")
         if model.rel_csci_end:
             out.append("_REL_CSCI_END END MY MZ")
+        if model.rel_cs_sec_start or model.rel_ci_sec_start:
+            out.append("_REL_SEC_START START MY MZ")
+        if model.rel_cs_sec_end or model.rel_ci_sec_end:
+            out.append("_REL_SEC_END END MY MZ")
         if model.rel_horiz_start:
             out.append("_REL_HORIZ_START START MY MZ")
         if model.rel_horiz_end:
@@ -300,19 +333,28 @@ def write_staad(model):
     cargas_text = CARGAS_TEMPLATE
             
     # Reemplazar Carga Muerta (LOAD 1)
+    cm_load_str = f"**** CM CUBIERTA: {model.c_muerta} KG/M2 *****\nMEMBER LOAD\n_LARGUEROS UNI GY -{format_num(model.load_cm)}"
+    if model.groups.get('_CS_SEC'):
+        cm_load_str += f"\n_CS_SEC UNI GY -{format_num(model.load_cm)}"
     cargas_text = cargas_text.replace(
         "**** CM CUBIERTA: 39.50 KG/M² *****",
-        f"**** CM CUBIERTA: {model.c_muerta} KG/M2 *****\nMEMBER LOAD\n_LARGUEROS UNI GY -{format_num(model.load_cm)}"
+        cm_load_str
     )
     # Añadir Carga Viva (LOAD 5)
+    cv_load_str = f"**** CV CUBIERTA: {model.c_viva} KG/M2 *****\nMEMBER LOAD\n_LARGUEROS UNI GY -{format_num(model.load_cv)}"
+    if model.groups.get('_CS_SEC'):
+        cv_load_str += f"\n_CS_SEC UNI GY -{format_num(model.load_cv)}"
     cargas_text = cargas_text.replace(
         "**** CV CUBIERTA: 100 KG/M2 *****\nMEMBER LOAD",
-        f"**** CV CUBIERTA: {model.c_viva} KG/M2 *****\nMEMBER LOAD\n_LARGUEROS UNI GY -{format_num(model.load_cv)}"
+        cv_load_str
     )
     # Añadir Granizo (LOAD 15)
+    granizo_load_str = f"**** CARGA DE GRANIZO: {model.c_granizo} KG/M2 *****\nMEMBER LOAD\n_LARGUEROS UNI GY -{format_num(model.load_granizo)}"
+    if model.groups.get('_CS_SEC'):
+        granizo_load_str += f"\n_CS_SEC UNI GY -{format_num(model.load_granizo)}"
     cargas_text = cargas_text.replace(
         "**** CARGA DE GRANIZO: 60 KG/M2 *****",
-        f"**** CARGA DE GRANIZO: {model.c_granizo} KG/M2 *****\nMEMBER LOAD\n_LARGUEROS UNI GY -{format_num(model.load_granizo)}"
+        granizo_load_str
     )
     
     # Función auxiliar para viento
