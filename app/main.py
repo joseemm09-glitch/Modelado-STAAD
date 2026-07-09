@@ -17,7 +17,8 @@ from model import StaadModel
 from staad_writer import write_staad
 from visualizer import plot_model
 
-st.set_page_config(page_title="Generador STAAD", layout="wide")
+icono_path = os.path.join(os.path.dirname(__file__), "..", "staad_green.ico")
+st.set_page_config(page_title="Naves Industriales STAAD.Pro", page_icon=icono_path, layout="wide")
 
 st.markdown("""
 <style>
@@ -145,9 +146,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.markdown("<div style='color: gray; margin-top: 15px; margin-bottom: -10px;'>&emsp;&emsp;M.I. José Ramón Márquez Montes</div>", unsafe_allow_html=True)
-st.title("Generador Paramétrico STAAD.Pro")
-st.markdown("Generador automático de naves industriales para STAAD.Pro")
+st.title("Generador Naves Industriales STAAD.Pro")
+st.markdown("<div style='color: gray; margin-top: -10px; margin-bottom: 10px;'>&emsp;&emsp;M.I. José Ramón Márquez Montes</div>", unsafe_allow_html=True)
 
 # Inicializar estado para variables por defecto
 defaults = {
@@ -384,7 +384,7 @@ col1, col2 = st.columns([3, 1])
 
 with col1:
     st.markdown("<div style='margin-top: -30px;'></div>", unsafe_allow_html=True)
-    st.subheader("Vista 3D")
+    st.subheader("Visualizador 3D")
     show_sup = (st.session_state.current_panel == "Geometría")
     fig = plot_model(model, show_supports=show_sup)
     st.plotly_chart(fig, use_container_width=True, config={
