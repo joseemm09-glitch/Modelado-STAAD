@@ -3,6 +3,7 @@ import math
 import os
 import subprocess
 import importlib
+import streamlit.components.v1 as components
 
 # Force reload of custom modules to ensure Streamlit hot-reloads them
 import model
@@ -92,7 +93,10 @@ st.markdown("""
         width: auto !important;
         font-size: 24px !important;
         box-shadow: none !important;
-        margin-bottom: 10px !important;
+        margin-bottom: -20px !important;
+        margin-top: 15px !important;
+        position: relative !important;
+        z-index: 10 !important;
     }
     section[data-testid="stSidebar"] button[kind="secondary"]:hover {
         color: darkgray !important;
@@ -147,14 +151,15 @@ st.markdown("Generador automático de naves industriales para STAAD.Pro")
 
 # Inicializar estado para variables por defecto
 defaults = {
-    "larm": 15.24, "ljoist": 12.20, "nbay": 10, "nspan": 5, 
+    "larm": 15.24, "ljoist": 12.20, "nbay": 7, "nspan": 4, 
     "harm": 1.30, "hlib": 9.75, "subdiv": 10,
-    "roof_type": "2 Aguas", "slope_pct": 3.0, "support_type": "FIXED",
+    "roof_type": "2 Aguas", "slope_pct": 5.0, "support_type": "FIXED",
     "c_muerta": 30.0, "c_viva": 100.0, "c_granizo": 60.0,
     "v_barlovento": 86.0, "v_sotavento": 50.0, "v_laterales": 78.0, "v_succion": 95.0,
     "coef_sismico": 0.08, "ductilidad": 2.0, "cm_sismo": None, "cv_sismo": None,
     "add_wind_cols": True,
     "max_wind_dist": 8.0,
+    "wall_type": "Metálico",
     "current_panel": "Main"
 }
 for k, v in defaults.items():
@@ -197,15 +202,18 @@ with st.sidebar:
     if panel == "Main":
         st.markdown("<br><br>", unsafe_allow_html=True)
         st.markdown("<h2 style='text-align: center;'>Menú Principal</h2>", unsafe_allow_html=True)
-        st.button("Geometría", type="primary", use_container_width=True, on_click=go_panel, args=("Geometría",))
-        st.button("Cargas", type="primary", use_container_width=True, on_click=go_panel, args=("Cargas",))
-        st.button("Diseño", type="primary", use_container_width=True, on_click=go_panel, args=("Diseño",))
+        st.button("Geometría", type="primary", width="stretch", on_click=go_panel, args=("Geometría",))
+        st.button("Cargas", type="primary", width="stretch", on_click=go_panel, args=("Cargas",))
+        st.button("Diseño", type="primary", width="stretch", on_click=go_panel, args=("Diseño",))
         
     elif panel == "Geometría":
         st.button("⬅", type="secondary", on_click=go_panel, args=("Main",))
         st.header("Geometría")
         
-        with st.expander("Dimensiones Generales", expanded=True):
+        wt = st.radio("Tipo de Muros", ["Metálico", "Tilt-Up"], index=0 if st.session_state.get("wall_type", "Metálico") == "Metálico" else 1, horizontal=True)
+        st.session_state.wall_type = wt
+        
+        with st.expander("Dimensiones Generales", expanded=False):
             st.number_input("Longitud de Armaduras (m)", min_value=1.0, step=0.1, value=st.session_state.larm, key="_larm", on_change=update_larm)
             st.number_input("Longitud de Joists (m)", min_value=1.0, step=0.1, value=st.session_state.ljoist, key="_ljoist", on_change=update_val, args=("ljoist",))
             
@@ -229,14 +237,26 @@ with st.sidebar:
             st.session_state.slope_pct = sp
 
         with st.expander("Apoyos", expanded=False):
-            apoyo = st.radio("Tipo de Apoyo", ["Empotrado", "Articulado"], index=0 if st.session_state.support_type == "FIXED" else 1)
-            st.session_state.support_type = "FIXED" if apoyo == "Empotrado" else "PINNED"
-
-        with st.expander("Columnas de Viento", expanded=False):
-            st.session_state.add_wind_cols = st.checkbox("Agregar Columnas de Viento", value=st.session_state.add_wind_cols)
-            if st.session_state.add_wind_cols:
-                st.session_state.max_wind_dist = st.number_input("Separación Máxima (m)", min_value=1.0, step=0.1, value=float(st.session_state.max_wind_dist))
+            if st.session_state.support_type == "FIXED":
+                idx = 0
+            elif st.session_state.support_type == "PINNED":
+                idx = 1
+            else:
+                idx = 2
+            apoyo = st.radio("Tipo de Apoyo", ["Empotrado", "Articulado", "Resorte"], index=idx)
+            
+            if apoyo == "Empotrado":
+                st.session_state.support_type = "FIXED"
+            elif apoyo == "Articulado":
+                st.session_state.support_type = "PINNED"
+            else:
+                st.session_state.support_type = "RESORTE"
                 
+            if st.session_state.support_type == "RESORTE":
+                if "resorte_val" not in st.session_state:
+                    st.session_state.resorte_val = "1,000,000"
+                st.session_state.resorte_val = st.text_input("Rigidez del resorte:", value=st.session_state.resorte_val)
+
         with st.expander("Armaduras Secundarias", expanded=False):
             sec_mode = st.radio("", ["Ninguno", "Automático", "Todos los Ejes", "Personalizado"], 
                                 index=["Ninguno", "Automático", "Todos los Ejes", "Personalizado"].index(st.session_state.get('sec_truss_mode', 'Ninguno')),
@@ -246,7 +266,10 @@ with st.sidebar:
                 st.write("Ejes:")
                 # Ordenar del centro hacia afuera
                 mid_j = st.session_state.nspan / 2.0
-                interior_j = list(range(0, st.session_state.nspan + 1))
+                if st.session_state.wall_type == "Tilt-Up":
+                    interior_j = list(range(1, st.session_state.nspan))
+                else:
+                    interior_j = list(range(0, st.session_state.nspan + 1))
                 interior_j.sort(key=lambda j: (abs(j - mid_j), j))
                 interior_j = interior_j[:10] # Limitar a 10 ejes máximo
                 
@@ -257,6 +280,14 @@ with st.sidebar:
                     if chk:
                         new_selected.append(j)
                 st.session_state.sec_truss_custom_ejes = new_selected
+
+        if st.session_state.wall_type != "Tilt-Up":
+            with st.expander("Columnas de Viento", expanded=False):
+                st.session_state.add_wind_cols = st.checkbox("Columnas de Viento", value=st.session_state.add_wind_cols)
+                if st.session_state.add_wind_cols:
+                    st.session_state.max_wind_dist = st.number_input("Separación Máxima (m)", min_value=1.0, step=0.1, value=float(st.session_state.max_wind_dist))
+        else:
+            st.session_state.add_wind_cols = False
 
     elif panel == "Cargas":
         st.button("⬅", type="secondary", on_click=go_panel, args=("Main",))
@@ -308,7 +339,10 @@ if sec_mode == "Automático":
         interior_j.sort(key=lambda j: (abs(j - mid_j), j))
         sec_trusses_j = interior_j[:n_trusses]
 elif sec_mode == "Todos los Ejes":
-    sec_trusses_j = list(range(0, st.session_state.nspan + 1))
+    if st.session_state.wall_type == "Tilt-Up":
+        sec_trusses_j = list(range(1, st.session_state.nspan))
+    else:
+        sec_trusses_j = list(range(0, st.session_state.nspan + 1))
 elif sec_mode == "Personalizado":
     sec_trusses_j = st.session_state.get('sec_truss_custom_ejes', [])
 
@@ -338,7 +372,9 @@ try:
         st.session_state.cv_sismo,
         st.session_state.add_wind_cols,
         st.session_state.max_wind_dist,
-        sec_trusses_j
+        st.session_state.wall_type,
+        sec_trusses_j,
+        st.session_state.get('resorte_val', '1,000,000').replace(',', '')
     )
 except Exception as e:
     st.error(f"Error generando la geometría: {e}")
@@ -381,16 +417,25 @@ with col2:
             st.text_input("ub", value=display_text, label_visibility="collapsed")
         with btn_col:
             if st.button("📁", help="Examinar..."):
-                import tkinter as tk
-                from tkinter import filedialog
-                root = tk.Tk()
-                root.withdraw()
-                root.attributes('-topmost', True)
-                folder_selected = filedialog.askdirectory(master=root, title="Seleccionar Carpeta de Exportación", initialdir=st.session_state.export_path)
-                root.destroy()
-                if folder_selected:
-                    st.session_state.export_path = folder_selected
-                    st.rerun()
+                import subprocess, sys
+                code = f"""
+import tkinter as tk
+from tkinter import filedialog
+root = tk.Tk()
+root.withdraw()
+root.attributes('-topmost', True)
+folder = filedialog.askdirectory(master=root, title="Seleccionar Carpeta", initialdir=r"{st.session_state.export_path}")
+root.destroy()
+print(folder)
+                """
+                try:
+                    result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=30)
+                    folder_selected = result.stdout.strip()
+                    if folder_selected and folder_selected != "()":
+                        st.session_state.export_path = folder_selected
+                        st.rerun()
+                except Exception as e:
+                    pass
                     
         staad_text = write_staad(model)
         
@@ -439,3 +484,40 @@ with col2:
         </div>
         <div style='height: 25px;'></div>
         """, unsafe_allow_html=True)
+
+# Javascript para hacer que los expanders funcionen como acordeón
+components.html(
+    """
+    <script>
+    const updateExpanders = () => {
+        const expanders = window.parent.document.querySelectorAll('details');
+        expanders.forEach(exp => {
+            exp.removeAttribute('name'); // Quitar para no interferir con Streamlit
+            const summary = exp.querySelector('summary');
+            if (summary && !summary.dataset.accordionAttached) {
+                summary.dataset.accordionAttached = 'true';
+                summary.addEventListener('click', (e) => {
+                    const isOpen = exp.hasAttribute('open');
+                    if (!isOpen) {
+                        expanders.forEach(otherExp => {
+                            if (otherExp !== exp && otherExp.hasAttribute('open')) {
+                                const otherSummary = otherExp.querySelector('summary');
+                                if (otherSummary) {
+                                    otherSummary.click(); // Cerrarlo simulando un click para que la flecha se actualice
+                                }
+                            }
+                        });
+                    }
+                });
+            }
+        });
+    };
+    updateExpanders();
+    const observer = new MutationObserver(updateExpanders);
+    observer.observe(window.parent.document.body, { childList: true, subtree: true });
+    </script>
+    """,
+    height=0,
+    width=0
+)
+

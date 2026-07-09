@@ -6,11 +6,15 @@ def get_group_color(group_name):
         '_COLVIENTO': 'limegreen',
         '_CS': 'red',
         '_CI': 'orange',
+        '_CS_PERIM': 'red',
+        '_CI_PERIM': 'orange',
         '_MONTANTES': 'green',
         '_DIAG': 'purple',
+        '_MONTANTES_PERIM': 'green',
+        '_DIAG_PERIM': 'purple',
         '_LARGUEROS': 'gray',
         '_JOISTGRAL': 'gray',
-        '_JPUNTAL': 'dimgray',
+        '_JPUNTAL': 'darkslategray',
         '_CVH': 'black',
         '_CS_SEC': 'red',
         '_CI_SEC': 'orange',
@@ -33,7 +37,7 @@ def plot_model(model, show_supports=False):
 
     # We group lines by group to draw them in a consistent order in the legend.
     # We initialize lines for each group to ensure they are added in the correct order.
-    group_order = ['_COL', '_COLVIENTO', '_CS', '_CI', '_MONTANTES', '_DIAG', '_LARGUEROS', '_JOISTGRAL', '_JPUNTAL', '_CVH', '_CS_SEC', '_CI_SEC', '_MONTANTES_SEC', '_DIAG_SEC']
+    group_order = ['_COL', '_COLVIENTO', '_CS', '_CI', '_CS_PERIM', '_CI_PERIM', '_MONTANTES', '_DIAG', '_MONTANTES_PERIM', '_DIAG_PERIM', '_LARGUEROS', '_JOISTGRAL', '_JPUNTAL', '_CVH', '_CS_SEC', '_CI_SEC', '_MONTANTES_SEC', '_DIAG_SEC']
     lines_by_group = {grp: {'x': [], 'y': [], 'z': [], 'color': get_group_color(grp)} for grp in group_order}
     lines_by_group['unknown'] = {'x': [], 'y': [], 'z': [], 'color': 'black'}
 
@@ -60,13 +64,15 @@ def plot_model(model, show_supports=False):
         data = lines_by_group[grp]
         if data['x']:
             lw = 3 if grp in ['_LARGUEROS', '_JOISTGRAL', '_JPUNTAL'] else 4
+            hidden_legend_groups = ['_CS', '_CI', '_CS_PERIM', '_CI_PERIM', '_MONTANTES', '_DIAG', '_MONTANTES_PERIM', '_DIAG_PERIM', '_CS_SEC', '_CI_SEC', '_MONTANTES_SEC', '_DIAG_SEC']
             fig.add_trace(go.Scatter3d(
                 x=data['x'],
                 y=data['z'], # Plotly Z is up by default in some views, but we'll map Y to Z for better default camera
                 z=data['y'],
                 mode='lines',
                 line=dict(color=data['color'], width=lw),
-                name=grp
+                name=grp,
+                showlegend=(grp not in hidden_legend_groups)
             ))
             
     if lines_by_group['unknown']['x']:
@@ -78,6 +84,53 @@ def plot_model(model, show_supports=False):
             mode='lines',
             line=dict(color=data['color'], width=4),
             name='Otros'
+        ))
+        
+    # Plot plates if any (Tilt-Up)
+    if getattr(model, 'plates', None):
+        px, py, pz = [], [], []
+        i_idx, j_idx, k_idx = [], [], []
+        idx = 0
+        
+        ox, oy, oz = [], [], [] # Outlines
+        
+        for pid, (n1, n2, n3, n4) in model.plates.items():
+            # Add to mesh
+            for n in [n1, n2, n3, n4]:
+                x, y, z = model.nodes[n]
+                px.append(x / 100.0)
+                py.append(z / 100.0) # Plotly Y is Model Z
+                pz.append(y / 100.0) # Plotly Z is Model Y
+                
+            i_idx.extend([idx, idx])
+            j_idx.extend([idx+1, idx+2])
+            k_idx.extend([idx+2, idx+3])
+            idx += 4
+            
+            # Add to outlines
+            for n in [n1, n2, n3, n4, n1]:
+                x, y, z = model.nodes[n]
+                ox.append(x / 100.0)
+                oy.append(z / 100.0)
+                oz.append(y / 100.0)
+            ox.append(None)
+            oy.append(None)
+            oz.append(None)
+            
+        fig.add_trace(go.Mesh3d(
+            x=px, y=py, z=pz,
+            i=i_idx, j=j_idx, k=k_idx,
+            color='lightgray',
+            opacity=0.65,
+            name='Muros (Plates)'
+        ))
+        
+        fig.add_trace(go.Scatter3d(
+            x=ox, y=oy, z=oz,
+            mode='lines',
+            line=dict(color='gray', width=2),
+            name='Bordes Muros',
+            showlegend=False
         ))
 
     # Also plot nodes as small dots
@@ -93,39 +146,98 @@ def plot_model(model, show_supports=False):
 
     # Plot supports
     if show_supports and model.base_nodes:
-        sup_x, sup_y, sup_z = [], [], []
-        
-        is_fixed = (model.support_type.upper() == "FIXED")
-        
-        for nid in model.base_nodes:
-            nx = model.nodes[nid][0] / 100.0
-            ny = model.nodes[nid][2] / 100.0 # Plotly Y is Model Z
-            nz = model.nodes[nid][1] / 100.0 # Plotly Z is Model Y (height, usually 0 at base)
+        if model.support_type.upper() == "RESORTE":
+            rx, ry, rz = [], [], []
+            gx, gy, gz = [], [], []
+            bx, by, bz = [], [], []
+            L = 0.5   # Longitud de la línea paralela al eje (mitad de antes)
+            w = 0.75  # Longitud de la línea perpendicular (75% de antes)
+            d = 0.225 # Longitud de las diagonales (75% de antes)
             
-            if is_fixed:
-                # Rectángulo hueco: alto la mitad del ancho. W=1.2, H=0.6
-                w = 1.2
-                h = 0.6
-                sup_x.extend([nx - w/2, nx + w/2, nx + w/2, nx - w/2, nx - w/2, None])
-                sup_y.extend([ny, ny, ny, ny, ny, None])
-                sup_z.extend([nz, nz, nz - h, nz - h, nz, None])
-            else:
-                # Triángulo hueco. W=1.2, H=1.0
-                w = 1.2
-                h = 1.0
-                sup_x.extend([nx, nx + w/2, nx - w/2, nx, None])
-                sup_y.extend([ny, ny, ny, ny, None])
-                sup_z.extend([nz, nz - h, nz - h, nz, None])
+            for nid in model.base_nodes:
+                nx = model.nodes[nid][0] / 100.0
+                ny = model.nodes[nid][2] / 100.0 # Plotly Y is Model Z
+                nz = model.nodes[nid][1] / 100.0 # Plotly Z is Model Y
                 
-        fig.add_trace(go.Scatter3d(
-            x=sup_x,
-            y=sup_y,
-            z=sup_z,
-            mode='lines',
-            line=dict(color='black', width=3),
-            name='Apoyos',
-            showlegend=True
-        ))
+                # GREEN (Resorte Y): línea paralela a Z Plotly (Y Model) hacia abajo
+                gx.extend([nx, nx, None])
+                gy.extend([ny, ny, None])
+                gz.extend([nz, nz - L, None])
+                # Perpendicular a lo largo de X Plotly
+                gx.extend([nx - w/2, nx + w/2, None])
+                gy.extend([ny, ny, None])
+                gz.extend([nz - L, nz - L, None])
+                # 4 Diagonales
+                for i in range(4):
+                    px = (nx - w/2) + i * (w / 3)
+                    gx.extend([px, px - d, None])
+                    gy.extend([ny, ny, None])
+                    gz.extend([nz - L, nz - L - d, None])
+                
+                # RED (Resorte X): línea paralela a X Plotly (X Model) hacia atrás (-X)
+                rx.extend([nx, nx - L, None])
+                ry.extend([ny, ny, None])
+                rz.extend([nz, nz, None])
+                # Perpendicular a lo largo de Z Plotly (Y Model)
+                rx.extend([nx - L, nx - L, None])
+                ry.extend([ny, ny, None])
+                rz.extend([nz - w/2, nz + w/2, None])
+                # 4 Diagonales
+                for i in range(4):
+                    pz = (nz - w/2) + i * (w / 3)
+                    rx.extend([nx - L, nx - L - d, None])
+                    ry.extend([ny, ny, None])
+                    rz.extend([pz, pz - d, None])
+                    
+                # BLUE (Resorte Z): línea paralela a Y Plotly (Z Model) hacia atrás (-Y Plotly)
+                bx.extend([nx, nx, None])
+                by.extend([ny, ny - L, None])
+                bz.extend([nz, nz, None])
+                # Perpendicular a lo largo de X Plotly
+                bx.extend([nx - w/2, nx + w/2, None])
+                by.extend([ny - L, ny - L, None])
+                bz.extend([nz, nz, None])
+                # 4 Diagonales
+                for i in range(4):
+                    px = (nx - w/2) + i * (w / 3)
+                    bx.extend([px, px - d, None])
+                    by.extend([ny - L, ny - L - d, None])
+                    bz.extend([nz, nz, None])
+                    
+            fig.add_trace(go.Scatter3d(x=rx, y=ry, z=rz, mode='lines', line=dict(color='red', width=3), name='Resorte X', legendgroup='resorte', showlegend=False))
+            fig.add_trace(go.Scatter3d(x=gx, y=gy, z=gz, mode='lines', line=dict(color='lime', width=3), name='Resorte Y', legendgroup='resorte', showlegend=False))
+            fig.add_trace(go.Scatter3d(x=bx, y=by, z=bz, mode='lines', line=dict(color='blue', width=3), name='Apoyos', legendgroup='resorte', showlegend=True))
+        else:
+            sup_x, sup_y, sup_z = [], [], []
+            is_fixed = (model.support_type.upper() == "FIXED")
+            
+            for nid in model.base_nodes:
+                nx = model.nodes[nid][0] / 100.0
+                ny = model.nodes[nid][2] / 100.0 # Plotly Y is Model Z
+                nz = model.nodes[nid][1] / 100.0 # Plotly Z is Model Y
+                
+                if is_fixed:
+                    w = 1.2
+                    h = 0.6
+                    sup_x.extend([nx - w/2, nx + w/2, nx + w/2, nx - w/2, nx - w/2, None])
+                    sup_y.extend([ny, ny, ny, ny, ny, None])
+                    sup_z.extend([nz, nz, nz - h, nz - h, nz, None])
+                else:
+                    w = 1.2
+                    h = 1.0
+                    sup_x.extend([nx, nx + w/2, nx - w/2, nx, None])
+                    sup_y.extend([ny, ny, ny, ny, None])
+                    sup_z.extend([nz, nz - h, nz - h, nz, None])
+                    
+            fig.add_trace(go.Scatter3d(
+                x=sup_x,
+                y=sup_y,
+                z=sup_z,
+                mode='lines',
+                line=dict(color='black', width=3),
+                name='Apoyos',
+                showlegend=True
+            ))
 
     # Plot wind column supports (Articulaciones / Triángulos rojo oscuro)
     if show_supports and getattr(model, 'wind_base_nodes', None):
@@ -142,13 +254,14 @@ def plot_model(model, show_supports=False):
             wsup_y.extend([ny, ny, ny, ny, None])
             wsup_z.extend([nz, nz - h, nz - h, nz, None])
             
+        name_support = 'Apoyos (Muro)' if getattr(model, 'wall_type', None) == 'Tilt-Up' else 'Apoyos (Viento)'
         fig.add_trace(go.Scatter3d(
             x=wsup_x,
             y=wsup_y,
             z=wsup_z,
             mode='lines',
             line=dict(color='darkred', width=3),
-            name='Apoyos (Viento)',
+            name=name_support,
             showlegend=True
         ))
 
@@ -157,7 +270,12 @@ def plot_model(model, show_supports=False):
             xaxis_title='X (m)',
             yaxis_title='Z (m)',
             zaxis_title='Y (m)',
-            aspectmode='data' # Keeps scale proportional
+            aspectmode='data', # Keeps scale proportional
+            camera=dict(
+                eye=dict(x=1.5, y=1.5, z=1.2),
+                center=dict(x=0, y=0, z=-0.5),
+                up=dict(x=0, y=0, z=1)
+            )
         ),
         margin=dict(l=0, r=0, b=0, t=0),
         title="",
@@ -174,10 +292,10 @@ def plot_model(model, show_supports=False):
                 bordercolor="rgba(0, 0, 0, 0.2)",
                 showactive=True,
                 buttons=[
-                    dict(label="Iso", method="relayout", args=["scene.camera", dict(eye=dict(x=1.5, y=1.5, z=1.2), up=dict(x=0, y=0, z=1))]),
-                    dict(label="Planta", method="relayout", args=["scene.camera", dict(eye=dict(x=0, y=0, z=2.5), up=dict(x=0, y=1, z=0))]),
-                    dict(label="Lat. X", method="relayout", args=["scene.camera", dict(eye=dict(x=0, y=-2.5, z=0), up=dict(x=0, y=0, z=1))]),
-                    dict(label="Lat. Z", method="relayout", args=["scene.camera", dict(eye=dict(x=-2.5, y=0, z=0), up=dict(x=0, y=0, z=1))])
+                    dict(label="Iso", method="relayout", args=["scene.camera", dict(eye=dict(x=1.5, y=1.5, z=1.2), center=dict(x=0, y=0, z=-0.5), up=dict(x=0, y=0, z=1))]),
+                    dict(label="Planta", method="relayout", args=["scene.camera", dict(eye=dict(x=0, y=0, z=2.5), center=dict(x=0, y=0, z=-0.5), up=dict(x=0, y=1, z=0))]),
+                    dict(label="Lat. X", method="relayout", args=["scene.camera", dict(eye=dict(x=0, y=-2.5, z=0), center=dict(x=0, y=0, z=-0.5), up=dict(x=0, y=0, z=1))]),
+                    dict(label="Lat. Z", method="relayout", args=["scene.camera", dict(eye=dict(x=-2.5, y=0, z=0), center=dict(x=0, y=0, z=-0.5), up=dict(x=0, y=0, z=1))])
                 ]
             )
         ],

@@ -1,7 +1,7 @@
 import math
 
 class StaadModel:
-    def __init__(self, Larm_m, Ljoist_m, nBay, nSpan, HArmad_m, HLibre_m, numSubdiv, roof_type="Plana", slope_pct=0.0, support_type="FIXED", c_muerta=30.0, c_viva=100.0, c_granizo=60.0, v_barlovento=86.0, v_sotavento=50.0, v_laterales=78.0, v_succion=95.0, coef_sismico=0.08, ductilidad=2.0, cm_sismo=None, cv_sismo=None, add_wind_cols=False, max_wind_dist_m=8.0, sec_trusses_j=None):
+    def __init__(self, Larm_m, Ljoist_m, nBay, nSpan, HArmad_m, HLibre_m, numSubdiv, roof_type="Plana", slope_pct=0.0, support_type="FIXED", c_muerta=30.0, c_viva=100.0, c_granizo=60.0, v_barlovento=86.0, v_sotavento=50.0, v_laterales=78.0, v_succion=95.0, coef_sismico=0.08, ductilidad=2.0, cm_sismo=None, cv_sismo=None, add_wind_cols=False, max_wind_dist_m=8.0, wall_type="Metálico", sec_trusses_j=None, resorte_val="1000000"):
         self.Larm_m = float(Larm_m)
         self.Ljoist_m = float(Ljoist_m)
         self.nBay = int(nBay)
@@ -13,6 +13,8 @@ class StaadModel:
         self.roof_type = roof_type
         self.slope_pct = float(slope_pct)
         self.support_type = support_type
+        self.resorte_val = resorte_val
+        self.wall_type = wall_type
         
         self.sec_trusses_j = sec_trusses_j if sec_trusses_j else []
         if self.sec_trusses_j:
@@ -118,8 +120,12 @@ class StaadModel:
             '_COLVIENTO': [],
             '_CS': [],
             '_CI': [],
+            '_CS_PERIM': [],
+            '_CI_PERIM': [],
             '_MONTANTES': [],
             '_DIAG': [],
+            '_MONTANTES_PERIM': [],
+            '_DIAG_PERIM': [],
             '_LARGUEROS': [],
             '_CVH': [],
             '_JOISTGRAL': [],
@@ -158,6 +164,10 @@ class StaadModel:
         self.rel_cs_sec_end = []
         self.rel_ci_sec_start = []
         self.rel_ci_sec_end = []
+        self.rel_tiltup_start = []
+        self.rel_tiltup_end = []
+        self.plate_releases_j1_j4 = []
+        self.plate_releases_j2_j3 = []
         self.release_end_fx = []
         self.horizontal_truss_members = []
         self.split_purlin_first = []
@@ -169,9 +179,12 @@ class StaadModel:
         
         self.base_nodes = [] # Nodos en la base para asignar SUPPORTS FIXED
         self.wind_base_nodes = []
+        self.plate_groups = {'X0': [], 'XMAX': [], 'Z0': [], 'ZMAX': []}
 
         self.node_id = 0
         self.mem_id = 0
+        
+        self.plates = {} # mem_id: (n1, n2, n3, n4)
         
         self.generate()
 
@@ -184,6 +197,11 @@ class StaadModel:
             else:
                 self.base_nodes.append(self.node_id)
         return self.node_id
+
+    def add_plate(self, n1, n2, n3, n4):
+        self.mem_id += 1
+        self.plates[self.mem_id] = (n1, n2, n3, n4)
+        return self.mem_id
 
     def add_member(self, n1, n2, group):
         self.mem_id += 1
@@ -313,44 +331,49 @@ class StaadModel:
         # --- Columnas (Niveles 1 -> 2 y 2 -> 3) ---
         for j in range(self.nSpan + 1):
             for i in range(self.nBay + 1):
-                col1 = self.add_member(nL1[(i, j)], nL2[(i, j)], '_COL')
-                col2 = self.add_member(nL2[(i, j)], nL3[(i, j)], '_COL')
+                is_perimeter = (j == 0 or j == self.nSpan or i == 0 or i == self.nBay)
+                if self.wall_type == "Tilt-Up" and is_perimeter:
+                    pass
+                else:
+                    col1 = self.add_member(nL1[(i, j)], nL2[(i, j)], '_COL')
+                    col2 = self.add_member(nL2[(i, j)], nL3[(i, j)], '_COL')
+                    
+                    # Height calculation
+                    x = j * self.Lx
+                    total_h = self.HtLibre + self.HtArmad + self.get_y_offset(x)
+                    h_rounded = math.ceil(total_h)
+                    if h_rounded not in self.col_heights:
+                        self.col_heights[h_rounded] = []
+                    self.col_heights[h_rounded].extend([col1, col2])
+                    
+                    # Face X0
+                    if j == 0:
+                        if i == 0 or i == self.nBay:
+                            self.wind_cols['X0_CORNER'].extend([col1, col2])
+                        else:
+                            self.wind_cols['X0_INNER'].extend([col1, col2])
+                    
+                    # Face XMAX
+                    if j == self.nSpan:
+                        if i == 0 or i == self.nBay:
+                            self.wind_cols['XMAX_CORNER'].extend([col1, col2])
+                        else:
+                            self.wind_cols['XMAX_INNER'].extend([col1, col2])
+                            
+                    # Face Z0
+                    if i == 0:
+                        if j == 0 or j == self.nSpan:
+                            self.wind_cols['Z0_CORNER'].extend([col1, col2])
+                        else:
+                            self.wind_cols['Z0_INNER'].extend([col1, col2])
+                            
+                    # Face ZMAX
+                    if i == self.nBay:
+                        if j == 0 or j == self.nSpan:
+                            self.wind_cols['ZMAX_CORNER'].extend([col1, col2])
+                        else:
+                            self.wind_cols['ZMAX_INNER'].extend([col1, col2])
                 
-                # Height calculation
-                x = j * self.Lx
-                total_h = self.HtLibre + self.HtArmad + self.get_y_offset(x)
-                h_rounded = math.ceil(total_h)
-                if h_rounded not in self.col_heights:
-                    self.col_heights[h_rounded] = []
-                self.col_heights[h_rounded].extend([col1, col2])
-                
-                # Face X0
-                if j == 0:
-                    if i == 0 or i == self.nBay:
-                        self.wind_cols['X0_CORNER'].extend([col1, col2])
-                    else:
-                        self.wind_cols['X0_INNER'].extend([col1, col2])
-                
-                # Face XMAX
-                if j == self.nSpan:
-                    if i == 0 or i == self.nBay:
-                        self.wind_cols['XMAX_CORNER'].extend([col1, col2])
-                    else:
-                        self.wind_cols['XMAX_INNER'].extend([col1, col2])
-                        
-                # Face Z0
-                if i == 0:
-                    if j == 0 or j == self.nSpan:
-                        self.wind_cols['Z0_CORNER'].extend([col1, col2])
-                    else:
-                        self.wind_cols['Z0_INNER'].extend([col1, col2])
-                        
-                # Face ZMAX
-                if i == self.nBay:
-                    if j == 0 or j == self.nSpan:
-                        self.wind_cols['ZMAX_CORNER'].extend([col1, col2])
-                    else:
-                        self.wind_cols['ZMAX_INNER'].extend([col1, col2])
                 
                 # Clasificación para Sismo en nodos superiores (Nivel 3)
                 top_node = nL3[(i, j)]
@@ -386,13 +409,17 @@ class StaadModel:
                     nid = self.add_node(xn, yn, zn)
                     upperSub[(i, j, k)] = nid
                     
-                    mid = self.add_member(prev, nid, '_CS')
-                    if is_first:
-                        self.rel_csci_start.append(mid)
-                        is_first = False
+                    if not (self.wall_type == "Tilt-Up" and (i == 0 or i == self.nBay)):
+                        grp = '_CS_PERIM' if (j == 0 or j == self.nSpan - 1) else '_CS'
+                        mid = self.add_member(prev, nid, grp)
+                        if is_first:
+                            self.rel_csci_start.append(mid)
+                            is_first = False
                     prev = nid
-                mid2 = self.add_member(prev, nL3[(i, j + 1)], '_CS')
-                self.rel_csci_end.append(mid2)
+                if not (self.wall_type == "Tilt-Up" and (i == 0 or i == self.nBay)):
+                    grp = '_CS_PERIM' if (j == 0 or j == self.nSpan - 1) else '_CS'
+                    mid2 = self.add_member(prev, nL3[(i, j + 1)], grp)
+                    self.rel_csci_end.append(mid2)
 
         # --- Cuerda Inferior (Nivel 2) ---
         L0 = self.Lx / self.numSubdiv
@@ -409,33 +436,43 @@ class StaadModel:
                     nid = self.add_node(x, yn, z2)
                     lowerInter[(i, j, t)] = nid
                     
-                    mid = self.add_member(leftN, nid, '_CI')
-                    if t == 1:
-                        self.rel_csci_start.append(mid)
-                    else:
-                        self.ci_int.append(mid)
+                    if not (self.wall_type == "Tilt-Up" and (i == 0 or i == self.nBay)):
+                        grp = '_CI_PERIM' if (j == 0 or j == self.nSpan - 1) else '_CI'
+                        mid = self.add_member(leftN, nid, grp)
+                        if t == 1:
+                            self.rel_csci_start.append(mid)
+                        else:
+                            self.ci_int.append(mid)
                     leftN = nid
 
-                mid2 = self.add_member(leftN, nL2[(i, j + 1)], '_CI')
-                self.rel_csci_end.append(mid2)
+                if not (self.wall_type == "Tilt-Up" and (i == 0 or i == self.nBay)):
+                    grp = '_CI_PERIM' if (j == 0 or j == self.nSpan - 1) else '_CI'
+                    mid2 = self.add_member(leftN, nL2[(i, j + 1)], grp)
+                    self.rel_csci_end.append(mid2)
 
         # --- Montantes ---
         for i in range(self.nBay + 1):
+            if self.wall_type == "Tilt-Up" and (i == 0 or i == self.nBay):
+                continue
             for j in range(self.nSpan):
+                grp = '_MONTANTES_PERIM' if (j == 0 or j == self.nSpan - 1) else '_MONTANTES'
                 for t in range(1, halfSub + 1):
                     oddK = 2 * t - 1
-                    self.add_member(lowerInter[(i, j, t)], upperSub[(i, j, oddK)], '_MONTANTES')
+                    self.add_member(lowerInter[(i, j, t)], upperSub[(i, j, oddK)], grp)
 
         # --- Diagonales (V) ---
         for i in range(self.nBay + 1):
+            if self.wall_type == "Tilt-Up" and (i == 0 or i == self.nBay):
+                continue
             for j in range(self.nSpan):
+                grp = '_DIAG_PERIM' if (j == 0 or j == self.nSpan - 1) else '_DIAG'
                 for t in range(1, halfSub + 1):
                     # izquierda
                     u_left = self.get_upper_node(nL3, upperSub, i, j, 2 * (t - 1))
-                    self.add_member(u_left, lowerInter[(i, j, t)], '_DIAG')
+                    self.add_member(u_left, lowerInter[(i, j, t)], grp)
                     # derecha
                     u_right = self.get_upper_node(nL3, upperSub, i, j, 2 * t)
-                    self.add_member(u_right, lowerInter[(i, j, t)], '_DIAG')
+                    self.add_member(u_right, lowerInter[(i, j, t)], grp)
 
         # --- Largueros ---
         if self.nBay >= 1:
@@ -476,7 +513,7 @@ class StaadModel:
                             x_next = L0 if j == 0 else (self.total_width - L0)
                             y_next = self.HtLibre + self.HtArmad + self.get_y_offset(x_next)
                             
-                            nid_new = self.add_node(x_next, y_next, z)
+                            nid_new = self.get_or_create_node(x_next, y_next, z)
                             B[k] = nid_new
                             
                             # Strut (Puntal horizontal)
@@ -533,8 +570,26 @@ class StaadModel:
             
             for j in range(self.nSpan):
                 for k in range(1, self.numSubdiv):
+                    is_segundo = (j == 0 and k == 1)
+                    is_penultimo = (j == self.nSpan - 1 and k == self.numSubdiv - 1)
+                    is_wind_strut = self.add_wind_cols and self.wind_col_N > 1 and (is_segundo or is_penultimo)
                     for i in range(self.nBay):
-                        self.add_member(upperSub[(i, j, k)], upperSub[(i + 1, j, k)], '_LARGUEROS')
+                        if is_wind_strut:
+                            N = self.wind_col_N
+                            x = L0 if is_segundo else (self.total_width - L0)
+                            y = self.HtLibre + self.HtArmad + self.get_y_offset(x)
+                            
+                            A = [None] * (N + 1)
+                            A[0] = upperSub[(i, j, k)]
+                            A[N] = upperSub[(i + 1, j, k)]
+                            for p in range(1, N):
+                                z = (i + p / N) * self.Lz
+                                A[p] = self.get_or_create_node(x, y, z)
+                                
+                            for p in range(N):
+                                self.add_member(A[p], A[p+1], '_JPUNTAL')
+                        else:
+                            self.add_member(upperSub[(i, j, k)], upperSub[(i + 1, j, k)], '_LARGUEROS')
 
         # --- Contravientos Horizontales (_CV) ---
         if self.nBay >= 1 and self.nSpan >= 1:
@@ -591,6 +646,8 @@ class StaadModel:
         # --- Columnas de Viento en Cabeceras (Eje Z primero y último) ---
         if self.add_wind_cols and self.wind_col_Z_M > 1:
             for i in [0, self.nBay]:
+                if self.wall_type == "Tilt-Up":
+                    continue
                 for j in range(self.nSpan):
                     # Existing nodes on Cuerda Inferior in this span j and bay i
                     ci_nodes_in_span = []
@@ -651,7 +708,10 @@ class StaadModel:
                 self.groups['_JOISTGRAL'].append(mem_id)
                 
             # Releases logic
-            if mem_id in self.split_purlin_first:
+            if is_puntal:
+                # No release for JPUNTAL
+                pass
+            elif mem_id in self.split_purlin_first:
                 self.rel_larg_start.append(mem_id)
             elif mem_id in self.split_purlin_last:
                 self.rel_larg_end.append(mem_id)
@@ -662,5 +722,126 @@ class StaadModel:
                 # Not split: release both start and end
                 self.rel_larg_start.append(mem_id)
                 self.rel_larg_end.append(mem_id)
+                
+        # --- Generación de Placas para Tilt-Up ---
+        if self.wall_type == "Tilt-Up":
+            # 1. Caras Z=0 y Z=ZMAX (A lo largo de X)
+            for i in [0, self.nBay]:
+                for j in range(self.nSpan):
+                    baseZ = i * self.Lz
+                    # En estas caras, generamos 2 placas por cada separación de la armadura
+                    for k in range(self.numSubdiv):
+                        xn1 = j * self.Lx + k * (self.Lx / self.numSubdiv)
+                        xn2 = j * self.Lx + (k + 1) * (self.Lx / self.numSubdiv)
+                        
+                        yn_bot1 = self.HtLibre + self.get_y_offset(xn1)
+                        yn_top1 = self.HtLibre + self.HtArmad + self.get_y_offset(xn1)
+                        
+                        yn_bot2 = self.HtLibre + self.get_y_offset(xn2)
+                        yn_top2 = self.HtLibre + self.HtArmad + self.get_y_offset(xn2)
+                        
+                        # Nodos inferiores en y=0
+                        n_b1 = self.get_or_create_node(xn1, 0.0, baseZ)
+                        n_b2 = self.get_or_create_node(xn2, 0.0, baseZ)
+                        
+                        # Nodos en CI
+                        n_ci1 = self.get_or_create_node(xn1, yn_bot1, baseZ)
+                        n_ci2 = self.get_or_create_node(xn2, yn_bot2, baseZ)
+                        
+                        # Nodos en CS
+                        n_cs1 = self.get_or_create_node(xn1, yn_top1, baseZ)
+                        n_cs2 = self.get_or_create_node(xn2, yn_top2, baseZ)
+                        
+                        # Placa Inferior (y=0 a CI)
+                        p1 = self.add_plate(n_b1, n_b2, n_ci2, n_ci1)
+                        
+                        # Placa Superior (CI a CS)
+                        p2 = self.add_plate(n_ci1, n_ci2, n_cs2, n_cs1)
+                        
+                        group_key = 'Z0' if i == 0 else 'ZMAX'
+                        self.plate_groups[group_key].extend([p1, p2])
+                        
+                        # Nodos base requieren soporte PINNED
+                        if n_b1 not in self.wind_base_nodes:
+                            self.wind_base_nodes.append(n_b1)
+                        if n_b2 not in self.wind_base_nodes:
+                            self.wind_base_nodes.append(n_b2)
+
+            # 2. Caras X=0 y X=XMAX (A lo largo de Z)
+            for j in [0, self.nSpan]:
+                baseX = j * self.Lx
+                yn_bot = self.HtLibre + self.get_y_offset(baseX)
+                yn_top = self.HtLibre + self.HtArmad + self.get_y_offset(baseX)
+                
+                for i in range(self.nBay):
+                    Nz = math.ceil(self.Ljoist_m / 4.0)
+                    step_z = self.Lz / Nz
+                    for nz in range(Nz):
+                        zn1 = i * self.Lz + nz * step_z
+                        zn2 = i * self.Lz + (nz + 1) * step_z
+                        
+                        n_b1 = self.get_or_create_node(baseX, 0.0, zn1)
+                        n_b2 = self.get_or_create_node(baseX, 0.0, zn2)
+                        
+                        n_ci1 = self.get_or_create_node(baseX, yn_bot, zn1)
+                        n_ci2 = self.get_or_create_node(baseX, yn_bot, zn2)
+                        
+                        n_cs1 = self.get_or_create_node(baseX, yn_top, zn1)
+                        n_cs2 = self.get_or_create_node(baseX, yn_top, zn2)
+                        
+                        p1 = self.add_plate(n_b1, n_b2, n_ci2, n_ci1)
+                        p2 = self.add_plate(n_ci1, n_ci2, n_cs2, n_cs1)
+                        
+                        group_key = 'X0' if j == 0 else 'XMAX'
+                        self.plate_groups[group_key].extend([p1, p2])
+                        
+                        if i == 0 and nz == 0:
+                            self.plate_releases_j1_j4.extend([p1, p2])
+                        elif i == self.nBay - 1 and nz == Nz - 1:
+                            self.plate_releases_j2_j3.extend([p1, p2])
+                        
+                        if n_b1 not in self.wind_base_nodes:
+                            self.wind_base_nodes.append(n_b1)
+                        if n_b2 not in self.wind_base_nodes:
+                            self.wind_base_nodes.append(n_b2)
+            
+            # 3. Liberaciones en armaduras que llegan a placas (X=0 y X=XMAX o Z=0 y Z=ZMAX)
+            for mem_id in self.groups.get('_CI', []):
+                n1, n2 = self.members[mem_id]
+                x1, y1, z1 = self.nodes[n1]
+                x2, y2, z2 = self.nodes[n2]
+                tol = 1.0 # 1 cm tol
+                if abs(x1 - 0) < tol or abs(x1 - self.total_width) < tol:
+                    if mem_id not in self.rel_tiltup_start:
+                        self.rel_tiltup_start.append(mem_id)
+                        if mem_id in self.rel_csci_start:
+                            self.rel_csci_start.remove(mem_id)
+                if abs(x2 - 0) < tol or abs(x2 - self.total_width) < tol:
+                    if mem_id not in self.rel_tiltup_end:
+                        self.rel_tiltup_end.append(mem_id)
+                        if mem_id in self.rel_csci_end:
+                            self.rel_csci_end.remove(mem_id)
+                            
+            total_depth = self.Lz * self.nBay
+            for mem_id in self.groups.get('_CI_SEC', []):
+                n1, n2 = self.members[mem_id]
+                x1, y1, z1 = self.nodes[n1]
+                x2, y2, z2 = self.nodes[n2]
+                tol = 1.0 # 1 cm tol
+                if abs(z1 - 0) < tol or abs(z1 - total_depth) < tol:
+                    if mem_id not in self.rel_tiltup_start:
+                        self.rel_tiltup_start.append(mem_id)
+                        if mem_id in self.rel_ci_sec_start:
+                            self.rel_ci_sec_start.remove(mem_id)
+                if abs(z2 - 0) < tol or abs(z2 - total_depth) < tol:
+                    if mem_id not in self.rel_tiltup_end:
+                        self.rel_tiltup_end.append(mem_id)
+                        if mem_id in self.rel_ci_sec_end:
+                            self.rel_ci_sec_end.remove(mem_id)
+
+        # Remove wind base nodes from regular base nodes to avoid duplicate/overlapping supports
+        for nid in self.wind_base_nodes:
+            if nid in self.base_nodes:
+                self.base_nodes.remove(nid)
 
         return self
