@@ -9,9 +9,11 @@ import streamlit.components.v1 as components
 import model
 import staad_writer
 import visualizer
+import prediseno
 importlib.reload(model)
 importlib.reload(staad_writer)
 importlib.reload(visualizer)
+importlib.reload(prediseno)
 
 from model import StaadModel
 from staad_writer import write_staad
@@ -195,6 +197,66 @@ def update_c_muerta():
     st.session_state.cm_sismo = st.session_state.c_muerta
     st.session_state['_cm_sismo'] = st.session_state.cm_sismo
 
+# Ensure even subdivisions
+if st.session_state.subdiv % 2 != 0:
+    st.sidebar.error("Las subdivisiones deben ser un número par.")
+    st.stop()
+
+# Calculate sec_trusses_j
+sec_trusses_j = []
+sec_mode = st.session_state.get('sec_truss_mode', 'Ninguno')
+if sec_mode == "Automático":
+    total_width_m = st.session_state.nspan * st.session_state.larm
+    if total_width_m >= 91.44:
+        extra_width = total_width_m - 91.44
+        num_pares = int(extra_width / st.session_state.larm)
+        n_trusses = 1 + 2 * num_pares
+        mid_j = st.session_state.nspan / 2.0
+        interior_j = list(range(1, st.session_state.nspan))
+        interior_j.sort(key=lambda j: (abs(j - mid_j), j))
+        sec_trusses_j = interior_j[:n_trusses]
+elif sec_mode == "Todos los Ejes":
+    if st.session_state.wall_type == "Tilt-Up":
+        sec_trusses_j = list(range(1, st.session_state.nspan))
+    else:
+        sec_trusses_j = list(range(0, st.session_state.nspan + 1))
+elif sec_mode == "Personalizado":
+    sec_trusses_j = st.session_state.get('sec_truss_custom_ejes', [])
+
+# Build Model
+try:
+    model = StaadModel(
+        st.session_state.larm, 
+        st.session_state.ljoist, 
+        st.session_state.nbay, 
+        st.session_state.nspan, 
+        st.session_state.harm, 
+        st.session_state.hlib, 
+        st.session_state.subdiv, 
+        st.session_state.roof_type, 
+        st.session_state.slope_pct,
+        st.session_state.support_type,
+        st.session_state.c_muerta,
+        st.session_state.c_viva,
+        st.session_state.c_granizo,
+        st.session_state.v_barlovento,
+        st.session_state.v_sotavento,
+        st.session_state.v_laterales,
+        st.session_state.v_succion,
+        st.session_state.coef_sismico,
+        st.session_state.ductilidad,
+        st.session_state.cm_sismo,
+        st.session_state.cv_sismo,
+        st.session_state.add_wind_cols,
+        st.session_state.max_wind_dist,
+        st.session_state.wall_type,
+        sec_trusses_j,
+        st.session_state.get('resorte_val', '1,000,000').replace(',', '')
+    )
+except Exception as e:
+    st.error(f"Error generando la geometría: {e}")
+    st.stop()
+
 
 with st.sidebar:
     panel = st.session_state.current_panel
@@ -204,7 +266,7 @@ with st.sidebar:
         st.markdown("<h2 style='text-align: center;'>Menú Principal</h2>", unsafe_allow_html=True)
         st.button("Geometría", type="primary", width="stretch", on_click=go_panel, args=("Geometría",))
         st.button("Cargas", type="primary", width="stretch", on_click=go_panel, args=("Cargas",))
-        st.button("Diseño", type="primary", width="stretch", on_click=go_panel, args=("Diseño",))
+        st.button("Prediseño", type="primary", width="stretch", on_click=go_panel, args=("Prediseño",))
         
     elif panel == "Geometría":
         st.button("⬅", type="secondary", on_click=go_panel, args=("Main",))
@@ -315,70 +377,25 @@ with st.sidebar:
             st.number_input("Carga Muerta para Sismo (kg/m²)", min_value=0.0, step=5.0, value=st.session_state.cm_sismo, key="_cm_sismo", on_change=update_val, args=("cm_sismo",))
             st.number_input("Carga Viva para Sismo (kg/m²)", min_value=0.0, step=5.0, value=st.session_state.cv_sismo, key="_cv_sismo", on_change=update_val, args=("cv_sismo",))
 
-    elif panel == "Diseño":
+    elif panel == "Prediseño":
         st.button("⬅", type="secondary", on_click=go_panel, args=("Main",))
-        st.header("Diseño")
-        st.info("Opciones de diseño en construcción...")
-
-# Ensure even subdivisions
-if st.session_state.subdiv % 2 != 0:
-    st.sidebar.error("Las subdivisiones deben ser un número par.")
-    st.stop()
-
-# Calculate sec_trusses_j
-sec_trusses_j = []
-sec_mode = st.session_state.get('sec_truss_mode', 'Ninguno')
-if sec_mode == "Automático":
-    total_width_m = st.session_state.nspan * st.session_state.larm
-    if total_width_m >= 91.44:
-        extra_width = total_width_m - 91.44
-        num_pares = int(extra_width / st.session_state.larm)
-        n_trusses = 1 + 2 * num_pares
-        mid_j = st.session_state.nspan / 2.0
-        interior_j = list(range(1, st.session_state.nspan))
-        interior_j.sort(key=lambda j: (abs(j - mid_j), j))
-        sec_trusses_j = interior_j[:n_trusses]
-elif sec_mode == "Todos los Ejes":
-    if st.session_state.wall_type == "Tilt-Up":
-        sec_trusses_j = list(range(1, st.session_state.nspan))
-    else:
-        sec_trusses_j = list(range(0, st.session_state.nspan + 1))
-elif sec_mode == "Personalizado":
-    sec_trusses_j = st.session_state.get('sec_truss_custom_ejes', [])
-
-# Build Model
-try:
-    model = StaadModel(
-        st.session_state.larm, 
-        st.session_state.ljoist, 
-        st.session_state.nbay, 
-        st.session_state.nspan, 
-        st.session_state.harm, 
-        st.session_state.hlib, 
-        st.session_state.subdiv, 
-        st.session_state.roof_type, 
-        st.session_state.slope_pct,
-        st.session_state.support_type,
-        st.session_state.c_muerta,
-        st.session_state.c_viva,
-        st.session_state.c_granizo,
-        st.session_state.v_barlovento,
-        st.session_state.v_sotavento,
-        st.session_state.v_laterales,
-        st.session_state.v_succion,
-        st.session_state.coef_sismico,
-        st.session_state.ductilidad,
-        st.session_state.cm_sismo,
-        st.session_state.cv_sismo,
-        st.session_state.add_wind_cols,
-        st.session_state.max_wind_dist,
-        st.session_state.wall_type,
-        sec_trusses_j,
-        st.session_state.get('resorte_val', '1,000,000').replace(',', '')
-    )
-except Exception as e:
-    st.error(f"Error generando la geometría: {e}")
-    st.stop()
+        st.header("Prediseño")
+        
+        with st.expander("Columnas", expanded=True):
+            grupos_cols = prediseno.clasificar_columnas(model)
+            
+            if not grupos_cols:
+                st.warning("No se encontraron columnas para diseñar.")
+            else:
+                st.radio("Resaltar en 3D:", list(sorted(grupos_cols.keys())), key="highlight_grupo_col")
+                for nombre_grupo in sorted(grupos_cols.keys()):
+                    top_5 = prediseno.predisenar_grupo(nombre_grupo, model)
+                    
+                    if top_5:
+                        opciones = [p['perfil']['nombre'] for p in top_5]
+                        st.selectbox(nombre_grupo, options=opciones, key=f"sel_{nombre_grupo}")
+                    else:
+                        st.error(f"No se encontraron perfiles óptimos.")
 
 col1, col2 = st.columns([3, 1])
 
@@ -386,7 +403,11 @@ with col1:
     st.markdown("<div style='margin-top: -30px;'></div>", unsafe_allow_html=True)
     st.subheader("Visualizador 3D")
     show_sup = (st.session_state.current_panel == "Geometría")
-    fig = plot_model(model, show_supports=show_sup)
+    highlight_col = st.session_state.get("highlight_grupo_col", "C-1") if st.session_state.current_panel == "Prediseño" else "Ninguno"
+    highlight_ids = None
+    if highlight_col != "Ninguno" and highlight_col in prediseno.clasificar_columnas(model):
+        highlight_ids = prediseno.clasificar_columnas(model).get(highlight_col, [])
+    fig = plot_model(model, show_supports=show_sup, highlight_ids=highlight_ids)
     st.plotly_chart(fig, use_container_width=True, config={
         'displaylogo': False,
         'modeBarButtonsToRemove': ['resetCameraDefault3d', 'resetCameraLastSave3d', 'hoverClosest3d', 'tableRotation']
@@ -437,7 +458,22 @@ print(folder)
                 except Exception as e:
                     pass
                     
-        staad_text = write_staad(model)
+        # Obtener nombres de STAAD
+        import prediseno
+        db_or = prediseno.generar_base_datos_or()
+        db_w = prediseno.generar_base_datos_w()
+        name_to_staad = {p['nombre']: p['nombre_staad'] for p in db_or + db_w}
+        
+        selected_profiles = {}
+        grupos_cols = prediseno.clasificar_columnas(model)
+        for g in grupos_cols.keys():
+            ui_name = st.session_state.get(f"sel_{g}")
+            if ui_name:
+                staad_name = name_to_staad.get(ui_name)
+                if staad_name:
+                    selected_profiles[g] = staad_name
+                    
+        staad_text = write_staad(model, selected_profiles=selected_profiles)
         
         if st.button("Guardar Archivo .std", type="primary"):
             # Limpiar el nombre del archivo para evitar caracteres inválidos

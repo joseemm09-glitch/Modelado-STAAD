@@ -23,9 +23,11 @@ def get_group_color(group_name):
     }
     return colors.get(group_name, 'black')
 
-def plot_model(model, show_supports=False):
+def plot_model(model, show_supports=False, highlight_ids=None):
     """
-    Returns a plotly figure representing the 3D STAAD model.
+    Plots the StaadModel using Plotly 3D scatter.
+    If highlight_ids is provided, those members are drawn in red and thicker,
+    while the rest are drawn transparent gray.
     """
     fig = go.Figure()
 
@@ -36,10 +38,18 @@ def plot_model(model, show_supports=False):
             member_to_group[m] = grp_name
 
     # We group lines by group to draw them in a consistent order in the legend.
-    # We initialize lines for each group to ensure they are added in the correct order.
     group_order = ['_COL', '_COLVIENTO', '_CS', '_CI', '_CS_PERIM', '_CI_PERIM', '_MONTANTES', '_DIAG', '_MONTANTES_PERIM', '_DIAG_PERIM', '_LARGUEROS', '_JOISTGRAL', '_JPUNTAL', '_CVH', '_CS_SEC', '_CI_SEC', '_MONTANTES_SEC', '_DIAG_SEC']
-    lines_by_group = {grp: {'x': [], 'y': [], 'z': [], 'color': get_group_color(grp)} for grp in group_order}
-    lines_by_group['unknown'] = {'x': [], 'y': [], 'z': [], 'color': 'black'}
+    
+    if highlight_ids is not None:
+        lines_by_group = {
+            'highlighted': {'x': [], 'y': [], 'z': [], 'color': 'red', 'width': 6},
+            'normal_cols': {'x': [], 'y': [], 'z': [], 'color': get_group_color('_COL'), 'width': 4},
+            'normal_wind_cols': {'x': [], 'y': [], 'z': [], 'color': get_group_color('_COLVIENTO'), 'width': 4},
+            'faded': {'x': [], 'y': [], 'z': [], 'color': '#b0b0b0', 'width': 2}
+        }
+    else:
+        lines_by_group = {grp: {'x': [], 'y': [], 'z': [], 'color': get_group_color(grp)} for grp in group_order}
+        lines_by_group['unknown'] = {'x': [], 'y': [], 'z': [], 'color': 'black'}
 
     for mid, (n1, n2) in model.members.items():
         if n1 not in model.nodes or n2 not in model.nodes:
@@ -52,39 +62,63 @@ def plot_model(model, show_supports=False):
         x0, y0, z0 = x0 / 100.0, y0 / 100.0, z0 / 100.0
         x1, y1, z1 = x1 / 100.0, y1 / 100.0, z1 / 100.0
         
-        grp = member_to_group.get(mid, 'unknown')
-        if grp not in lines_by_group:
-            grp = 'unknown'
+        if highlight_ids is not None:
+            if mid in highlight_ids:
+                target_grp = 'highlighted'
+            elif member_to_group.get(mid) == '_COL':
+                target_grp = 'normal_cols'
+            elif member_to_group.get(mid) == '_COLVIENTO':
+                target_grp = 'normal_wind_cols'
+            else:
+                target_grp = 'faded'
+        else:
+            target_grp = member_to_group.get(mid, 'unknown')
+            if target_grp not in lines_by_group:
+                target_grp = 'unknown'
             
-        lines_by_group[grp]['x'].extend([x0, x1, None])
-        lines_by_group[grp]['y'].extend([y0, y1, None])
-        lines_by_group[grp]['z'].extend([z0, z1, None])
+        lines_by_group[target_grp]['x'].extend([x0, x1, None])
+        lines_by_group[target_grp]['y'].extend([y0, y1, None])
+        lines_by_group[target_grp]['z'].extend([z0, z1, None])
 
-    for grp in group_order:
-        data = lines_by_group[grp]
-        if data['x']:
-            lw = 3 if grp in ['_LARGUEROS', '_JOISTGRAL', '_JPUNTAL'] else 4
-            hidden_legend_groups = ['_CS', '_CI', '_CS_PERIM', '_CI_PERIM', '_MONTANTES', '_DIAG', '_MONTANTES_PERIM', '_DIAG_PERIM', '_CS_SEC', '_CI_SEC', '_MONTANTES_SEC', '_DIAG_SEC']
+    if highlight_ids is not None:
+        ordered_keys = ['highlighted', 'normal_wind_cols', 'normal_cols', 'faded']
+        name_map = {'highlighted': 'Grupo Seleccionado', 'normal_cols': 'Resto Columnas', 'normal_wind_cols': 'Columnas Viento', 'faded': 'Resto Estructura'}
+        for grp_name in ordered_keys:
+            data = lines_by_group[grp_name]
+            if data['x']:
+                fig.add_trace(go.Scatter3d(
+                    x=data['x'], y=data['z'], z=data['y'],
+                    mode='lines',
+                    line=dict(color=data['color'], width=data['width']),
+                    name=name_map[grp_name],
+                    opacity=0.4 if grp_name == 'faded' else 1.0
+                ))
+    else:
+        for grp in group_order:
+            data = lines_by_group[grp]
+            if data['x']:
+                lw = 3 if grp in ['_LARGUEROS', '_JOISTGRAL', '_JPUNTAL'] else 4
+                hidden_legend_groups = ['_CS', '_CI', '_CS_PERIM', '_CI_PERIM', '_MONTANTES', '_DIAG', '_MONTANTES_PERIM', '_DIAG_PERIM', '_CS_SEC', '_CI_SEC', '_MONTANTES_SEC', '_DIAG_SEC']
+                fig.add_trace(go.Scatter3d(
+                    x=data['x'],
+                    y=data['z'],
+                    z=data['y'],
+                    mode='lines',
+                    line=dict(color=data['color'], width=lw),
+                    name=grp,
+                    showlegend=(grp not in hidden_legend_groups)
+                ))
+                
+        if lines_by_group['unknown']['x']:
+            data = lines_by_group['unknown']
             fig.add_trace(go.Scatter3d(
                 x=data['x'],
-                y=data['z'], # Plotly Z is up by default in some views, but we'll map Y to Z for better default camera
+                y=data['z'],
                 z=data['y'],
                 mode='lines',
-                line=dict(color=data['color'], width=lw),
-                name=grp,
-                showlegend=(grp not in hidden_legend_groups)
+                line=dict(color=data['color'], width=4),
+                name='Otros'
             ))
-            
-    if lines_by_group['unknown']['x']:
-        data = lines_by_group['unknown']
-        fig.add_trace(go.Scatter3d(
-            x=data['x'],
-            y=data['z'],
-            z=data['y'],
-            mode='lines',
-            line=dict(color=data['color'], width=4),
-            name='Otros'
-        ))
         
     # Plot plates if any (Tilt-Up)
     if getattr(model, 'plates', None):
@@ -121,7 +155,7 @@ def plot_model(model, show_supports=False):
             x=px, y=py, z=pz,
             i=i_idx, j=j_idx, k=k_idx,
             color='lightgray',
-            opacity=0.65,
+            opacity=0.15 if highlight_ids is not None else 0.65,
             name='Muros (Plates)'
         ))
         
@@ -133,6 +167,8 @@ def plot_model(model, show_supports=False):
             showlegend=False
         ))
 
+    node_opacity = 0.0 if highlight_ids is not None else 1.0
+    
     # Also plot nodes as small dots
     fig.add_trace(go.Scatter3d(
         x=[n[0] / 100.0 for n in model.nodes.values()],
@@ -141,7 +177,8 @@ def plot_model(model, show_supports=False):
         mode='markers',
         marker=dict(size=2, color='black'),
         name='Nodos',
-        showlegend=False
+        showlegend=False,
+        opacity=node_opacity
     ))
 
     # Plot supports

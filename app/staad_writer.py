@@ -25,6 +25,8 @@ def group_ranges(numbers):
         else:
             if start == end:
                 ranges.append(str(start))
+            elif end == start + 1:
+                ranges.append(f"{start} {end}")
             else:
                 ranges.append(f"{start} TO {end}")
             start = n
@@ -32,6 +34,8 @@ def group_ranges(numbers):
             
     if start == end:
         ranges.append(str(start))
+    elif end == start + 1:
+        ranges.append(f"{start} {end}")
     else:
         ranges.append(f"{start} TO {end}")
         
@@ -99,8 +103,11 @@ def parse_upt_to_user_table(file_path, table_number):
                 out.append(stripped)
     return "\n".join(out)
 
-def write_staad(model):
-    """Generates the STAAD file content from a StaadModel object."""
+def write_staad(model, selected_profiles=None):
+    """
+    Generates STAAD.Pro input file text from a StaadModel instance.
+    If selected_profiles is provided, maps {'C-1': 'HSS10X10X0.250', ...} to the respective members.
+    """
     date_str = datetime.now().strftime("%d-%b-%y")
     
     out = []
@@ -255,10 +262,21 @@ def write_staad(model):
     armadura_perim_str = group_ranges(group_map.get('_ARMADURA_PERIM', []))
     cv_str = group_ranges(group_map.get('_CVH', []))
     
-    if col_str:
-        out.append(build_lines(col_str.split(" ") + ["TABLE ST HSST14X14X0.313"], 72))
-    if colviento_str:
-        out.append(build_lines(colviento_str.split(" ") + ["TABLE ST W12X26"], 72))
+    if selected_profiles:
+        import prediseno
+        grupos_cols = prediseno.clasificar_columnas(model)
+        for g_name, ids in grupos_cols.items():
+            staad_prof = selected_profiles.get(g_name)
+            if staad_prof and ids:
+                g_str = group_ranges(ids)
+                if g_str:
+                    out.append(build_lines(g_str.split(" ") + [f"TABLE ST {staad_prof}"], 72))
+    else:
+        if col_str:
+            out.append(build_lines(col_str.split(" ") + ["TABLE ST HSST14X14X0.313"], 72))
+        if colviento_str:
+            out.append(build_lines(colviento_str.split(" ") + ["TABLE ST W12X26"], 72))
+            
     joistgral_str = group_ranges(group_map.get('_JOISTGRAL', []))
     jpuntal_str = group_ranges(group_map.get('_JPUNTAL', []))
     if joistgral_str:
