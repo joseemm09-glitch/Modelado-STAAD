@@ -310,13 +310,14 @@ def plot_model(model, show_supports=False, highlight_ids=None):
             aspectmode='data', # Keeps scale proportional
             camera=dict(
                 eye=dict(x=1.5, y=1.5, z=1.2),
-                center=dict(x=0, y=0, z=-0.5),
+                center=dict(x=-0.2, y=0, z=-0.5),
                 up=dict(x=0, y=0, z=1)
             )
         ),
         margin=dict(l=0, r=0, b=0, t=0),
         title="",
         showlegend=True,
+        uirevision='model_view',
         updatemenus=[
             dict(
                 type="buttons",

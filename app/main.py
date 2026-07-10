@@ -272,8 +272,8 @@ with st.sidebar:
         st.button("⬅", type="secondary", on_click=go_panel, args=("Main",))
         st.header("Geometría")
         
-        wt = st.radio("Tipo de Muros", ["Metálico", "Tilt-Up"], index=0 if st.session_state.get("wall_type", "Metálico") == "Metálico" else 1, horizontal=True)
-        st.session_state.wall_type = wt
+        wt_idx = 0 if st.session_state.get("wall_type", "Metálico") == "Metálico" else 1
+        st.radio("Tipo de Muros", ["Metálico", "Tilt-Up"], index=wt_idx, key="_wall_type", on_change=update_val, args=("wall_type",), horizontal=True)
         
         with st.expander("Dimensiones Generales", expanded=False):
             st.number_input("Longitud de Armaduras (m)", min_value=1.0, step=0.1, value=st.session_state.larm, key="_larm", on_change=update_larm)
@@ -293,26 +293,28 @@ with st.sidebar:
             st.number_input("Subdivisiones (Debe ser par)", min_value=2, step=2, value=st.session_state.subdiv, key="_subdiv", on_change=update_val, args=("subdiv",))
 
         with st.expander("Cubierta", expanded=False):
-            rt = st.radio("Tipo de Cubierta", ["1 Agua", "2 Aguas"], index=["1 Agua", "2 Aguas"].index(st.session_state.roof_type) if st.session_state.roof_type in ["1 Agua", "2 Aguas"] else 1)
-            st.session_state.roof_type = rt
-            sp = st.number_input("Pendiente (%)", min_value=0.0, step=0.5, value=st.session_state.slope_pct)
-            st.session_state.slope_pct = sp
+            rt_idx = 1 if st.session_state.roof_type == "2 Aguas" else 0
+            st.radio("Tipo de Cubierta", ["1 Agua", "2 Aguas"], index=rt_idx, key="_roof_type", on_change=update_val, args=("roof_type",))
+            st.number_input("Pendiente (%)", min_value=0.0, step=0.5, value=st.session_state.slope_pct, key="_slope_pct", on_change=update_val, args=("slope_pct",))
 
         with st.expander("Apoyos", expanded=False):
-            if st.session_state.support_type == "FIXED":
-                idx = 0
-            elif st.session_state.support_type == "PINNED":
-                idx = 1
-            else:
-                idx = 2
-            apoyo = st.radio("Tipo de Apoyo", ["Empotrado", "Articulado", "Resorte"], index=idx)
-            
-            if apoyo == "Empotrado":
-                st.session_state.support_type = "FIXED"
-            elif apoyo == "Articulado":
-                st.session_state.support_type = "PINNED"
-            else:
-                st.session_state.support_type = "RESORTE"
+            if 'apoyo_ui' not in st.session_state:
+                if st.session_state.support_type == "FIXED":
+                    st.session_state.apoyo_ui = "Empotrado"
+                elif st.session_state.support_type == "PINNED":
+                    st.session_state.apoyo_ui = "Articulado"
+                else:
+                    st.session_state.apoyo_ui = "Resorte"
+                    
+            def update_apoyo():
+                if st.session_state.apoyo_ui == "Empotrado":
+                    st.session_state.support_type = "FIXED"
+                elif st.session_state.apoyo_ui == "Articulado":
+                    st.session_state.support_type = "PINNED"
+                else:
+                    st.session_state.support_type = "RESORTE"
+                    
+            st.radio("Tipo de Apoyo", ["Empotrado", "Articulado", "Resorte"], key="apoyo_ui", on_change=update_apoyo)
                 
             if st.session_state.support_type == "RESORTE":
                 if "resorte_val" not in st.session_state:
@@ -345,9 +347,9 @@ with st.sidebar:
 
         if st.session_state.wall_type != "Tilt-Up":
             with st.expander("Columnas de Viento", expanded=False):
-                st.session_state.add_wind_cols = st.checkbox("Columnas de Viento", value=st.session_state.add_wind_cols)
+                st.checkbox("Columnas de Viento", value=st.session_state.add_wind_cols, key="_add_wind_cols", on_change=update_val, args=("add_wind_cols",))
                 if st.session_state.add_wind_cols:
-                    st.session_state.max_wind_dist = st.number_input("Separación Máxima (m)", min_value=1.0, step=0.1, value=float(st.session_state.max_wind_dist))
+                    st.number_input("Separación Máxima (m)", min_value=1.0, step=0.1, value=float(st.session_state.max_wind_dist), key="_max_wind_dist", on_change=update_val, args=("max_wind_dist",))
         else:
             st.session_state.add_wind_cols = False
 
@@ -360,14 +362,14 @@ with st.sidebar:
             st.number_input("Granizo (kg/m²)", min_value=0.0, step=5.0, value=st.session_state.c_granizo, key="_c_granizo", on_change=update_val, args=("c_granizo",))
             
         with st.expander("Viento", expanded=False):
-            st.session_state.v_barlovento = st.number_input("Barlovento (kg/m²)", min_value=0.0, step=1.0, value=st.session_state.v_barlovento)
-            st.session_state.v_sotavento = st.number_input("Sotavento (kg/m²)", min_value=0.0, step=1.0, value=st.session_state.v_sotavento)
-            st.session_state.v_laterales = st.number_input("Laterales (kg/m²)", min_value=0.0, step=1.0, value=st.session_state.v_laterales)
-            st.session_state.v_succion = st.number_input("Succión (kg/m²)", min_value=0.0, step=1.0, value=st.session_state.v_succion)
+            st.number_input("Barlovento (kg/m²)", min_value=0.0, step=1.0, value=st.session_state.v_barlovento, key="_v_barlovento", on_change=update_val, args=("v_barlovento",))
+            st.number_input("Sotavento (kg/m²)", min_value=0.0, step=1.0, value=st.session_state.v_sotavento, key="_v_sotavento", on_change=update_val, args=("v_sotavento",))
+            st.number_input("Laterales (kg/m²)", min_value=0.0, step=1.0, value=st.session_state.v_laterales, key="_v_laterales", on_change=update_val, args=("v_laterales",))
+            st.number_input("Succión (kg/m²)", min_value=0.0, step=1.0, value=st.session_state.v_succion, key="_v_succion", on_change=update_val, args=("v_succion",))
 
         with st.expander("Sismo", expanded=False):
-            st.session_state.coef_sismico = st.number_input("Coeficiente Sísmico", min_value=0.0, step=0.01, value=st.session_state.coef_sismico)
-            st.session_state.ductilidad = st.number_input("Ductilidad", min_value=1.0, step=0.5, value=st.session_state.ductilidad)
+            st.number_input("Coeficiente Sísmico", min_value=0.0, step=0.01, value=st.session_state.coef_sismico, key="_coef_sismico", on_change=update_val, args=("coef_sismico",))
+            st.number_input("Ductilidad", min_value=1.0, step=0.5, value=st.session_state.ductilidad, key="_ductilidad", on_change=update_val, args=("ductilidad",))
             
             if st.session_state.cm_sismo is None:
                 st.session_state.cm_sismo = st.session_state.c_muerta
