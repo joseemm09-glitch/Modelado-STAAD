@@ -478,7 +478,7 @@ class StaadModel:
         if self.nBay >= 1:
             for j in range(self.nSpan + 1):
                 has_sec_truss = (j in self.sec_trusses_j)
-                is_wind_col_axis = (self.add_wind_cols and self.wind_col_N > 1 and (j == 0 or j == self.nSpan))
+                is_wind_col_axis = (self.add_wind_cols and self.wind_col_N > 1 and (j == 0 or j == self.nSpan) and self.wall_type != "Tilt-Up")
                 for i in range(self.nBay):
                     if is_wind_col_axis:
                         # Split larguero and create wind columns and horizontal wind trusses
@@ -572,7 +572,7 @@ class StaadModel:
                 for k in range(1, self.numSubdiv):
                     is_segundo = (j == 0 and k == 1)
                     is_penultimo = (j == self.nSpan - 1 and k == self.numSubdiv - 1)
-                    is_wind_strut = self.add_wind_cols and self.wind_col_N > 1 and (is_segundo or is_penultimo)
+                    is_wind_strut = self.add_wind_cols and self.wind_col_N > 1 and (is_segundo or is_penultimo) and self.wall_type != "Tilt-Up"
                     for i in range(self.nBay):
                         if is_wind_strut:
                             N = self.wind_col_N

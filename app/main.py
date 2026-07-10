@@ -162,7 +162,8 @@ defaults = {
     "add_wind_cols": True,
     "max_wind_dist": 8.0,
     "wall_type": "Metálico",
-    "current_panel": "Main"
+    "current_panel": "Main",
+    "subdiv_warning": False
 }
 for k, v in defaults.items():
     if k not in st.session_state:
@@ -174,6 +175,16 @@ def go_panel(p):
 def update_val(key):
     st.session_state[key] = st.session_state["_" + key]
 
+def update_subdiv():
+    val = st.session_state._subdiv
+    if val % 2 != 0:
+        val += 1
+        st.session_state.subdiv_warning = True
+    else:
+        st.session_state.subdiv_warning = False
+    st.session_state.subdiv = val
+    st.session_state._subdiv = val
+
 def update_larm():
     st.session_state.larm = st.session_state._larm
     # Auto-actualizar
@@ -183,6 +194,7 @@ def update_larm():
         needed += 1
     st.session_state.subdiv = max(2, int(needed))
     st.session_state['_subdiv'] = st.session_state.subdiv
+    st.session_state.subdiv_warning = False
     
     st.session_state.harm = math.ceil((length / 12.5) * 10) / 10.0
     st.session_state['_harm'] = st.session_state.harm
@@ -196,11 +208,6 @@ def update_c_muerta():
     st.session_state.c_muerta = st.session_state._c_muerta
     st.session_state.cm_sismo = st.session_state.c_muerta
     st.session_state['_cm_sismo'] = st.session_state.cm_sismo
-
-# Ensure even subdivisions
-if st.session_state.subdiv % 2 != 0:
-    st.sidebar.error("Las subdivisiones deben ser un número par.")
-    st.stop()
 
 # Calculate sec_trusses_j
 sec_trusses_j = []
@@ -221,7 +228,16 @@ elif sec_mode == "Todos los Ejes":
     else:
         sec_trusses_j = list(range(0, st.session_state.nspan + 1))
 elif sec_mode == "Personalizado":
-    sec_trusses_j = st.session_state.get('sec_truss_custom_ejes', [])
+    mid_j = st.session_state.nspan / 2.0
+    if st.session_state.wall_type == "Tilt-Up":
+        interior_j = list(range(1, st.session_state.nspan))
+    else:
+        interior_j = list(range(0, st.session_state.nspan + 1))
+    interior_j.sort(key=lambda j: (abs(j - mid_j), j))
+    interior_j = interior_j[:10]
+    
+    sec_trusses_j = [j for j in interior_j if st.session_state.get(f"sec_eje_{j}", False)]
+    st.session_state.sec_truss_custom_ejes = sec_trusses_j
 
 # Build Model
 try:
@@ -282,7 +298,7 @@ with st.sidebar:
             st.number_input("Número de Bahías (Profundidad)", min_value=1, step=1, value=st.session_state.nbay, key="_nbay", on_change=update_val, args=("nbay",))
             st.number_input("Número de Entre-ejes (Ancho)", min_value=1, step=1, value=st.session_state.nspan, key="_nspan", on_change=update_val, args=("nspan",))
             
-            st.number_input("Altura de Armadura (Peralte) (m)", min_value=0.5, step=0.1, value=st.session_state.harm, key="_harm", on_change=update_val, args=("harm",))
+            st.number_input("Peralte Armadura (m)", min_value=0.5, step=0.1, value=st.session_state.harm, key="_harm", on_change=update_val, args=("harm",))
             
             # Relaciones L/10 y L/15
             l_10 = st.session_state.larm / 10.0
@@ -290,7 +306,13 @@ with st.sidebar:
             st.markdown(f"<div style='font-size: 0.85em; color: gray; margin-top: -10px; margin-bottom: 10px;'>L/10 = {l_10:.2f} m.<br>L/15 = {l_15:.2f} m.</div>", unsafe_allow_html=True)
             
             st.number_input("Altura Libre (m)", min_value=1.0, step=0.1, value=st.session_state.hlib, key="_hlib", on_change=update_val, args=("hlib",))
-            st.number_input("Subdivisiones (Debe ser par)", min_value=2, step=2, value=st.session_state.subdiv, key="_subdiv", on_change=update_val, args=("subdiv",))
+            st.number_input("Subdivisiones (Debe ser par)", min_value=2, step=2, value=st.session_state.subdiv, key="_subdiv", on_change=update_subdiv)
+            if st.session_state.get("subdiv_warning", False):
+                st.markdown("<div style='font-size: 0.85em; color: red; margin-top: -10px; margin-bottom: 10px;'>Debe ser número par. Se ajustó automáticamente.</div>", unsafe_allow_html=True)
+            
+            # Relación de Separación (Sep)
+            sep_val = st.session_state.larm / st.session_state.subdiv
+            st.markdown(f"<div style='font-size: 0.85em; color: gray; margin-top: -10px; margin-bottom: 10px;'>Sep = {sep_val:.2f} m.</div>", unsafe_allow_html=True)
 
         with st.expander("Cubierta", expanded=False):
             rt_idx = 1 if st.session_state.roof_type == "2 Aguas" else 0
@@ -338,12 +360,8 @@ with st.sidebar:
                 interior_j = interior_j[:10] # Limitar a 10 ejes máximo
                 
                 selected_ejes = st.session_state.get('sec_truss_custom_ejes', [])
-                new_selected = []
                 for j in interior_j:
-                    chk = st.checkbox(f"X = {j * st.session_state.larm:.2f} m", value=(j in selected_ejes), key=f"sec_eje_{j}")
-                    if chk:
-                        new_selected.append(j)
-                st.session_state.sec_truss_custom_ejes = new_selected
+                    st.checkbox(f"X = {j * st.session_state.larm:.2f} m", value=(j in selected_ejes), key=f"sec_eje_{j}")
 
         if st.session_state.wall_type != "Tilt-Up":
             with st.expander("Columnas de Viento", expanded=False):

@@ -461,14 +461,13 @@ class StaadModel:
                     # derecha
                     u_right = self.get_upper_node(nL3, upperSub, i, j, 2 * t)
                     self.add_member(u_right, lowerInter[(i, j, t)], '_DIAG')
-
         # --- Largueros ---
         if self.nBay >= 1:
             for j in range(self.nSpan + 1):
                 if self.wall_type == "Tilt-Up" and (j == 0 or j == self.nSpan):
                     continue
                 has_sec_truss = (j in self.sec_trusses_j)
-                is_wind_col_axis = (self.add_wind_cols and self.wind_col_N > 1 and (j == 0 or j == self.nSpan))
+                is_wind_col_axis = (self.add_wind_cols and self.wind_col_N > 1 and (j == 0 or j == self.nSpan) and self.wall_type != "Tilt-Up")
                 for i in range(self.nBay):
                     if is_wind_col_axis:
                         # Split larguero and create wind columns and horizontal wind trusses
