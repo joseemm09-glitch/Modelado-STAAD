@@ -262,20 +262,19 @@ def write_staad(model, selected_profiles=None):
     armadura_perim_str = group_ranges(group_map.get('_ARMADURA_PERIM', []))
     cv_str = group_ranges(group_map.get('_CVH', []))
     
-    if selected_profiles:
-        import prediseno
-        grupos_cols = prediseno.clasificar_columnas(model)
-        for g_name, ids in grupos_cols.items():
+    import prediseno
+    grupos_cols = prediseno.clasificar_columnas(model)
+    for g_name, ids in grupos_cols.items():
+        if not ids: continue
+        staad_prof = None
+        if selected_profiles:
             staad_prof = selected_profiles.get(g_name)
-            if staad_prof and ids:
-                g_str = group_ranges(ids)
-                if g_str:
-                    out.append(build_lines(g_str.split(" ") + [f"TABLE ST {staad_prof}"], 72))
-    else:
-        if col_str:
-            out.append(build_lines(col_str.split(" ") + ["TABLE ST HSST14X14X0.313"], 72))
-        if colviento_str:
-            out.append(build_lines(colviento_str.split(" ") + ["TABLE ST W12X26"], 72))
+        if not staad_prof:
+            staad_prof = "W12X26" if "CV" in g_name else "HSST14X14X0.313"
+        
+        g_str = group_ranges(ids)
+        if g_str:
+            out.append(build_lines(g_str.split(" ") + [f"TABLE ST {staad_prof}"], 72))
             
     joistgral_str = group_ranges(group_map.get('_JOISTGRAL', []))
     jpuntal_str = group_ranges(group_map.get('_JPUNTAL', []))
@@ -357,6 +356,14 @@ def write_staad(model, selected_profiles=None):
         out.append(build_lines(["MATERIAL", "CONCRETE", "MEMB"] + plate_range_str.split(" "), 72))
     else:
         out.append("MATERIAL STEEL ALL")
+        
+    if hasattr(model, 'wind_cols'):
+        beta_members = []
+        beta_members.extend(model.wind_cols.get('Z0_WINDCOL', []))
+        beta_members.extend(model.wind_cols.get('ZMAX_WINDCOL', []))
+        if beta_members:
+            beta_str = group_ranges(beta_members)
+            out.append(build_lines(["BETA", "90", "MEMB"] + beta_str.split(" "), 72))
     
     # ------------------
     # Specifications
@@ -635,10 +642,13 @@ def write_staad(model, selected_profiles=None):
         sign = -1 if "-" in direction else 1
         
         # SELFWEIGHT
-        all_cols = model.groups.get('_COL', []) + model.groups.get('_COLVIENTO', [])
-        all_cols_str = group_ranges(all_cols)
-        if all_cols_str:
-            lines.append(f"SELFWEIGHT {axis} {format_num(sign * model.seismic_v)} LIST {all_cols_str}")
+        if col_str:
+            tokens = [f"SELFWEIGHT {axis} {format_num(sign * model.seismic_v)} LIST"] + col_str.split(" ")
+            lines.append(build_lines(tokens))
+            
+        if colviento_str:
+            tokens = [f"SELFWEIGHT {axis} {format_num(sign * model.seismic_v)} LIST"] + colviento_str.split(" ")
+            lines.append(build_lines(tokens))
             
         if getattr(model, 'wall_type', None) == "Tilt-Up":
             if axis == "X":
@@ -648,7 +658,8 @@ def write_staad(model, selected_profiles=None):
             
             plates_str = group_ranges(target_plates)
             if plates_str:
-                lines.append(f"SELFWEIGHT {axis} {format_num(sign * model.seismic_v)} LIST {plates_str}")
+                tokens = [f"SELFWEIGHT {axis} {format_num(sign * model.seismic_v)} LIST"] + plates_str.split(" ")
+                lines.append(build_lines(tokens))
             
         lines.append("JOINT LOAD")
         
@@ -709,6 +720,26 @@ def write_staad(model, selected_profiles=None):
         out.append(build_lines(["FYLD", "3515", "MEMB"] + colviento_str.split(" "), 72))
         out.append(build_lines(["KY", "1.4", "MEMB"] + colviento_str.split(" "), 72))
         out.append(build_lines(["KZ", "1.4", "MEMB"] + colviento_str.split(" "), 72))
+        
+        # Parámetros especiales para columnas Doble IPR (WD)
+        if selected_profiles:
+            import prediseno
+            grupos_cols = prediseno.clasificar_columnas(model)
+            wd_members = []
+            for g_name, ids in grupos_cols.items():
+                staad_prof = selected_profiles.get(g_name, "")
+                if staad_prof.startswith("WD") and ids:
+                    wd_members.extend(ids)
+            
+            if wd_members:
+                wd_str = group_ranges(wd_members)
+                if wd_str:
+                    out.append("** PARAMETROS DOBLE IPR (WD) **")
+                    out.append(build_lines(["LY", "100", "MEMB"] + wd_str.split(" "), 72))
+                    out.append(build_lines(["UNL", "100", "MEMB"] + wd_str.split(" "), 72))
+                    out.append(build_lines(["UNT", "100", "MEMB"] + wd_str.split(" "), 72))
+                    out.append(build_lines(["UNB", "100", "MEMB"] + wd_str.split(" "), 72))
+
 
     if armadura_central_str or armadura_perim_str:
         out.append("** ARMADURAS CENTRALES **")

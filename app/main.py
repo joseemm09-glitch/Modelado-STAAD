@@ -401,21 +401,38 @@ with st.sidebar:
         st.button("⬅", type="secondary", on_click=go_panel, args=("Main",))
         st.header("Prediseño")
         
+        def reset_cv_selection():
+            for k in list(st.session_state.keys()):
+                if k.startswith("sel_CV"):
+                    del st.session_state[k]
+        
+        
         with st.expander("Columnas", expanded=True):
             grupos_cols = prediseno.clasificar_columnas(model)
             
             if not grupos_cols:
                 st.warning("No se encontraron columnas para diseñar.")
             else:
+                usar_2w = st.session_state.get("usar_2w_checkbox", False)
+                
                 st.radio("Resaltar en 3D:", list(sorted(grupos_cols.keys())), key="highlight_grupo_col")
                 for nombre_grupo in sorted(grupos_cols.keys()):
-                    top_5 = prediseno.predisenar_grupo(nombre_grupo, model)
+                    top_5 = prediseno.predisenar_grupo(nombre_grupo, model, usar_2w)
                     
                     if top_5:
                         opciones = [p['perfil']['nombre'] for p in top_5]
-                        st.selectbox(nombre_grupo, options=opciones, key=f"sel_{nombre_grupo}")
+                        
+                        key_name = f"sel_{nombre_grupo}"
+                        if key_name in st.session_state and st.session_state[key_name] not in opciones:
+                            del st.session_state[key_name]
+                            
+                        st.selectbox(nombre_grupo, options=opciones, key=key_name)
                     else:
-                        st.error(f"No se encontraron perfiles óptimos.")
+                        st.error(f"No se encontraron perfiles óptimos para {nombre_grupo}.")
+                        
+                    if "CV" in nombre_grupo:
+                        st.checkbox("Usar perfiles 2W", key="usar_2w_checkbox", on_change=reset_cv_selection)
+                        st.markdown("<div style='margin-top:-15px; font-size:12px; color:#888;'>(Requiere Base de Datos WD)</div>", unsafe_allow_html=True)
 
 col1, col2 = st.columns([3, 1])
 
@@ -480,9 +497,9 @@ print(folder)
                     
         # Obtener nombres de STAAD
         import prediseno
-        db_or = prediseno.generar_base_datos_or()
-        db_w = prediseno.generar_base_datos_w()
-        name_to_staad = {p['nombre']: p['nombre_staad'] for p in db_or + db_w}
+        db_or = prediseno.cargar_base_datos_excel()
+        db_w = prediseno.PERFILES_W
+        name_to_staad = {p['nombre']: p.get('nombre_staad', p['nombre']) for p in db_or + db_w}
         
         selected_profiles = {}
         grupos_cols = prediseno.clasificar_columnas(model)

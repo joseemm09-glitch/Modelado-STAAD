@@ -587,7 +587,10 @@ class StaadModel:
                                 A[p] = self.get_or_create_node(x, y, z)
                                 
                             for p in range(N):
-                                self.add_member(A[p], A[p+1], '_JPUNTAL')
+                                mid = self.add_member(A[p], A[p+1], '_LARGUEROS')
+                                if not hasattr(self, 'wind_strut_members'):
+                                    self.wind_strut_members = []
+                                self.wind_strut_members.append(mid)
                         else:
                             self.add_member(upperSub[(i, j, k)], upperSub[(i + 1, j, k)], '_LARGUEROS')
 
@@ -700,6 +703,8 @@ class StaadModel:
         for mem_id in self.groups.get('_LARGUEROS', []):
             n1, n2 = self.members[mem_id]
             is_puntal = (n1 in puntal_nodes or n2 in puntal_nodes)
+            if hasattr(self, 'wind_strut_members') and mem_id in self.wind_strut_members:
+                is_puntal = True
             
             # Add to the correct group
             if is_puntal:
