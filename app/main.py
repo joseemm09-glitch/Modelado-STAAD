@@ -79,6 +79,11 @@ hr {
 # CSS para botones
 st.markdown("""
     <style>
+    /* Asegurar que el texto dentro de los botones sea bold */
+    button p, button div {
+        font-weight: bold !important;
+    }
+
     /* Botones principales (Azul Sólido) */
     section[data-testid="stSidebar"] button[kind="primary"] {
         background: #005cb2 !important;
@@ -108,21 +113,23 @@ st.markdown("""
     
     /* Botón de retroceso (Flecha gris) */
     section[data-testid="stSidebar"] button[kind="secondary"] {
-        background-color: transparent !important;
-        color: gray !important;
-        border: none !important;
-        padding: 0px !important;
+        background-color: #f8f9fa !important;
+        color: #444 !important;
+        border: 1px solid #ddd !important;
+        padding: 4px 12px !important;
         width: auto !important;
-        font-size: 24px !important;
-        box-shadow: none !important;
-        margin-bottom: -20px !important;
-        margin-top: 15px !important;
+        font-size: 14px !important;
+        font-weight: 500 !important;
+        box-shadow: 0px 1px 2px rgba(0,0,0,0.05) !important;
+        border-radius: 4px !important;
+        margin-bottom: 5px !important;
+        margin-top: 5px !important;
         position: relative !important;
         z-index: 10 !important;
     }
     section[data-testid="stSidebar"] button[kind="secondary"]:hover {
-        color: darkgray !important;
-        background-color: transparent !important;
+        background-color: #e9ecef !important;
+        color: #111 !important;
     }
 
     /* Botón de Guardar/Acciones en Panel Derecho (Rojo Sólido) */
@@ -293,6 +300,34 @@ except Exception as e:
     st.stop()
 
 
+def render_siblings_top(group, current):
+    for name in group:
+        if name == current: break
+        c1, c2, c3 = st.columns([1, 6, 1])
+        is_dis = False
+        if name in ["Diseño", "Catálogo"] and not st.session_state.get("file_generated", False):
+            is_dis = True
+        with c2: st.button(name, type="primary", use_container_width=True, on_click=go_panel, args=(name,), key=f"nav_top_{name}", disabled=is_dis)
+
+def render_siblings_bottom(group, current):
+    found = False
+    first_bot = True
+    for name in group:
+        if found:
+            if first_bot:
+                st.markdown("<br>", unsafe_allow_html=True)
+                st.markdown("<hr style='margin: 0px 0px 10px 0px; border: 0; border-top: 1px solid #e0e0e0;'>", unsafe_allow_html=True)
+                first_bot = False
+            c1, c2, c3 = st.columns([1, 6, 1])
+            is_dis = False
+            if name in ["Diseño", "Catálogo"] and not st.session_state.get("file_generated", False):
+                is_dis = True
+            with c2: st.button(name, type="primary", use_container_width=True, on_click=go_panel, args=(name,), key=f"nav_bot_{name}", disabled=is_dis)
+        if name == current: found = True
+
+nav_group1 = ["Geometría", "Cargas", "Prediseño"]
+nav_group2 = ["Diseño", "Catálogo"]
+
 with st.sidebar:
     panel = st.session_state.current_panel
     
@@ -311,7 +346,8 @@ with st.sidebar:
         st.button("Catálogo", type="primary", width="stretch", on_click=go_panel, args=("Catálogo",))
         
     elif panel == "Geometría":
-        st.button("⬅", type="secondary", on_click=go_panel, args=("Main",))
+        st.button("⬅ Volver", type="secondary", on_click=go_panel, args=("Main",))
+        render_siblings_top(nav_group1, "Geometría")
         st.header("Geometría")
         
         wt_idx = 0 if st.session_state.get("wall_type", "Metálico") == "Metálico" else 1
@@ -396,9 +432,11 @@ with st.sidebar:
                     st.number_input("Separación Máxima (m)", min_value=1.0, step=0.1, value=float(st.session_state.max_wind_dist), key="_max_wind_dist", on_change=update_val, args=("max_wind_dist",))
         else:
             st.session_state.add_wind_cols = False
+        render_siblings_bottom(nav_group1, "Geometría")
 
     elif panel == "Cargas":
-        st.button("⬅", type="secondary", on_click=go_panel, args=("Main",))
+        st.button("⬅ Volver", type="secondary", on_click=go_panel, args=("Main",))
+        render_siblings_top(nav_group1, "Cargas")
         st.header("Cargas")
         with st.expander("Gravitacionales", expanded=True):
             st.number_input("Carga Muerta (kg/m²)", min_value=0.0, step=5.0, value=st.session_state.c_muerta, key="_c_muerta", on_change=update_c_muerta)
@@ -422,9 +460,11 @@ with st.sidebar:
                 
             st.number_input("Carga Muerta para Sismo (kg/m²)", min_value=0.0, step=5.0, value=st.session_state.cm_sismo, key="_cm_sismo", on_change=update_val, args=("cm_sismo",))
             st.number_input("Carga Viva para Sismo (kg/m²)", min_value=0.0, step=5.0, value=st.session_state.cv_sismo, key="_cv_sismo", on_change=update_val, args=("cv_sismo",))
+        render_siblings_bottom(nav_group1, "Cargas")
 
     elif panel == "Prediseño":
-        st.button("⬅", type="secondary", on_click=go_panel, args=("Main",))
+        st.button("⬅ Volver", type="secondary", on_click=go_panel, args=("Main",))
+        render_siblings_top(nav_group1, "Prediseño")
         st.header("Prediseño")
         
         def reset_cv_selection():
@@ -459,128 +499,313 @@ with st.sidebar:
                     if "CV" in nombre_grupo:
                         st.checkbox("Usar perfiles 2W", key="usar_2w_checkbox", on_change=reset_cv_selection)
                         st.markdown("<div style='margin-top:-15px; font-size:12px; color:#888;'>(Requiere Base de Datos WD)</div>", unsafe_allow_html=True)
+        render_siblings_bottom(nav_group1, "Prediseño")
 
-col1, col2 = st.columns([3, 1])
-
-with col1:
-    st.markdown("<div style='margin-top: -15px;'></div>", unsafe_allow_html=True)
-    st.subheader("Visualizador 3D")
-    show_sup = (st.session_state.current_panel == "Geometría")
-    highlight_col = st.session_state.get("highlight_grupo_col", "C-1") if st.session_state.current_panel == "Prediseño" else "Ninguno"
-    highlight_ids = None
-    if highlight_col != "Ninguno" and highlight_col in prediseno.clasificar_columnas(model):
-        highlight_ids = prediseno.clasificar_columnas(model).get(highlight_col, [])
-    fig = plot_model(model, show_supports=show_sup, highlight_ids=highlight_ids)
-    st.plotly_chart(fig, use_container_width=True, config={
-        'displaylogo': False,
-        'modeBarButtonsToRemove': ['resetCameraDefault3d', 'resetCameraLastSave3d', 'hoverClosest3d', 'tableRotation']
-    })
-
-with col2:
-    with st.container():
-        st.markdown("<div class='ios-glass-marker'></div>", unsafe_allow_html=True)
+    elif panel == "Diseño":
+        st.button("⬅ Menú Principal", type="secondary", on_click=go_panel, args=("Main",))
         
-        file_name_export = "Modelo.std"
+        st.markdown("<h3 style='margin-top: 10px; margin-bottom: 30px;'>Diseño Estructural</h3>", unsafe_allow_html=True)
         
-        st.markdown("**Ubicación:**")
+        import sys, os
+        if os.path.join(os.path.dirname(__file__), 'staad_link') not in sys.path:
+            sys.path.append(os.path.join(os.path.dirname(__file__), 'staad_link'))
+        from link import check_staad_status
+        staad_info = check_staad_status()
         
-        if 'export_path' not in st.session_state:
-            st.session_state.export_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            
-        parts = os.path.normpath(st.session_state.export_path).split(os.sep)
-        if len(parts) >= 2:
-            display_text = os.path.join(parts[-2], parts[-1])
+        target_file = st.session_state.get("active_staad_file", "")
+        if staad_info["status"] in ["connected", "connected_no_results"] and target_file and target_file.lower() == str(staad_info["filename"]).lower():
+            color = "#005cb2" if staad_info["status"] == "connected" else "#d4b106"
+            text = f"Sincronizado a modelo:<br><span style='color: {color}; font-weight: normal;'>{staad_info['filename']}</span>"
         else:
-            display_text = st.session_state.export_path
+            # Override if disconnected or mismatched
+            staad_info["status"] = "disconnected"
+            color = "#ba281b" # Red
+            text = "No sincronizado al modelo exportado"
             
-        path_col, btn_col = st.columns([3, 1])
-        with path_col:
-            st.markdown("<div class='path-marker'></div>", unsafe_allow_html=True)
-            st.text_input("ub", value=display_text, label_visibility="collapsed")
-        with btn_col:
-            if st.button("📁", help="Examinar..."):
-                import subprocess, sys
-                code = f"""
-import tkinter as tk
-from tkinter import filedialog
-root = tk.Tk()
-root.withdraw()
-root.attributes('-topmost', True)
-folder = filedialog.askdirectory(master=root, title="Seleccionar Carpeta", initialdir=r"{st.session_state.export_path}")
-root.destroy()
-print(folder)
-                """
-                try:
-                    result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=30)
-                    folder_selected = result.stdout.strip()
-                    if folder_selected and folder_selected != "()":
-                        st.session_state.export_path = folder_selected
-                        st.rerun()
-                except Exception as e:
-                    pass
-                    
-        # Obtener nombres de STAAD
-        import prediseno
-        db_or = prediseno.cargar_base_datos_excel()
-        db_w = prediseno.PERFILES_W
-        name_to_staad = {p['nombre']: p.get('nombre_staad', p['nombre']) for p in db_or + db_w}
+        st.markdown(f"<div style='margin-bottom: 20px; font-size: 14px; font-weight: 600;'><span style='color: {color}; font-size: 10px;'>●</span> {text}</div>", unsafe_allow_html=True)
         
-        selected_profiles = {}
-        grupos_cols = prediseno.clasificar_columnas(model)
-        for g in grupos_cols.keys():
-            ui_name = st.session_state.get(f"sel_{g}")
-            if ui_name:
-                staad_name = name_to_staad.get(ui_name)
-                if staad_name:
-                    selected_profiles[g] = staad_name
-                    
-        staad_text = write_staad(model, selected_profiles=selected_profiles)
+        render_siblings_bottom(nav_group2, "Diseño")
+
+
+    elif panel == "Catálogo":
+        st.button("⬅ Volver", type="secondary", on_click=go_panel, args=("Main",))
+        render_siblings_top(nav_group2, "Catálogo")
+        st.header("Catálogo")
+        render_siblings_bottom(nav_group2, "Catálogo")
+
+if st.session_state.current_panel == "Diseño":
+    st.title("Naves Industriales STAAD.Pro")
+    st.markdown("<div style='color: gray; font-size: 14px; margin-top: -15px; margin-bottom: 30px; margin-left: 5px;'>M.I. José Ramón Márquez Montes</div>", unsafe_allow_html=True)
+    
+    col_izq, col_der = st.columns([2, 1])
+    
+    with col_izq:
+        import sys, os
+        if os.path.join(os.path.dirname(__file__), 'staad_link') not in sys.path:
+            sys.path.append(os.path.join(os.path.dirname(__file__), 'staad_link'))
+        from link import check_staad_status, run_analysis
         
-        if st.button("Guardar Archivo .std", type="primary"):
-            # Limpiar el nombre del archivo para evitar caracteres inválidos
-            clean_name = "".join(c for c in file_name_export if c.isalnum() or c in " ._-").strip()
-            if not clean_name.endswith(".std"):
-                clean_name += ".std"
+        staad_info = check_staad_status()
+        is_disabled = (staad_info["status"] == "disconnected")
+        
+        col_btn, col_spin = st.columns([1, 2])
+        with col_btn:
+            if st.button("Correr Análisis ▶", type="primary", disabled=is_disabled):
+                st.session_state.is_analyzing = True
+        
+        if st.session_state.get("is_analyzing", False):
+            with col_spin:
+                with st.spinner("Corriendo análisis en STAAD.Pro..."):
+                    run_analysis()
+                st.session_state.is_analyzing = False
+                st.rerun()
                 
-            full_path = os.path.join(st.session_state.export_path, clean_name)
-            try:
-                with open(full_path, "w", encoding="utf-8") as f:
-                    f.write(staad_text)
-                st.success(f"Guardado exitosamente en:\n{full_path}")
+        st.markdown("<div style='height: 30px;'></div>", unsafe_allow_html=True)
+        
+        def render_group_results(tab_name, grupos_dict):
+            if not grupos_dict:
+                st.info(f"No hay grupos definidos para {tab_name}")
+                return
+            sel_g = st.radio("Seleccionar Grupo:", list(sorted(grupos_dict.keys())), key=f"highlight_diseno_{tab_name}", horizontal=True)
+            st.session_state["highlight_diseno_active"] = sel_g
+            m_ids = grupos_dict[sel_g]
+            
+            st.markdown(f"<div style='margin-top: 10px; padding: 15px; border-radius: 8px; background-color: #f8f9fa; border: 1px solid #e9ecef;'>", unsafe_allow_html=True)
+            st.markdown(f"**Grupo {sel_g}** ({len(m_ids)} elementos)")
+            
+            can_modify = not (sel_g.startswith('_DIAG') or sel_g.startswith('_MONT'))
+            es_w = sel_g.startswith('_COL') or sel_g.startswith('_CV')
+            
+            import prediseno
+            db_or = prediseno.cargar_base_datos_excel()
+            db_w = prediseno.PERFILES_W
+            opciones = [p['nombre'] for p in db_w] if es_w else [p['nombre'] for p in db_or]
+            
+            curr_key = f"sel_{sel_g}"
+            if curr_key not in st.session_state:
+                st.session_state[curr_key] = opciones[0] if opciones else ""
                 
-                # Abrir archivo automáticamente (en Windows usa la app predeterminada para .std)
-                if os.name == 'nt':
-                    os.startfile(full_path)
+            if can_modify:
+                st.selectbox("Perfil Asignado:", options=opciones, key=curr_key)
+            else:
+                st.write(f"Perfil Asignado: Auto (Comando SELECT de STAAD)")
+            
+            if staad_info["status"] != "disconnected" and not st.session_state.get("is_analyzing", False):
+                from link import get_design_results
+                ratios = get_design_results(m_ids)
+                
+                valid_ratios = {k: v for k, v in ratios.items() if v > 0.0}
+                if valid_ratios:
+                    max_id = max(valid_ratios, key=valid_ratios.get)
+                    max_ratio = valid_ratios[max_id]
+                    
+                    c1, c2 = st.columns([1, 1])
+                    with c1:
+                        st.metric(label="Ratio Crítico", value=f"{max_ratio:.3f}", delta=f"Barra más crítica: {max_id}", delta_color="off")
+                        if max_ratio > 1.0:
+                            st.markdown("<span style='color: #ba281b; font-weight: bold;'>⚠️ Falla por capacidad</span>", unsafe_allow_html=True)
+                        else:
+                            st.markdown("<span style='color: #0b7a0b; font-weight: bold;'>✅ Diseño Adecuado</span>", unsafe_allow_html=True)
+                            
+                    with c2:
+                        if can_modify:
+                            st.markdown("<br>", unsafe_allow_html=True)
+                            if st.button("Optimizar Grupo ⚡", key=f"btn_opt_{sel_g}", type="primary"):
+                                st.session_state.is_analyzing = True
+                                nuevo_perfil = prediseno.optimizar_perfil(st.session_state[curr_key], max_ratio, es_w=es_w, ratio_objetivo=0.95)
+                                if nuevo_perfil != st.session_state[curr_key]:
+                                    st.session_state[curr_key] = nuevo_perfil
+                                    
+                                    import staad_writer
+                                    name_to_staad = {p['nombre']: p.get('nombre_staad', p['nombre']) for p in db_or + db_w}
+                                    selected_profiles = {}
+                                    all_groups = {**prediseno.clasificar_columnas(model), **{k: v for k, v in model.groups.items() if k.startswith(('_CS', '_CI', '_DIAG', '_MONT', '_CV'))}}
+                                    for g in all_groups.keys():
+                                        ui_name = st.session_state.get(f"sel_{g}")
+                                        if ui_name:
+                                            staad_name = name_to_staad.get(ui_name)
+                                            if staad_name:
+                                                selected_profiles[g] = staad_name
+                                                
+                                    staad_text = staad_writer.write_staad(model, selected_profiles=selected_profiles)
+                                    clean_name = st.session_state.get("active_staad_file", "Modelo.std")
+                                    export_path = st.session_state.get("export_path", ".")
+                                    import os
+                                    full_path = os.path.join(export_path, clean_name)
+                                    with open(full_path, "w", encoding="utf-8") as f:
+                                        f.write(staad_text)
+                                        
+                                st.rerun()
                 else:
-                    subprocess.call(('open', full_path))
+                    st.warning("No se encontraron resultados de diseño. Verifica comandos CHECK CODE.")
+            else:
+                st.info("Sincroniza y corre el análisis para ver los resultados.")
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        tab_col, tab_arm, tab_cv = st.tabs(["Columnas", "Armaduras", "Contravientos"])
+        
+        with tab_col:
+            import prediseno
+            grupos_c = prediseno.clasificar_columnas(model)
+            render_group_results("Columnas", grupos_c)
+            
+        with tab_arm:
+            grupos_a = {k: v for k, v in model.groups.items() if k.startswith(('_CS', '_CI', '_DIAG', '_MONT'))}
+            render_group_results("Armaduras", grupos_a)
+            
+        with tab_cv:
+            grupos_v = {k: v for k, v in model.groups.items() if k.startswith('_CV')}
+            render_group_results("Contravientos", grupos_v)
+
+    with col_der:
+        st.markdown("<b>Visualizador 3D</b>", unsafe_allow_html=True)
+        
+        st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+        # Using the last active group for highlighting if any
+        highlight_col = st.session_state.get("highlight_diseno_active", "Ninguno")
+        fig = plot_model(model, show_supports=True, highlight_ids=None) # Highlight logic would go here if implemented
+        
+        # Cube aspect ratio to prevent clipping, and zoomed out slightly
+        fig.update_layout(
+            scene_camera=dict(eye=dict(x=1.8, y=1.8, z=1.8)),
+            margin=dict(l=0, r=0, b=0, t=0),
+            scene=dict(aspectmode='cube')
+        )
+        st.plotly_chart(fig, use_container_width=True, config={'displaylogo': False})
+
+elif st.session_state.current_panel == "Catálogo":
+    st.title("Catálogo de Conceptos")
+    st.write("En desarrollo...")
+
+else:
+    col1, col2 = st.columns([3, 1])
+    
+    with col1:
+        st.markdown("<div style='margin-top: -15px;'></div>", unsafe_allow_html=True)
+        st.subheader("Visualizador 3D")
+        show_sup = (st.session_state.current_panel == "Geometría")
+        highlight_col = st.session_state.get("highlight_grupo_col", "C-1") if st.session_state.current_panel == "Prediseño" else "Ninguno"
+        highlight_ids = None
+        if highlight_col != "Ninguno" and highlight_col in prediseno.clasificar_columnas(model):
+            highlight_ids = prediseno.clasificar_columnas(model).get(highlight_col, [])
+        fig = plot_model(model, show_supports=show_sup, highlight_ids=highlight_ids)
+        st.plotly_chart(fig, use_container_width=True, config={
+            'displaylogo': False,
+            'modeBarButtonsToRemove': ['resetCameraDefault3d', 'resetCameraLastSave3d', 'hoverClosest3d', 'tableRotation']
+        })
+
+    with col2:
+        with st.container():
+            st.markdown("<div class='ios-glass-marker'></div>", unsafe_allow_html=True)
+        
+            file_name_export = "Modelo.std"
+        
+            st.markdown("**Ubicación:**")
+        
+            if 'export_path' not in st.session_state:
+                st.session_state.export_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            
+            parts = os.path.normpath(st.session_state.export_path).split(os.sep)
+            if len(parts) >= 2:
+                display_text = os.path.join(parts[-2], parts[-1])
+            else:
+                display_text = st.session_state.export_path
+            
+            path_col, btn_col = st.columns([3, 1])
+            with path_col:
+                st.markdown("<div class='path-marker'></div>", unsafe_allow_html=True)
+                st.text_input("ub", value=display_text, label_visibility="collapsed")
+            with btn_col:
+                if st.button("📁", help="Examinar..."):
+                    import subprocess, sys
+                    code = f"""
+    import tkinter as tk
+    from tkinter import filedialog
+    root = tk.Tk()
+    root.withdraw()
+    root.attributes('-topmost', True)
+    folder = filedialog.askdirectory(master=root, title="Seleccionar Carpeta", initialdir=r"{st.session_state.export_path}")
+    root.destroy()
+    print(folder)
+                    """
+                    try:
+                        result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=30)
+                        folder_selected = result.stdout.strip()
+                        if folder_selected and folder_selected != "()":
+                            st.session_state.export_path = folder_selected
+                            st.rerun()
+                    except Exception as e:
+                        pass
                     
-            except Exception as e:
-                st.error(f"Error al guardar o abrir en '{full_path}': {e}")
+            # Obtener nombres de STAAD
+            import prediseno
+            db_or = prediseno.cargar_base_datos_excel()
+            db_w = prediseno.PERFILES_W
+            name_to_staad = {p['nombre']: p.get('nombre_staad', p['nombre']) for p in db_or + db_w}
+        
+            selected_profiles = {}
+            grupos_cols = prediseno.clasificar_columnas(model)
+            for g in grupos_cols.keys():
+                ui_name = st.session_state.get(f"sel_{g}")
+                if ui_name:
+                    staad_name = name_to_staad.get(ui_name)
+                    if staad_name:
+                        selected_profiles[g] = staad_name
+                    
+            staad_text = write_staad(model, selected_profiles=selected_profiles)
+        
+            if st.button("Guardar Archivo .std", type="primary"):
+                # Limpiar el nombre del archivo para evitar caracteres inválidos
+                clean_name = "".join(c for c in file_name_export if c.isalnum() or c in " ._-").strip()
+                if not clean_name.endswith(".std"):
+                    clean_name += ".std"
+                
+                full_path = os.path.join(st.session_state.export_path, clean_name)
+                try:
+                    with open(full_path, "w", encoding="utf-8") as f:
+                        f.write(staad_text)
+                    st.success(f"Guardado exitosamente en:\n{full_path}")
+                
+                    import time
+                    time.sleep(1)
+                    st.session_state.file_generated = True
+                    st.session_state.active_staad_file = clean_name
+                    st.session_state.current_panel = "Diseño"
+                    st.rerun()
+
+                    # Abrir archivo automáticamente (en Windows usa la app predeterminada para .std)
+                    if os.name == 'nt':
+                        os.startfile(full_path)
+                    else:
+                        subprocess.call(('open', full_path))
+                    
+                except Exception as e:
+                    st.error(f"Error al guardar o abrir en '{full_path}': {e}")
 
 
-    with st.container():
-        st.markdown("<div class='ios-glass-marker'></div>", unsafe_allow_html=True)
-        st.subheader("Elementos")
-        num_wind_cols = len(model.groups.get('_COLVIENTO', []))
-        wind_cols_line = f"&emsp;• Columnas (Viento): {num_wind_cols}<br>" if num_wind_cols > 0 else ""
-        num_purlins = (st.session_state.nspan + 1) * st.session_state.nbay + st.session_state.nspan * (st.session_state.subdiv - 1) * st.session_state.nbay
+        with st.container():
+            st.markdown("<div class='ios-glass-marker'></div>", unsafe_allow_html=True)
+            st.subheader("Elementos")
+            num_wind_cols = len(model.groups.get('_COLVIENTO', []))
+            wind_cols_line = f"&emsp;• Columnas (Viento): {num_wind_cols}<br>" if num_wind_cols > 0 else ""
+            num_purlins = (st.session_state.nspan + 1) * st.session_state.nbay + st.session_state.nspan * (st.session_state.subdiv - 1) * st.session_state.nbay
         
-        # Deduct purlins replaced by secondary trusses
-        num_sec_trusses_axes = len(model.sec_trusses_j)
-        num_purlins -= (num_sec_trusses_axes * st.session_state.nbay)
+            # Deduct purlins replaced by secondary trusses
+            num_sec_trusses_axes = len(model.sec_trusses_j)
+            num_purlins -= (num_sec_trusses_axes * st.session_state.nbay)
         
-        num_sec_trusses_total = num_sec_trusses_axes * st.session_state.nbay
-        sec_trusses_line = f"&emsp;• Armaduras (Secundarias): {num_sec_trusses_total}<br>" if num_sec_trusses_total > 0 else ""
+            num_sec_trusses_total = num_sec_trusses_axes * st.session_state.nbay
+            sec_trusses_line = f"&emsp;• Armaduras (Secundarias): {num_sec_trusses_total}<br>" if num_sec_trusses_total > 0 else ""
         
-        st.markdown(f"""
-        <div style='line-height: 1.8;'>
-            • Columnas: {(st.session_state.nbay + 1) * (st.session_state.nspan + 1)}<br>
-            {wind_cols_line}• Armaduras: {(st.session_state.nbay + 1) * st.session_state.nspan}<br>
-            {sec_trusses_line}• Contravientos: {len(model.groups.get('_CVH', []))}<br>
-            • Largueros: {num_purlins}
-        </div>
-        <div style='height: 25px;'></div>
-        """, unsafe_allow_html=True)
+            st.markdown(f"""
+            <div style='line-height: 1.8;'>
+                • Columnas: {(st.session_state.nbay + 1) * (st.session_state.nspan + 1)}<br>
+                {wind_cols_line}• Armaduras: {(st.session_state.nbay + 1) * st.session_state.nspan}<br>
+                {sec_trusses_line}• Contravientos: {len(model.groups.get('_CVH', []))}<br>
+                • Largueros: {num_purlins}
+            </div>
+            <div style='height: 25px;'></div>
+            """, unsafe_allow_html=True)
 
 # Javascript para hacer que los expanders funcionen como acordeón
 components.html(
