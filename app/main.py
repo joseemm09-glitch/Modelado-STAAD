@@ -534,8 +534,6 @@ with st.sidebar:
         render_siblings_bottom(nav_group2, "Catálogo")
 
 if st.session_state.current_panel == "Diseño":
-    st.title("Naves Industriales STAAD.Pro")
-    st.markdown("<div style='color: gray; font-size: 14px; margin-top: -15px; margin-bottom: 30px; margin-left: 5px;'>M.I. José Ramón Márquez Montes</div>", unsafe_allow_html=True)
     
     col_izq, col_der = st.columns([2, 1])
     
@@ -703,7 +701,7 @@ else:
             st.markdown("**Ubicación:**")
         
             if 'export_path' not in st.session_state:
-                st.session_state.export_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                st.session_state.export_path = r'C:\Users\josee\OneDrive\Escritorio\MODELOS GENERADOS'
             
             parts = os.path.normpath(st.session_state.export_path).split(os.sep)
             if len(parts) >= 2:
@@ -766,18 +764,19 @@ else:
                         f.write(staad_text)
                     st.success(f"Guardado exitosamente en:\n{full_path}")
                 
+                    # Abrir archivo automáticamente (en Windows usa la app predeterminada para .std)
+                    if os.name == 'nt':
+                        os.startfile(full_path)
+                    else:
+                        import subprocess
+                        subprocess.call(('open', full_path))
+                        
                     import time
                     time.sleep(1)
                     st.session_state.file_generated = True
                     st.session_state.active_staad_file = clean_name
                     st.session_state.current_panel = "Diseño"
                     st.rerun()
-
-                    # Abrir archivo automáticamente (en Windows usa la app predeterminada para .std)
-                    if os.name == 'nt':
-                        os.startfile(full_path)
-                    else:
-                        subprocess.call(('open', full_path))
                     
                 except Exception as e:
                     st.error(f"Error al guardar o abrir en '{full_path}': {e}")
