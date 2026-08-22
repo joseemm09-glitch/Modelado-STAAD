@@ -175,7 +175,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("Naves Industriales STAAD.Pro")
-st.markdown("<div style='color: gray; margin-top: -15px; margin-bottom: 20px;'>M.I. José Ramón Márquez Montes</div>", unsafe_allow_html=True)
+st.markdown("<div style='color: gray; margin-top: -15px; margin-bottom: 20px; margin-left: 10px;'>M.I. José Ramón Márquez Montes</div>", unsafe_allow_html=True)
 
 # Inicializar estado para variables por defecto
 defaults = {
@@ -342,8 +342,9 @@ with st.sidebar:
         st.button("Cargas", type="primary", width="stretch", on_click=go_panel, args=("Cargas",))
         st.button("Prediseño", type="primary", width="stretch", on_click=go_panel, args=("Prediseño",))
         st.divider()
-        st.button("Diseño", type="primary", width="stretch", on_click=go_panel, args=("Diseño",))
-        st.button("Catálogo", type="primary", width="stretch", on_click=go_panel, args=("Catálogo",))
+        is_disabled = not st.session_state.get("file_generated", False)
+        st.button("Diseño", type="primary", width="stretch", on_click=go_panel, args=("Diseño",), disabled=is_disabled)
+        st.button("Catálogo", type="primary", width="stretch", on_click=go_panel, args=("Catálogo",), disabled=is_disabled)
         
     elif panel == "Geometría":
         st.button("⬅ Volver", type="secondary", on_click=go_panel, args=("Main",))
@@ -560,15 +561,112 @@ if st.session_state.current_panel == "Diseño":
                 
         st.markdown("<div style='height: 30px;'></div>", unsafe_allow_html=True)
         
+        def update_highlight(key):
+            st.session_state["highlight_diseno_active"] = st.session_state[key]
+            
         def render_group_results(tab_name, grupos_dict):
             if not grupos_dict:
                 st.info(f"No hay grupos definidos para {tab_name}")
                 return
-            sel_g = st.radio("Seleccionar Grupo:", list(sorted(grupos_dict.keys())), key=f"highlight_diseno_{tab_name}", horizontal=True)
-            st.session_state["highlight_diseno_active"] = sel_g
+            key_name = f"highlight_diseno_{tab_name}"
+            sel_g = st.radio("Seleccionar Grupo:", list(sorted(grupos_dict.keys())), key=key_name, horizontal=True, on_change=update_highlight, args=(key_name,))
+            if "highlight_diseno_active" not in st.session_state:
+                st.session_state["highlight_diseno_active"] = sel_g
             m_ids = grupos_dict[sel_g]
             
             st.markdown(f"<div style='margin-top: 10px; padding: 15px; border-radius: 8px; background-color: #f8f9fa; border: 1px solid #e9ecef;'>", unsafe_allow_html=True)
+            
+            if sel_g == "_CVH":
+                DIAMETERS = [1.905, 2.54, 3.175, 3.81, 4.445, 5.08]
+                DIAMETERS_STR = ["3/4\"", "1\"", "1 1/4\"", "1 1/2\"", "1 3/4\"", "2\""]
+                
+                if "cvh_props" not in st.session_state:
+                    st.session_state.cvh_props = {m: 1.905 for m in m_ids}
+                    
+                from link import get_design_results
+                ratios = {}
+                if staad_info["status"] != "disconnected" and not st.session_state.get("is_analyzing", False):
+                    ratios = get_design_results(m_ids)
+                
+                stats = {}
+                for m in m_ids:
+                    d = st.session_state.cvh_props.get(m, 1.905)
+                    r = ratios.get(m, 0.0)
+                    if d not in stats:
+                        stats[d] = {'pass': 0, 'fail': 0, 'mids_pass': [], 'mids_fail': []}
+                    if r <= 0.5:
+                        stats[d]['pass'] += 1
+                        stats[d]['mids_pass'].append(m)
+                    else:
+                        stats[d]['fail'] += 1
+                        stats[d]['mids_fail'].append(m)
+                
+                st.markdown(f"**Grupo _CVH** ({len(m_ids)} elementos)")
+                st.markdown("Ratio máximo permitido: **0.50**")
+                
+                options = []
+                options_map = {}
+                for d in DIAMETERS:
+                    if d in stats:
+                        idx = DIAMETERS.index(d)
+                        label = f"Redondo {DIAMETERS_STR[idx]} [{stats[d]['pass']} Pasan, {stats[d]['fail']} Fallan]"
+                        options.append(label)
+                        options_map[label] = d
+                        
+                if not options:
+                    st.info("No hay contravientos horizontales evaluados aún.")
+                else:
+                    sel_label = st.radio("Inspeccionar en visualizador 3D:", options, key="cvh_inspect")
+                    sel_d = options_map[sel_label]
+                    
+                    h_colors = {}
+                    for m in stats[sel_d]['mids_pass']:
+                        h_colors[m] = 'green'
+                    for m in stats[sel_d]['mids_fail']:
+                        h_colors[m] = 'red'
+                    st.session_state["highlight_colors_active"] = h_colors
+                
+                st.markdown("<br>", unsafe_allow_html=True)
+                if st.button("Optimizar CVH ⚡", type="primary"):
+                    st.session_state.is_analyzing = True
+                    changed = False
+                    for m in m_ids:
+                        r = ratios.get(m, 0.0)
+                        if r > 0.5:
+                            curr_d = st.session_state.cvh_props.get(m, 1.905)
+                            try:
+                                idx = DIAMETERS.index(curr_d)
+                                if idx < len(DIAMETERS) - 1:
+                                    st.session_state.cvh_props[m] = DIAMETERS[idx+1]
+                                    changed = True
+                            except ValueError:
+                                pass
+                    
+                    if changed:
+                        import staad_writer
+                        name_to_staad = {p['nombre']: p.get('nombre_staad', p['nombre']) for p in db_or + db_w}
+                        selected_profiles = {}
+                        all_groups = {**prediseno.clasificar_columnas(model), **{k: v for k, v in model.groups.items() if k.startswith(('_CS', '_CI', '_DIAG', '_MONT', '_CV'))}}
+                        for g in all_groups.keys():
+                            if g == "_CVH": continue
+                            ui_name = st.session_state.get(f"sel_{g}")
+                            if ui_name:
+                                staad_name = name_to_staad.get(ui_name)
+                                if staad_name:
+                                    selected_profiles[g] = staad_name
+                                    
+                        staad_text = staad_writer.write_staad(model, selected_profiles=selected_profiles, cvh_props=st.session_state.cvh_props)
+                        clean_name = st.session_state.get("active_staad_file", "Modelo.std")
+                        export_path = st.session_state.get("export_path", ".")
+                        import os
+                        full_path = os.path.join(export_path, clean_name)
+                        with open(full_path, "w", encoding="utf-8") as f:
+                            f.write(staad_text)
+                            
+                    st.rerun()
+                st.markdown("</div>", unsafe_allow_html=True)
+                return
+
             st.markdown(f"**Grupo {sel_g}** ({len(m_ids)} elementos)")
             
             can_modify = not (sel_g.startswith('_DIAG') or sel_g.startswith('_MONT'))
@@ -581,7 +679,13 @@ if st.session_state.current_panel == "Diseño":
             
             curr_key = f"sel_{sel_g}"
             if curr_key not in st.session_state:
-                st.session_state[curr_key] = opciones[0] if opciones else ""
+                # Inicializar con logica de Prediseño para que empate con la exportacion
+                usar_2w = st.session_state.get("usar_2w_checkbox", False)
+                top_5 = prediseno.predisenar_grupo(sel_g, model, usar_2w)
+                if top_5:
+                    st.session_state[curr_key] = top_5[0]['perfil']['nombre']
+                else:
+                    st.session_state[curr_key] = opciones[0] if opciones else ""
                 
             if can_modify:
                 st.selectbox("Perfil Asignado:", options=opciones, key=curr_key)
@@ -661,13 +765,20 @@ if st.session_state.current_panel == "Diseño":
         st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
         # Using the last active group for highlighting if any
         highlight_col = st.session_state.get("highlight_diseno_active", "Ninguno")
-        fig = plot_model(model, show_supports=True, highlight_ids=None) # Highlight logic would go here if implemented
+        import prediseno
+        all_grps = {**prediseno.clasificar_columnas(model), **model.groups}
+        h_ids = all_grps.get(highlight_col, None)
+        h_colors = None
+        if highlight_col == "_CVH" and "highlight_colors_active" in st.session_state:
+            h_colors = st.session_state["highlight_colors_active"]
+            h_ids = None # Override to use colors instead of simple highlight
+        fig = plot_model(model, show_supports=True, highlight_ids=h_ids, highlight_colors=h_colors)
         
         # Cube aspect ratio to prevent clipping, and zoomed out slightly
         fig.update_layout(
             scene_camera=dict(eye=dict(x=1.8, y=1.8, z=1.8)),
             margin=dict(l=0, r=0, b=0, t=0),
-            scene=dict(aspectmode='cube')
+            scene=dict(aspectmode='data')
         )
         st.plotly_chart(fig, use_container_width=True, config={'displaylogo': False})
 
@@ -696,7 +807,9 @@ else:
         with st.container():
             st.markdown("<div class='ios-glass-marker'></div>", unsafe_allow_html=True)
         
-            file_name_export = "Modelo.std"
+            st.markdown("**Nombre Proyecto:**")
+            file_name_export = st.text_input("proj_name", value="Modelo.std", label_visibility="collapsed")
+            st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
         
             st.markdown("**Ubicación:**")
         
@@ -742,9 +855,17 @@ else:
             name_to_staad = {p['nombre']: p.get('nombre_staad', p['nombre']) for p in db_or + db_w}
         
             selected_profiles = {}
-            grupos_cols = prediseno.clasificar_columnas(model)
-            for g in grupos_cols.keys():
+            all_grps = {**prediseno.clasificar_columnas(model), **{k: v for k, v in model.groups.items() if k.startswith(('_CS', '_CI', '_CV'))}}
+            for g in all_grps.keys():
                 ui_name = st.session_state.get(f"sel_{g}")
+                if not ui_name:
+                    # Forzar calculo de Prediseño si el usuario no paso por esa pestaña
+                    usar_2w = st.session_state.get("usar_2w_checkbox", False)
+                    top_5 = prediseno.predisenar_grupo(g, model, usar_2w)
+                    if top_5:
+                        ui_name = top_5[0]['perfil']['nombre']
+                        st.session_state[f"sel_{g}"] = ui_name
+                
                 if ui_name:
                     staad_name = name_to_staad.get(ui_name)
                     if staad_name:
@@ -772,7 +893,7 @@ else:
                         subprocess.call(('open', full_path))
                         
                     import time
-                    time.sleep(1)
+                    time.sleep(5)
                     st.session_state.file_generated = True
                     st.session_state.active_staad_file = clean_name
                     st.session_state.current_panel = "Diseño"

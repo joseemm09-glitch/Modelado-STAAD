@@ -23,7 +23,7 @@ def get_group_color(group_name):
     }
     return colors.get(group_name, 'black')
 
-def plot_model(model, show_supports=False, highlight_ids=None):
+def plot_model(model, show_supports=False, highlight_ids=None, highlight_colors=None):
     """
     Plots the StaadModel using Plotly 3D scatter.
     If highlight_ids is provided, those members are drawn in red and thicker,
@@ -40,12 +40,13 @@ def plot_model(model, show_supports=False, highlight_ids=None):
     # We group lines by group to draw them in a consistent order in the legend.
     group_order = ['_COL', '_COLVIENTO', '_CS', '_CI', '_CS_PERIM', '_CI_PERIM', '_MONTANTES', '_DIAG', '_MONTANTES_PERIM', '_DIAG_PERIM', '_LARGUEROS', '_JOISTGRAL', '_JPUNTAL', '_CVH', '_CS_SEC', '_CI_SEC', '_MONTANTES_SEC', '_DIAG_SEC']
     
-    if highlight_ids is not None:
+    if highlight_ids is not None or highlight_colors is not None:
         lines_by_group = {
             'highlighted': {'x': [], 'y': [], 'z': [], 'color': 'red', 'width': 6},
+            'highlighted_green': {'x': [], 'y': [], 'z': [], 'color': '#0b7a0b', 'width': 6},
             'normal_cols': {'x': [], 'y': [], 'z': [], 'color': get_group_color('_COL'), 'width': 4},
             'normal_wind_cols': {'x': [], 'y': [], 'z': [], 'color': get_group_color('_COLVIENTO'), 'width': 4},
-            'faded': {'x': [], 'y': [], 'z': [], 'color': '#b0b0b0', 'width': 2}
+            'faded': {'x': [], 'y': [], 'z': [], 'color': '#e0e0e0', 'width': 1}
         }
     else:
         lines_by_group = {grp: {'x': [], 'y': [], 'z': [], 'color': get_group_color(grp)} for grp in group_order}
@@ -62,8 +63,10 @@ def plot_model(model, show_supports=False, highlight_ids=None):
         x0, y0, z0 = x0 / 100.0, y0 / 100.0, z0 / 100.0
         x1, y1, z1 = x1 / 100.0, y1 / 100.0, z1 / 100.0
         
-        if highlight_ids is not None:
-            if mid in highlight_ids:
+        if highlight_ids is not None or highlight_colors is not None:
+            if highlight_colors is not None and mid in highlight_colors:
+                target_grp = 'highlighted' if highlight_colors[mid] == 'red' else 'highlighted_green'
+            elif highlight_ids is not None and mid in highlight_ids:
                 target_grp = 'highlighted'
             elif member_to_group.get(mid) == '_COL':
                 target_grp = 'normal_cols'
