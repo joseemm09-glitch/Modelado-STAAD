@@ -302,18 +302,28 @@ def plot_model(model, show_supports=False, highlight_ids=None):
             showlegend=True
         ))
 
+    # Custom grid ticks matching model dimensions
+    x_ticks = [i * model.Larm_m for i in range(model.nSpan + 1)] if hasattr(model, 'Larm_m') else None
+    y_ticks = [i * model.Ljoist_m for i in range(model.nBay + 1)] if hasattr(model, 'Ljoist_m') else None
+    z_ticks = [0, model.HLibre_m, model.HLibre_m + model.HArmad_m] if hasattr(model, 'HLibre_m') else None
+
+    scene_config = dict(
+        xaxis=dict(title='X (m)'),
+        yaxis=dict(title='Z (m)'),
+        zaxis=dict(title='Y (m)'),
+        aspectmode='data', # Keeps scale proportional
+        camera=dict(
+            eye=dict(x=1.5, y=1.5, z=1.2),
+            center=dict(x=-0.2, y=0, z=-0.5),
+            up=dict(x=0, y=0, z=1)
+        )
+    )
+    if x_ticks is not None: scene_config['xaxis']['tickvals'] = x_ticks
+    if y_ticks is not None: scene_config['yaxis']['tickvals'] = y_ticks
+    if z_ticks is not None: scene_config['zaxis']['tickvals'] = z_ticks
+
     fig.update_layout(
-        scene=dict(
-            xaxis_title='X (m)',
-            yaxis_title='Z (m)',
-            zaxis_title='Y (m)',
-            aspectmode='data', # Keeps scale proportional
-            camera=dict(
-                eye=dict(x=1.5, y=1.5, z=1.2),
-                center=dict(x=-0.2, y=0, z=-0.5),
-                up=dict(x=0, y=0, z=1)
-            )
-        ),
+        scene=scene_config,
         margin=dict(l=0, r=0, b=0, t=0),
         title="",
         showlegend=True,

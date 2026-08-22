@@ -19,7 +19,7 @@ from model import StaadModel
 from staad_writer import write_staad
 from visualizer import plot_model
 
-icono_path = os.path.join(os.path.dirname(__file__), "..", "staad_green.ico")
+icono_path = os.path.join(os.path.dirname(__file__), "..", "staad_blue.ico")
 st.set_page_config(page_title="Naves Industriales STAAD.Pro", page_icon=icono_path, layout="wide")
 
 st.markdown("""
@@ -53,6 +53,25 @@ div.element-container:has(div.path-marker) {
     margin: 0 !important;
     height: 0 !important;
 }
+/* Sidebar Logo Styling */
+[data-testid="stSidebar"] [data-testid="stImage"] {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+}
+[data-testid="stSidebar"] img {
+    border-radius: 18px !important;
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.25) !important;
+    width: 60% !important;
+    margin: 0 auto 15px auto !important;
+    display: block !important;
+}
+/* Make the divider faint grey */
+hr {
+    margin: 15px 0 !important;
+    border-top: 1px solid rgba(0,0,0,0.1) !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -60,31 +79,31 @@ div.element-container:has(div.path-marker) {
 # CSS para botones
 st.markdown("""
     <style>
-    /* Botones principales (Azul oscurecido) */
+    /* Botones principales (Azul Sólido) */
     section[data-testid="stSidebar"] button[kind="primary"] {
-        background: linear-gradient(180deg, #2472A6 0%, #17537A 100%) !important;
+        background: #005cb2 !important;
         color: white !important;
-        font-weight: 600 !important;
-        letter-spacing: 0.5px !important;
-        border-radius: 6px !important;
+        font-weight: bold !important;
+        border-radius: 4px !important;
         width: 100% !important;
         margin: 0 auto !important;
         display: block !important;
-        border: 1px solid #144769 !important;
+        border: none !important;
         text-align: center !important;
         justify-content: center !important;
-        box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.2) !important;
+        box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.1) !important;
         transition: all 0.2s ease-in-out !important;
+        padding-top: 0.5rem !important;
+        padding-bottom: 0.5rem !important;
     }
     section[data-testid="stSidebar"] button[kind="primary"]:hover {
-        background: linear-gradient(180deg, #297FB8 0%, #1D6799 100%) !important;
-        box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.3) !important;
+        background: #004ba0 !important;
+        box-shadow: 0px 3px 6px rgba(0, 0, 0, 0.15) !important;
         transform: translateY(-1px) !important;
-        border: 1px solid #17537A !important;
     }
     section[data-testid="stSidebar"] button[kind="primary"]:active {
         transform: translateY(1px) !important;
-        box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.2) !important;
+        box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.1) !important;
     }
     
     /* Botón de retroceso (Flecha gris) */
@@ -106,26 +125,26 @@ st.markdown("""
         background-color: transparent !important;
     }
 
-    /* Botón de Guardar/Acciones en Panel Derecho (Rojo Premium STAAD) */
+    /* Botón de Guardar/Acciones en Panel Derecho (Rojo Sólido) */
     div[data-testid="stMainBlockContainer"] button[kind="primary"] {
-        background: linear-gradient(180deg, #991B1B 0%, #7F1D1D 100%) !important;
-        border: 1px solid #7F1D1D !important;
+        background: #ba281b !important;
         color: white !important;
-        font-weight: 600 !important;
-        border-radius: 6px !important;
-        box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.2) !important;
+        font-weight: bold !important;
+        border-radius: 4px !important;
+        border: none !important;
+        box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.1) !important;
         transition: all 0.2s ease-in-out !important;
-        letter-spacing: 0.5px !important;
+        padding-top: 0.5rem !important;
+        padding-bottom: 0.5rem !important;
     }
     div[data-testid="stMainBlockContainer"] button[kind="primary"]:hover {
-        background: linear-gradient(180deg, #DC2626 0%, #B91C1C 100%) !important;
-        box-shadow: 0px 5px 10px rgba(220, 38, 38, 0.25) !important;
-        transform: translateY(-2px) !important;
-        border: 1px solid #B91C1C !important;
+        background: #9d2116 !important;
+        box-shadow: 0px 3px 6px rgba(0, 0, 0, 0.15) !important;
+        transform: translateY(-1px) !important;
     }
     div[data-testid="stMainBlockContainer"] button[kind="primary"]:active {
         transform: translateY(1px) !important;
-        box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.2) !important;
+        box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.1) !important;
     }
     
     /* Reducir ancho de la barra lateral */
@@ -148,8 +167,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("Generador Naves Industriales STAAD.Pro")
-st.markdown("<div style='color: gray; margin-top: -10px; margin-bottom: 10px;'>&emsp;&emsp;M.I. José Ramón Márquez Montes</div>", unsafe_allow_html=True)
+st.title("Naves Industriales STAAD.Pro")
+st.markdown("<div style='color: gray; margin-top: -15px; margin-bottom: 20px;'>M.I. José Ramón Márquez Montes</div>", unsafe_allow_html=True)
 
 # Inicializar estado para variables por defecto
 defaults = {
@@ -278,11 +297,18 @@ with st.sidebar:
     panel = st.session_state.current_panel
     
     if panel == "Main":
-        st.markdown("<br><br>", unsafe_allow_html=True)
-        st.markdown("<h2 style='text-align: center;'>Menú Principal</h2>", unsafe_allow_html=True)
+        # Logo at the top of the sidebar
+        try:
+            st.image(icono_path, use_container_width=True)
+        except:
+            pass
+        st.markdown("<h3 style='text-align: center; margin-top: 10px;'>Menú Principal</h3>", unsafe_allow_html=True)
         st.button("Geometría", type="primary", width="stretch", on_click=go_panel, args=("Geometría",))
         st.button("Cargas", type="primary", width="stretch", on_click=go_panel, args=("Cargas",))
         st.button("Prediseño", type="primary", width="stretch", on_click=go_panel, args=("Prediseño",))
+        st.divider()
+        st.button("Diseño", type="primary", width="stretch", on_click=go_panel, args=("Diseño",))
+        st.button("Catálogo", type="primary", width="stretch", on_click=go_panel, args=("Catálogo",))
         
     elif panel == "Geometría":
         st.button("⬅", type="secondary", on_click=go_panel, args=("Main",))
@@ -437,7 +463,7 @@ with st.sidebar:
 col1, col2 = st.columns([3, 1])
 
 with col1:
-    st.markdown("<div style='margin-top: -30px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='margin-top: -15px;'></div>", unsafe_allow_html=True)
     st.subheader("Visualizador 3D")
     show_sup = (st.session_state.current_panel == "Geometría")
     highlight_col = st.session_state.get("highlight_grupo_col", "C-1") if st.session_state.current_panel == "Prediseño" else "Ninguno"
@@ -453,10 +479,8 @@ with col1:
 with col2:
     with st.container():
         st.markdown("<div class='ios-glass-marker'></div>", unsafe_allow_html=True)
-        st.subheader("Exportación")
         
-        project_name = st.text_input("Nombre del Proyecto:", value="Modelo")
-        file_name_export = f"{project_name.strip()}.std" if project_name.strip() else "Modelo.std"
+        file_name_export = "Modelo.std"
         
         st.markdown("**Ubicación:**")
         
