@@ -160,13 +160,13 @@
                 dismissed = true;
                 if (observer) observer.disconnect();
                 
-                // Dar 3.0 segundos adicionales para asegurar que todo el 3D y CSS se haya pintado suavemente
+                // Dar 5.0 segundos adicionales para asegurar que todo el 3D y CSS se haya pintado suavemente
                 setTimeout(() => {
                     if (splash) {
                         splash.style.opacity = "0";
                         setTimeout(() => splash.remove(), 600);
                     }
-                }, 3000);
+                }, 5000);
             }
         }
 
