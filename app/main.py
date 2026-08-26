@@ -399,15 +399,15 @@ with st.sidebar:
         except:
             pass
         st.markdown("<h3 style='text-align: center; margin-top: 10px;'>Menú Principal</h3>", unsafe_allow_html=True)
-        st.button("Geometría", type="primary", width="stretch", on_click=go_panel, args=("Geometría",))
-        st.button("Cargas", type="primary", width="stretch", on_click=go_panel, args=("Cargas",))
-        st.button("Prediseño", type="primary", width="stretch", on_click=go_panel, args=("Prediseño",))
+        st.button("Geometría", type="primary", use_container_width=True, on_click=go_panel, args=("Geometría",))
+        st.button("Cargas", type="primary", use_container_width=True, on_click=go_panel, args=("Cargas",))
+        st.button("Prediseño", type="primary", use_container_width=True, on_click=go_panel, args=("Prediseño",))
         st.divider()
         is_disabled = not st.session_state.get("file_generated", False)
         st.markdown("<div class='grey-btn-marker'></div>", unsafe_allow_html=True)
-        st.button("Diseño", type="primary", width="stretch", on_click=go_panel, args=("Diseño",), disabled=is_disabled)
+        st.button("Diseño", type="primary", use_container_width=True, on_click=go_panel, args=("Diseño",), disabled=is_disabled)
         st.markdown("<div class='grey-btn-marker'></div>", unsafe_allow_html=True)
-        st.button("Catálogo", type="primary", width="stretch", on_click=go_panel, args=("Catálogo",), disabled=is_disabled)
+        st.button("Catálogo", type="primary", use_container_width=True, on_click=go_panel, args=("Catálogo",), disabled=is_disabled)
         
     elif panel == "Geometría":
         st.button("⬅ Volver", type="secondary", on_click=go_panel, args=("Main",))
