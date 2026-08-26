@@ -1116,6 +1116,15 @@ else:
                                 st.rerun()
                         except Exception as e:
                             pass
+            else:
+                # ─── Modo Web: mostrar Ubicación con "Descargas" ───
+                st.markdown("**Ubicación:**")
+                path_col, btn_col = st.columns([3, 1])
+                with path_col:
+                    st.markdown("<div class='path-marker'></div>", unsafe_allow_html=True)
+                    st.text_input("ub", value="Descargas", label_visibility="collapsed", disabled=True)
+                with btn_col:
+                    st.button("📁", help="No disponible en versión web", disabled=True)
         
             # Obtener nombres de STAAD
             import prediseno
@@ -1149,14 +1158,12 @@ else:
                     clean_name += ".std"
                 
                 st.download_button(
-                    label="⬇ Descargar Archivo .std",
+                    label="Guardar Archivo .std",
                     data=staad_text,
                     file_name=clean_name,
                     mime="text/plain",
                     type="primary",
-                    use_container_width=True
                 )
-                st.markdown("<div style='font-size: 11px; color: #64748b; margin-top: 4px;'>Se guardará en tu carpeta de Descargas</div>", unsafe_allow_html=True)
             else:
                 # ─── Modo Escritorio: guardar al disco y abrir ───
                 if st.button("Guardar Archivo .std", type="primary"):
