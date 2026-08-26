@@ -1,8 +1,15 @@
 import streamlit as st
 import math
 import os
+import sys
 import subprocess
 import importlib
+
+# Ensure app directory is in sys.path for both local and web environments
+app_dir = os.path.dirname(os.path.abspath(__file__))
+if app_dir not in sys.path:
+    sys.path.insert(0, app_dir)
+
 import streamlit.components.v1 as components
 
 # Force reload of custom modules to ensure Streamlit hot-reloads them
@@ -20,7 +27,8 @@ from staad_writer import write_staad
 from visualizer import plot_model
 
 icono_path = os.path.join(os.path.dirname(__file__), "..", "staad_blue.ico")
-st.set_page_config(page_title="Naves Industriales STAAD.Pro", page_icon=icono_path, layout="wide")
+page_icon = icono_path if os.path.exists(icono_path) else "🏢"
+st.set_page_config(page_title="Naves Industriales STAAD.Pro", page_icon=page_icon, layout="wide")
 
 st.markdown("""
 <style>
@@ -79,16 +87,16 @@ hr {
 # CSS para botones
 st.markdown("""
     <style>
-    /* Asegurar que el texto dentro de los botones sea bold */
-    button p, button div {
-        font-weight: bold !important;
+    /* Asegurar que el texto dentro de los botones no sea bold */
+    button, button p, button div, button span {
+        font-weight: normal !important;
     }
 
     /* Botones principales (Azul Sólido) */
     section[data-testid="stSidebar"] button[kind="primary"] {
         background: #005cb2 !important;
         color: white !important;
-        font-weight: bold !important;
+        font-weight: normal !important;
         border-radius: 4px !important;
         width: 100% !important;
         margin: 0 auto !important;
@@ -119,7 +127,7 @@ st.markdown("""
         padding: 4px 12px !important;
         width: auto !important;
         font-size: 14px !important;
-        font-weight: 500 !important;
+        font-weight: normal !important;
         box-shadow: 0px 1px 2px rgba(0,0,0,0.05) !important;
         border-radius: 4px !important;
         margin-bottom: 5px !important;
@@ -136,7 +144,7 @@ st.markdown("""
     div[data-testid="stMainBlockContainer"] button[kind="primary"] {
         background: #ba281b !important;
         color: white !important;
-        font-weight: bold !important;
+        font-weight: normal !important;
         border-radius: 4px !important;
         border: none !important;
         box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.1) !important;
@@ -152,6 +160,53 @@ st.markdown("""
     div[data-testid="stMainBlockContainer"] button[kind="primary"]:active {
         transform: translateY(1px) !important;
         box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.1) !important;
+    }
+    
+    /* Marcador para botones grises (Diseño y Catálogo) */
+    div.element-container:has(div.grey-btn-marker), div[data-testid="stElementContainer"]:has(div.grey-btn-marker) {
+        display: none !important;
+        margin: 0 !important;
+        height: 0 !important;
+    }
+
+    /* Botones de Diseño y Catálogo (Gris siempre) */
+    div.element-container:has(div.grey-btn-marker) + div.element-container button,
+    div[data-testid="stElementContainer"]:has(div.grey-btn-marker) + div[data-testid="stElementContainer"] button,
+    section[data-testid="stSidebar"] div.element-container:has(div.grey-btn-marker) + div.element-container button,
+    section[data-testid="stSidebar"] div[data-testid="stElementContainer"]:has(div.grey-btn-marker) + div[data-testid="stElementContainer"] button {
+        background: #6c757d !important;
+        color: white !important;
+        font-weight: normal !important;
+        border-radius: 4px !important;
+        border: none !important;
+        width: 100% !important;
+        margin: 0 auto !important;
+        display: block !important;
+        text-align: center !important;
+        justify-content: center !important;
+        box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.1) !important;
+        transition: all 0.2s ease-in-out !important;
+        padding-top: 0.5rem !important;
+        padding-bottom: 0.5rem !important;
+    }
+    div.element-container:has(div.grey-btn-marker) + div.element-container button:hover:not(:disabled),
+    div[data-testid="stElementContainer"]:has(div.grey-btn-marker) + div[data-testid="stElementContainer"] button:hover:not(:disabled),
+    section[data-testid="stSidebar"] div.element-container:has(div.grey-btn-marker) + div.element-container button:hover:not(:disabled),
+    section[data-testid="stSidebar"] div[data-testid="stElementContainer"]:has(div.grey-btn-marker) + div[data-testid="stElementContainer"] button:hover:not(:disabled) {
+        background: #5a6268 !important;
+        box-shadow: 0px 3px 6px rgba(0, 0, 0, 0.15) !important;
+        transform: translateY(-1px) !important;
+    }
+    div.element-container:has(div.grey-btn-marker) + div.element-container button:disabled,
+    div[data-testid="stElementContainer"]:has(div.grey-btn-marker) + div[data-testid="stElementContainer"] button:disabled,
+    section[data-testid="stSidebar"] div.element-container:has(div.grey-btn-marker) + div.element-container button:disabled,
+    section[data-testid="stSidebar"] div[data-testid="stElementContainer"]:has(div.grey-btn-marker) + div[data-testid="stElementContainer"] button:disabled {
+        background: #adb5bd !important;
+        color: #f8f9fa !important;
+        opacity: 0.65 !important;
+        cursor: not-allowed !important;
+        box-shadow: none !important;
+        transform: none !important;
     }
     
     /* Reducir ancho de la barra lateral */
@@ -307,7 +362,10 @@ def render_siblings_top(group, current):
         is_dis = False
         if name in ["Diseño", "Catálogo"] and not st.session_state.get("file_generated", False):
             is_dis = True
-        with c2: st.button(name, type="primary", use_container_width=True, on_click=go_panel, args=(name,), key=f"nav_top_{name}", disabled=is_dis)
+        with c2:
+            if name in ["Diseño", "Catálogo"]:
+                st.markdown("<div class='grey-btn-marker'></div>", unsafe_allow_html=True)
+            st.button(name, type="primary", use_container_width=True, on_click=go_panel, args=(name,), key=f"nav_top_{name}", disabled=is_dis)
 
 def render_siblings_bottom(group, current):
     found = False
@@ -322,7 +380,10 @@ def render_siblings_bottom(group, current):
             is_dis = False
             if name in ["Diseño", "Catálogo"] and not st.session_state.get("file_generated", False):
                 is_dis = True
-            with c2: st.button(name, type="primary", use_container_width=True, on_click=go_panel, args=(name,), key=f"nav_bot_{name}", disabled=is_dis)
+            with c2:
+                if name in ["Diseño", "Catálogo"]:
+                    st.markdown("<div class='grey-btn-marker'></div>", unsafe_allow_html=True)
+                st.button(name, type="primary", use_container_width=True, on_click=go_panel, args=(name,), key=f"nav_bot_{name}", disabled=is_dis)
         if name == current: found = True
 
 nav_group1 = ["Geometría", "Cargas", "Prediseño"]
@@ -343,7 +404,9 @@ with st.sidebar:
         st.button("Prediseño", type="primary", width="stretch", on_click=go_panel, args=("Prediseño",))
         st.divider()
         is_disabled = not st.session_state.get("file_generated", False)
+        st.markdown("<div class='grey-btn-marker'></div>", unsafe_allow_html=True)
         st.button("Diseño", type="primary", width="stretch", on_click=go_panel, args=("Diseño",), disabled=is_disabled)
+        st.markdown("<div class='grey-btn-marker'></div>", unsafe_allow_html=True)
         st.button("Catálogo", type="primary", width="stretch", on_click=go_panel, args=("Catálogo",), disabled=is_disabled)
         
     elif panel == "Geometría":
@@ -569,7 +632,10 @@ if st.session_state.current_panel == "Diseño":
                 st.info(f"No hay grupos definidos para {tab_name}")
                 return
             key_name = f"highlight_diseno_{tab_name}"
-            sel_g = st.radio("Seleccionar Grupo:", list(sorted(grupos_dict.keys())), key=key_name, horizontal=True, on_change=update_highlight, args=(key_name,))
+            opts = list(sorted(grupos_dict.keys()))
+            if key_name not in st.session_state or st.session_state[key_name] not in opts:
+                st.session_state[key_name] = opts[0]
+            sel_g = st.radio("Seleccionar Grupo:", opts, key=key_name, horizontal=True, on_change=update_highlight, args=(key_name,))
             if "highlight_diseno_active" not in st.session_state:
                 st.session_state["highlight_diseno_active"] = sel_g
             m_ids = grupos_dict[sel_g]
@@ -748,15 +814,16 @@ if st.session_state.current_panel == "Diseño":
         
         with tab_col:
             import prediseno
-            grupos_c = prediseno.clasificar_columnas(model)
+            grupos_c = {k: v for k, v in prediseno.clasificar_columnas(model).items() if len(v) > 0}
             render_group_results("Columnas", grupos_c)
             
         with tab_arm:
-            grupos_a = {k: v for k, v in model.groups.items() if k.startswith(('_CS', '_CI', '_DIAG', '_MONT'))}
+            # Solo Cuerda Superior y Cuerda Inferior por tipo de armadura (sin montantes ni diagonales)
+            grupos_a = {k: v for k, v in model.groups.items() if (k.startswith('_CS') or k.startswith('_CI')) and len(v) > 0}
             render_group_results("Armaduras", grupos_a)
             
         with tab_cv:
-            grupos_v = {k: v for k, v in model.groups.items() if k.startswith('_CV')}
+            grupos_v = {k: v for k, v in model.groups.items() if k.startswith('_CV') and len(v) > 0}
             render_group_results("Contravientos", grupos_v)
 
     with col_der:

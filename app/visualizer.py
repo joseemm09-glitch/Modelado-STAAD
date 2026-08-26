@@ -42,11 +42,9 @@ def plot_model(model, show_supports=False, highlight_ids=None, highlight_colors=
     
     if highlight_ids is not None or highlight_colors is not None:
         lines_by_group = {
-            'highlighted': {'x': [], 'y': [], 'z': [], 'color': 'red', 'width': 6},
+            'highlighted': {'x': [], 'y': [], 'z': [], 'color': '#ba281b', 'width': 6},
             'highlighted_green': {'x': [], 'y': [], 'z': [], 'color': '#0b7a0b', 'width': 6},
-            'normal_cols': {'x': [], 'y': [], 'z': [], 'color': get_group_color('_COL'), 'width': 4},
-            'normal_wind_cols': {'x': [], 'y': [], 'z': [], 'color': get_group_color('_COLVIENTO'), 'width': 4},
-            'faded': {'x': [], 'y': [], 'z': [], 'color': '#e0e0e0', 'width': 1}
+            'faded': {'x': [], 'y': [], 'z': [], 'color': '#b0b8c0', 'width': 2}
         }
     else:
         lines_by_group = {grp: {'x': [], 'y': [], 'z': [], 'color': get_group_color(grp)} for grp in group_order}
@@ -68,10 +66,6 @@ def plot_model(model, show_supports=False, highlight_ids=None, highlight_colors=
                 target_grp = 'highlighted' if highlight_colors[mid] == 'red' else 'highlighted_green'
             elif highlight_ids is not None and mid in highlight_ids:
                 target_grp = 'highlighted'
-            elif member_to_group.get(mid) == '_COL':
-                target_grp = 'normal_cols'
-            elif member_to_group.get(mid) == '_COLVIENTO':
-                target_grp = 'normal_wind_cols'
             else:
                 target_grp = 'faded'
         else:
@@ -83,9 +77,13 @@ def plot_model(model, show_supports=False, highlight_ids=None, highlight_colors=
         lines_by_group[target_grp]['y'].extend([y0, y1, None])
         lines_by_group[target_grp]['z'].extend([z0, z1, None])
 
-    if highlight_ids is not None:
-        ordered_keys = ['highlighted', 'normal_wind_cols', 'normal_cols', 'faded']
-        name_map = {'highlighted': 'Grupo Seleccionado', 'normal_cols': 'Resto Columnas', 'normal_wind_cols': 'Columnas Viento', 'faded': 'Resto Estructura'}
+    if highlight_ids is not None or highlight_colors is not None:
+        ordered_keys = ['highlighted', 'highlighted_green', 'faded']
+        name_map = {
+            'highlighted': 'Grupo Seleccionado' if highlight_colors is None else 'Falla (Ratio > 0.5)',
+            'highlighted_green': 'Adecuado (Ratio ≤ 0.5)',
+            'faded': 'Resto Estructura'
+        }
         for grp_name in ordered_keys:
             data = lines_by_group[grp_name]
             if data['x']:
@@ -94,7 +92,7 @@ def plot_model(model, show_supports=False, highlight_ids=None, highlight_colors=
                     mode='lines',
                     line=dict(color=data['color'], width=data['width']),
                     name=name_map[grp_name],
-                    opacity=0.4 if grp_name == 'faded' else 1.0
+                    opacity=0.45 if grp_name == 'faded' else 1.0
                 ))
     else:
         for grp in group_order:

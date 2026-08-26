@@ -1,0 +1,8 @@
+{
+  "name": "modelado-staad",
+  "version": "1.0.0",
+  "description": "Naves Industriales STAAD.Pro Web App",
+  "scripts": {
+    "build": "python build_stlite.py"
+  }
+}
