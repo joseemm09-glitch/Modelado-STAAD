@@ -71,7 +71,7 @@ div.element-container:has(div.path-marker) {
 [data-testid="stSidebar"] img {
     border-radius: 18px !important;
     box-shadow: 0 12px 24px rgba(0, 0, 0, 0.25) !important;
-    width: 60% !important;
+    width: 66% !important;
     margin: 0 auto 15px auto !important;
     display: block !important;
 }
@@ -87,9 +87,10 @@ hr {
 # CSS para botones
 st.markdown("""
     <style>
-    /* Asegurar que el texto dentro de los botones no sea bold */
+    /* Asegurar que el texto dentro de los botones no sea bold y reducir 1 punto el tamaño */
     button, button p, button div, button span {
         font-weight: normal !important;
+        font-size: 13px !important;
     }
 
     /* Botones principales (Azul Sólido) */
@@ -97,6 +98,7 @@ st.markdown("""
         background: #005cb2 !important;
         color: white !important;
         font-weight: normal !important;
+        font-size: 13px !important;
         border-radius: 4px !important;
         width: 100% !important;
         margin: 0 auto !important;
@@ -126,7 +128,7 @@ st.markdown("""
         border: 1px solid #ddd !important;
         padding: 4px 12px !important;
         width: auto !important;
-        font-size: 14px !important;
+        font-size: 13px !important;
         font-weight: normal !important;
         box-shadow: 0px 1px 2px rgba(0,0,0,0.05) !important;
         border-radius: 4px !important;
