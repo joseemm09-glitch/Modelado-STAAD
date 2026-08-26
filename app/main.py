@@ -86,6 +86,7 @@ hr {
 
 # CSS para botones
 st.markdown("""
+    <style>
     /* Variables globales de tema */
     :root, html, body, #root, [data-testid="stAppViewContainer"] {
         --primary-color: #005cb2 !important;
