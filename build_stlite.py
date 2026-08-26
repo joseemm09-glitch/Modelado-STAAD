@@ -138,6 +138,11 @@ def build():
             font-weight: 500;
         }}
 
+        /* Ocultar skeleton loaders de Streamlit para que no parpadeen */
+        [data-testid="stSkeleton"], [data-testid="stSkeletonBlock"], .stSkeleton {{
+            opacity: 0 !important;
+        }}
+
         @keyframes spin {{
             0% {{ transform: rotate(0deg); }}
             100% {{ transform: rotate(360deg); }}
@@ -179,18 +184,38 @@ def build():
         }}
 
         const splash = document.getElementById("splash-screen");
-        const observer = new MutationObserver(() => {{
-            if (document.querySelector('[data-testid="stAppViewContainer"]') || document.querySelector('.stApp')) {{
+        let dismissed = false;
+        let observer = null;
+
+        function tryDismiss() {{
+            if (dismissed) return;
+            // Verificar que los botones del menú y el gráfico o título ya estén completamente dibujados
+            const hasSidebarButtons = document.querySelectorAll('section[data-testid="stSidebar"] button').length >= 3;
+            const hasPlotly = document.querySelector('.js-plotly-plot') || document.querySelector('[data-testid="stPlotlyChart"]');
+            const hasHeading = Array.from(document.querySelectorAll('h1, h2, h3')).some(el => el.textContent.includes('Naves Industriales'));
+            const hasSkeleton = document.querySelector('[data-testid="stSkeleton"]') || document.querySelector('[data-testid="stSkeletonBlock"]') || document.querySelector('.stSkeleton');
+
+            if ((hasSidebarButtons || hasPlotly || hasHeading) && !hasSkeleton) {{
+                dismissed = true;
+                if (observer) observer.disconnect();
+                
+                // Dar 1.2 segundos adicionales para asegurar que todo el 3D y CSS se haya pintado suavemente
                 setTimeout(() => {{
                     if (splash) {{
                         splash.style.opacity = "0";
-                        setTimeout(() => splash.remove(), 500);
+                        setTimeout(() => splash.remove(), 600);
                     }}
-                }}, 300);
-                observer.disconnect();
+                }}, 1200);
             }}
-        }});
+        }}
+
+        observer = new MutationObserver(tryDismiss);
         observer.observe(document.getElementById("root"), {{ childList: true, subtree: true }});
+
+        const pollInterval = setInterval(() => {{
+            tryDismiss();
+            if (dismissed) clearInterval(pollInterval);
+        }}, 300);
 
         stlite.mount({{
             requirements: ["plotly"],
