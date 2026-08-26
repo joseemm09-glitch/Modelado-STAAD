@@ -228,6 +228,13 @@ st.markdown("""
     /* Descomentar para ocultar el header (Deploy/Menu) en producción: */
     /* header {visibility: hidden !important; display: none !important;} */
     footer {visibility: hidden !important; display: none !important;}
+    
+    /* Ocultar la barra decorativa superior multicolor */
+    [data-testid="stDecoration"], .stDecoration, div[class*="stDecoration"] {
+        display: none !important;
+        visibility: hidden !important;
+        height: 0 !important;
+    }
     </style>
 """, unsafe_allow_html=True)
 

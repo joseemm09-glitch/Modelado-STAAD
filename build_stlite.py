@@ -72,6 +72,13 @@ def build():
             pointer-events: none !important;
         }}
 
+        /* Ocultar barra decorativa superior multicolor */
+        [data-testid="stDecoration"], .stDecoration, div[class*="stDecoration"] {{
+            display: none !important;
+            visibility: hidden !important;
+            height: 0 !important;
+        }}
+
         /* Pantalla de carga profesional */
         #splash-screen {{
             position: fixed;
