@@ -101,16 +101,16 @@ def build():
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);
             border: 1px solid #e2e8f0;
             text-align: center;
-            max-width: 360px;
+            max-width: 380px;
             width: 90%;
             animation: fadeIn 0.4s ease-out;
         }}
 
         .splash-logo {{
-            width: 72px;
-            height: 72px;
-            border-radius: 16px;
-            box-shadow: 0 8px 16px rgba(0, 92, 178, 0.2);
+            width: 108px;
+            height: 108px;
+            border-radius: 22px;
+            box-shadow: 0 10px 22px rgba(0, 92, 178, 0.22);
             margin-bottom: 16px;
         }}
 
@@ -118,14 +118,16 @@ def build():
             font-size: 19px;
             font-weight: 600;
             color: #0f172a;
-            margin: 0 0 6px 0;
+            margin: 0 0 2px 0;
             letter-spacing: -0.3px;
+            line-height: 1.25;
         }}
 
         .splash-subtitle {{
             font-size: 13px;
             color: #64748b;
-            margin: 0 0 24px 0;
+            margin: 0 0 22px 0;
+            line-height: 1.2;
         }}
 
         .splash-spinner {{
