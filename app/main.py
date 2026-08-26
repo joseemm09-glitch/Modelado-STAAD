@@ -1069,25 +1069,36 @@ else:
             file_name_export = st.text_input("proj_name", value="Modelo.std", label_visibility="collapsed")
             st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
         
-            st.markdown("**Ubicación:**")
+            # Detectar si estamos en entorno web (stlite/Pyodide) o escritorio
+            _is_web = False
+            try:
+                import sys
+                if 'pyodide' in sys.modules or 'micropip' in sys.modules:
+                    _is_web = True
+            except:
+                pass
         
-            if 'export_path' not in st.session_state:
-                st.session_state.export_path = r'C:\Users\josee\OneDrive\Escritorio\MODELOS GENERADOS'
+            if not _is_web:
+                # ─── Modo Escritorio: selector de carpeta + guardar al disco ───
+                st.markdown("**Ubicación:**")
             
-            parts = os.path.normpath(st.session_state.export_path).split(os.sep)
-            if len(parts) >= 2:
-                display_text = os.path.join(parts[-2], parts[-1])
-            else:
-                display_text = st.session_state.export_path
-            
-            path_col, btn_col = st.columns([3, 1])
-            with path_col:
-                st.markdown("<div class='path-marker'></div>", unsafe_allow_html=True)
-                st.text_input("ub", value=display_text, label_visibility="collapsed")
-            with btn_col:
-                if st.button("📁", help="Examinar..."):
-                    import subprocess, sys
-                    code = f"""
+                if 'export_path' not in st.session_state:
+                    st.session_state.export_path = r'C:\Users\josee\OneDrive\Escritorio\MODELOS GENERADOS'
+                
+                parts = os.path.normpath(st.session_state.export_path).split(os.sep)
+                if len(parts) >= 2:
+                    display_text = os.path.join(parts[-2], parts[-1])
+                else:
+                    display_text = st.session_state.export_path
+                
+                path_col, btn_col = st.columns([3, 1])
+                with path_col:
+                    st.markdown("<div class='path-marker'></div>", unsafe_allow_html=True)
+                    st.text_input("ub", value=display_text, label_visibility="collapsed")
+                with btn_col:
+                    if st.button("📁", help="Examinar..."):
+                        import subprocess, sys
+                        code = f"""
     import tkinter as tk
     from tkinter import filedialog
     root = tk.Tk()
@@ -1096,16 +1107,16 @@ else:
     folder = filedialog.askdirectory(master=root, title="Seleccionar Carpeta", initialdir=r"{st.session_state.export_path}")
     root.destroy()
     print(folder)
-                    """
-                    try:
-                        result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=30)
-                        folder_selected = result.stdout.strip()
-                        if folder_selected and folder_selected != "()":
-                            st.session_state.export_path = folder_selected
-                            st.rerun()
-                    except Exception as e:
-                        pass
-                    
+                        """
+                        try:
+                            result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=30)
+                            folder_selected = result.stdout.strip()
+                            if folder_selected and folder_selected != "()":
+                                st.session_state.export_path = folder_selected
+                                st.rerun()
+                        except Exception as e:
+                            pass
+        
             # Obtener nombres de STAAD
             import prediseno
             db_or = prediseno.cargar_base_datos_excel()
@@ -1131,34 +1142,51 @@ else:
                     
             staad_text = write_staad(model, selected_profiles=selected_profiles)
         
-            if st.button("Guardar Archivo .std", type="primary"):
-                # Limpiar el nombre del archivo para evitar caracteres inválidos
+            if _is_web:
+                # ─── Modo Web: descarga directa al navegador (carpeta Descargas) ───
                 clean_name = "".join(c for c in file_name_export if c.isalnum() or c in " ._-").strip()
                 if not clean_name.endswith(".std"):
                     clean_name += ".std"
                 
-                full_path = os.path.join(st.session_state.export_path, clean_name)
-                try:
-                    with open(full_path, "w", encoding="utf-8") as f:
-                        f.write(staad_text)
-                    st.success(f"Guardado exitosamente en:\n{full_path}")
-                
-                    # Abrir archivo automáticamente (en Windows usa la app predeterminada para .std)
-                    if os.name == 'nt':
-                        os.startfile(full_path)
-                    else:
-                        import subprocess
-                        subprocess.call(('open', full_path))
-                        
-                    import time
-                    time.sleep(5)
-                    st.session_state.file_generated = True
-                    st.session_state.active_staad_file = clean_name
-                    st.session_state.current_panel = "Diseño"
-                    st.rerun()
+                st.download_button(
+                    label="⬇ Descargar Archivo .std",
+                    data=staad_text,
+                    file_name=clean_name,
+                    mime="text/plain",
+                    type="primary",
+                    use_container_width=True
+                )
+                st.markdown("<div style='font-size: 11px; color: #64748b; margin-top: 4px;'>Se guardará en tu carpeta de Descargas</div>", unsafe_allow_html=True)
+            else:
+                # ─── Modo Escritorio: guardar al disco y abrir ───
+                if st.button("Guardar Archivo .std", type="primary"):
+                    # Limpiar el nombre del archivo para evitar caracteres inválidos
+                    clean_name = "".join(c for c in file_name_export if c.isalnum() or c in " ._-").strip()
+                    if not clean_name.endswith(".std"):
+                        clean_name += ".std"
                     
-                except Exception as e:
-                    st.error(f"Error al guardar o abrir en '{full_path}': {e}")
+                    full_path = os.path.join(st.session_state.export_path, clean_name)
+                    try:
+                        with open(full_path, "w", encoding="utf-8") as f:
+                            f.write(staad_text)
+                        st.success(f"Guardado exitosamente en:\n{full_path}")
+                    
+                        # Abrir archivo automáticamente (en Windows usa la app predeterminada para .std)
+                        if os.name == 'nt':
+                            os.startfile(full_path)
+                        else:
+                            import subprocess
+                            subprocess.call(('open', full_path))
+                            
+                        import time
+                        time.sleep(5)
+                        st.session_state.file_generated = True
+                        st.session_state.active_staad_file = clean_name
+                        st.session_state.current_panel = "Diseño"
+                        st.rerun()
+                        
+                    except Exception as e:
+                        st.error(f"Error al guardar o abrir en '{full_path}': {e}")
 
 
         with st.container():
