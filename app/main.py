@@ -1163,7 +1163,7 @@ else:
                             margin-bottom: 5px; display: block; }}
                   .row {{ display: flex; gap: 5px; margin-bottom: 10px; align-items: center; }}
                   .path-input {{
-                    flex: 1; padding: 4px 8px; font-size: 11px; color: #374151;
+                    flex: none; width: 40%; padding: 4px 8px; font-size: 11px; color: #374151;
                     border: 1px solid #d1d5db; border-radius: 6px;
                     background: #f9fafb; outline: none; height: 32px;
                     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
