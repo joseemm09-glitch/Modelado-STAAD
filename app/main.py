@@ -86,11 +86,192 @@ hr {
 
 # CSS para botones
 st.markdown("""
-    <style>
+    /* Variables globales de tema */
+    :root, html, body, #root, [data-testid="stAppViewContainer"] {
+        --primary-color: #005cb2 !important;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+    }
+
+    /* Reducción general de fuentes para la barra lateral y controles */
+    section[data-testid="stSidebar"] h1,
+    section[data-testid="stSidebar"] h2 {
+        font-size: 18px !important;
+        font-weight: 600 !important;
+        color: #0f172a !important;
+        margin-top: 4px !important;
+        margin-bottom: 8px !important;
+        letter-spacing: -0.2px !important;
+    }
+
+    section[data-testid="stSidebar"] label,
+    section[data-testid="stSidebar"] label p,
+    section[data-testid="stSidebar"] [data-testid="stWidgetLabel"] p,
+    section[data-testid="stSidebar"] [data-testid="stWidgetLabel"] span {
+        font-size: 12px !important;
+        font-weight: 500 !important;
+        color: #334155 !important;
+        margin-bottom: 2px !important;
+        line-height: 1.25 !important;
+    }
+
+    section[data-testid="stSidebar"] div[role="radiogroup"] label p,
+    section[data-testid="stSidebar"] [data-testid="stCheckbox"] label p {
+        font-size: 12.5px !important;
+        font-weight: normal !important;
+        color: #1e293b !important;
+    }
+
+    /* Inputs numéricos y textos en sidebar */
+    section[data-testid="stSidebar"] input {
+        font-size: 12.5px !important;
+        padding: 4px 8px !important;
+        height: 34px !important;
+        color: #0f172a !important;
+    }
+
+    /* Tema Azul para Controles: Radio, Toggles, Checkboxes */
+    div[role="radiogroup"] label div[role="radio"][aria-checked="true"],
+    div[role="radiogroup"] label div:has(input:checked),
+    div[data-testid="stRadio"] label [aria-checked="true"] > div,
+    div[data-testid="stRadio"] [aria-checked="true"] div {
+        border-color: #005cb2 !important;
+    }
+    div[role="radiogroup"] label div[role="radio"][aria-checked="true"]::after,
+    div[data-testid="stRadio"] [aria-checked="true"] span,
+    div[data-testid="stRadio"] [aria-checked="true"] svg circle {
+        background-color: #005cb2 !important;
+        fill: #005cb2 !important;
+    }
+
+    div[data-testid="stToggle"] label div[aria-checked="true"],
+    div[data-testid="stToggle"] [aria-checked="true"] {
+        background-color: #005cb2 !important;
+    }
+
+    div[data-testid="stCheckbox"] label div[aria-checked="true"],
+    div[data-testid="stCheckbox"] [aria-checked="true"] {
+        background-color: #005cb2 !important;
+        border-color: #005cb2 !important;
+    }
+
+    /* Botones de incremento y decremento (+ y -) de stNumberInput */
+    div[data-testid="stNumberInput"] button:hover,
+    div[data-testid="stNumberInput"] button:focus,
+    div[data-testid="stNumberInput"] button:active,
+    div[data-testid="stNumberInputStepDown"]:hover,
+    div[data-testid="stNumberInputStepDown"]:focus,
+    div[data-testid="stNumberInputStepDown"]:active,
+    div[data-testid="stNumberInputStepUp"]:hover,
+    div[data-testid="stNumberInputStepUp"]:focus,
+    div[data-testid="stNumberInputStepUp"]:active {
+        background-color: #005cb2 !important;
+        color: #ffffff !important;
+        border-color: #005cb2 !important;
+    }
+    div[data-testid="stNumberInput"] button:hover svg,
+    div[data-testid="stNumberInput"] button:focus svg,
+    div[data-testid="stNumberInput"] button:active svg,
+    div[data-testid="stNumberInputStepDown"]:hover svg,
+    div[data-testid="stNumberInputStepDown"]:focus svg,
+    div[data-testid="stNumberInputStepDown"]:active svg,
+    div[data-testid="stNumberInputStepUp"]:hover svg,
+    div[data-testid="stNumberInputStepUp"]:focus svg,
+    div[data-testid="stNumberInputStepUp"]:active svg {
+        fill: #ffffff !important;
+        stroke: #ffffff !important;
+    }
+
+    /* ========================================================= */
+    /* Submenús / Expanders con apariencia de tarjetas redondeadas */
+    /* ========================================================= */
+    div[data-testid="stExpander"],
+    .stExpander {
+        border: none !important;
+        background: transparent !important;
+        box-shadow: none !important;
+        margin-bottom: 7px !important;
+    }
+
+    section[data-testid="stSidebar"] div[data-testid="stExpander"] details,
+    div[data-testid="stExpander"] details {
+        border: 1.5px solid #cbd5e1 !important;
+        border-radius: 8px !important;
+        background-color: #f8fafc !important;
+        overflow: hidden !important;
+        transition: all 0.2s ease !important;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03) !important;
+    }
+
+    section[data-testid="stSidebar"] div[data-testid="stExpander"] details:hover,
+    div[data-testid="stExpander"] details:hover {
+        border-color: #94a3b8 !important;
+        background-color: #f1f5f9 !important;
+    }
+
+    /* Submenú activo / desplegado (Borde azul continuo) */
+    section[data-testid="stSidebar"] div[data-testid="stExpander"] details[open],
+    div[data-testid="stExpander"] details[open] {
+        border: 2px solid #5b92cb !important;
+        background-color: #f8fafc !important;
+        box-shadow: 0 2px 8px rgba(0, 92, 178, 0.12) !important;
+    }
+
+    /* Encabezado del Submenú */
+    section[data-testid="stSidebar"] div[data-testid="stExpander"] details summary,
+    div[data-testid="stExpander"] details summary {
+        padding: 7px 12px !important;
+        background-color: #f8fafc !important;
+        color: #1e293b !important;
+        font-size: 13px !important;
+        font-weight: 500 !important;
+        border-radius: 6px !important;
+        display: flex !important;
+        align-items: center !important;
+        cursor: pointer !important;
+    }
+
+    section[data-testid="stSidebar"] div[data-testid="stExpander"] details summary:hover,
+    div[data-testid="stExpander"] details summary:hover {
+        background-color: #f1f5f9 !important;
+    }
+
+    /* Encabezado cuando está abierto (fondo azul tenue y borde inferior divisorio) */
+    section[data-testid="stSidebar"] div[data-testid="stExpander"] details[open] summary,
+    div[data-testid="stExpander"] details[open] summary {
+        background-color: #e8f1fa !important;
+        border-bottom: 1px solid #cbd5e1 !important;
+        border-radius: 6px 6px 0 0 !important;
+        font-weight: 600 !important;
+        color: #0f172a !important;
+    }
+
+    section[data-testid="stSidebar"] div[data-testid="stExpander"] details summary p,
+    div[data-testid="stExpander"] details summary p {
+        font-size: 13px !important;
+        font-weight: inherit !important;
+        color: inherit !important;
+        margin: 0 !important;
+    }
+
+    section[data-testid="stSidebar"] div[data-testid="stExpander"] details summary svg,
+    div[data-testid="stExpander"] details summary svg {
+        color: #475569 !important;
+        width: 14px !important;
+        height: 14px !important;
+    }
+
+    /* Contenido dentro del Submenú */
+    section[data-testid="stSidebar"] div[data-testid="stExpander"] [data-testid="stExpanderDetails"],
+    div[data-testid="stExpander"] [data-testid="stExpanderDetails"] {
+        padding: 8px 10px 10px 10px !important;
+        background-color: #f8fafc !important;
+        border-radius: 0 0 6px 6px !important;
+    }
+
     /* Asegurar que el texto dentro de los botones no sea bold y reducir 1 punto el tamaño */
     button, button p, button div, button span {
         font-weight: normal !important;
-        font-size: 13px !important;
+        font-size: 12.5px !important;
     }
 
     /* Botones principales (Azul Sólido) */
@@ -98,7 +279,7 @@ st.markdown("""
         background: #005cb2 !important;
         color: white !important;
         font-weight: normal !important;
-        font-size: 13px !important;
+        font-size: 12.5px !important;
         border-radius: 4px !important;
         width: 100% !important;
         margin: 0 auto !important;
@@ -126,14 +307,14 @@ st.markdown("""
         background-color: #f8f9fa !important;
         color: #444 !important;
         border: 1px solid #ddd !important;
-        padding: 4px 12px !important;
+        padding: 3px 10px !important;
         width: auto !important;
-        font-size: 13px !important;
+        font-size: 12px !important;
         font-weight: normal !important;
         box-shadow: 0px 1px 2px rgba(0,0,0,0.05) !important;
         border-radius: 4px !important;
-        margin-bottom: 5px !important;
-        margin-top: 5px !important;
+        margin-bottom: 4px !important;
+        margin-top: 4px !important;
         position: relative !important;
         z-index: 10 !important;
     }
@@ -438,16 +619,16 @@ with st.sidebar:
             # Relaciones L/10 y L/15
             l_10 = st.session_state.larm / 10.0
             l_15 = st.session_state.larm / 15.0
-            st.markdown(f"<div style='font-size: 0.85em; color: gray; margin-top: -10px; margin-bottom: 10px;'>L/10 = {l_10:.2f} m.<br>L/15 = {l_15:.2f} m.</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='font-size: 11px; color: #64748b; margin-top: -6px; margin-bottom: 8px; line-height: 1.4;'>L/10 = {l_10:.2f} m.<br>L/15 = {l_15:.2f} m.</div>", unsafe_allow_html=True)
             
             st.number_input("Altura Libre (m)", min_value=1.0, step=0.1, value=st.session_state.hlib, key="_hlib", on_change=update_val, args=("hlib",))
             st.number_input("Subdivisiones (Debe ser par)", min_value=2, step=2, value=st.session_state.subdiv, key="_subdiv", on_change=update_subdiv)
             if st.session_state.get("subdiv_warning", False):
-                st.markdown("<div style='font-size: 0.85em; color: red; margin-top: -10px; margin-bottom: 10px;'>Debe ser número par. Se ajustó automáticamente.</div>", unsafe_allow_html=True)
+                st.markdown("<div style='font-size: 11px; color: #e11d48; margin-top: -6px; margin-bottom: 8px;'>Debe ser número par. Se ajustó automáticamente.</div>", unsafe_allow_html=True)
             
             # Relación de Separación (Sep)
             sep_val = st.session_state.larm / st.session_state.subdiv
-            st.markdown(f"<div style='font-size: 0.85em; color: gray; margin-top: -10px; margin-bottom: 10px;'>Sep = {sep_val:.2f} m.</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='font-size: 11px; color: #64748b; margin-top: -6px; margin-bottom: 8px;'>Sep = {sep_val:.2f} m.</div>", unsafe_allow_html=True)
 
         with st.expander("Cubierta", expanded=False):
             rt_idx = 1 if st.session_state.roof_type == "2 Aguas" else 0

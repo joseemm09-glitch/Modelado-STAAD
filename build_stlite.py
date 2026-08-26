@@ -5,6 +5,7 @@ import base64
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 FILES_TO_INCLUDE = [
+    (".streamlit/config.toml", "text"),
     ("app/main.py", "text"),
     ("app/model.py", "text"),
     ("app/staad_writer.py", "text"),
@@ -54,6 +55,10 @@ def build():
     <link rel="icon" type="image/x-icon" href="data:image/x-icon;base64,{logo_base64}" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@stlite/mountable@0.73.1/build/stlite.css" />
     <style>
+        :root {{
+            --primary-color: #005cb2 !important;
+        }}
+
         body, html, #root {{
             margin: 0;
             padding: 0;
@@ -229,7 +234,13 @@ def build():
         stlite.mount({{
             requirements: ["plotly"],
             entrypoint: "app/main.py",
-            files: processedFiles
+            files: processedFiles,
+            streamlitConfig: {{
+                "theme.primaryColor": "#005cb2",
+                "theme.backgroundColor": "#ffffff",
+                "theme.secondaryBackgroundColor": "#f8fafc",
+                "theme.textColor": "#1e293b"
+            }}
         }}, document.getElementById("root"));
     </script>
 </body>
