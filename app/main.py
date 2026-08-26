@@ -1117,14 +1117,9 @@ else:
                         except Exception as e:
                             pass
             else:
-                # ─── Modo Web: mostrar Ubicación con "Descargas" ───
+                # ─── Modo Web: Ubicación se elige al guardar ───
                 st.markdown("**Ubicación:**")
-                path_col, btn_col = st.columns([3, 1])
-                with path_col:
-                    st.markdown("<div class='path-marker'></div>", unsafe_allow_html=True)
-                    st.text_input("ub", value="Descargas", label_visibility="collapsed", disabled=True)
-                with btn_col:
-                    st.button("📁", help="No disponible en versión web", disabled=True)
+                st.markdown("<div style='font-size: 11px; color: #64748b; margin-top: -8px; margin-bottom: 8px;'>Se selecciona al guardar el archivo</div>", unsafe_allow_html=True)
         
             # Obtener nombres de STAAD
             import prediseno
@@ -1152,18 +1147,62 @@ else:
             staad_text = write_staad(model, selected_profiles=selected_profiles)
         
             if _is_web:
-                # ─── Modo Web: descarga directa al navegador (carpeta Descargas) ───
+                # ─── Modo Web: File System Access API (showSaveFilePicker) ───
                 clean_name = "".join(c for c in file_name_export if c.isalnum() or c in " ._-").strip()
                 if not clean_name.endswith(".std"):
                     clean_name += ".std"
                 
-                st.download_button(
-                    label="Guardar Archivo .std",
-                    data=staad_text,
-                    file_name=clean_name,
-                    mime="text/plain",
-                    type="primary",
-                )
+                import base64
+                staad_b64 = base64.b64encode(staad_text.encode("utf-8")).decode("utf-8")
+                
+                save_js = f"""
+                <div style="margin-top: 4px;">
+                    <button id="saveBtn" style="
+                        background: #ba281b; color: white; border: none; border-radius: 4px;
+                        padding: 8px 16px; font-size: 13px; cursor: pointer; width: 100%;
+                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                        box-shadow: 0px 1px 3px rgba(0,0,0,0.1); transition: all 0.2s;
+                    " onmouseover="this.style.background='#9d2116'" onmouseout="this.style.background='#ba281b'">
+                        Guardar Archivo .std
+                    </button>
+                </div>
+                <script>
+                    const fileContent = atob("{staad_b64}");
+                    const fileName = "{clean_name}";
+                    
+                    document.getElementById("saveBtn").addEventListener("click", async () => {{
+                        try {{
+                            // Intentar File System Access API (Chrome, Edge, Opera)
+                            if (window.showSaveFilePicker) {{
+                                const handle = await window.showSaveFilePicker({{
+                                    suggestedName: fileName,
+                                    types: [{{
+                                        description: "STAAD.Pro File",
+                                        accept: {{ "text/plain": [".std"] }}
+                                    }}]
+                                }});
+                                const writable = await handle.createWritable();
+                                await writable.write(fileContent);
+                                await writable.close();
+                            }} else {{
+                                // Fallback: descarga clásica para Firefox/Safari
+                                const blob = new Blob([fileContent], {{ type: "text/plain" }});
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement("a");
+                                a.href = url;
+                                a.download = fileName;
+                                a.click();
+                                URL.revokeObjectURL(url);
+                            }}
+                        }} catch (e) {{
+                            if (e.name !== "AbortError") {{
+                                console.error("Error al guardar:", e);
+                            }}
+                        }}
+                    }});
+                </script>
+                """
+                components.html(save_js, height=45)
             else:
                 # ─── Modo Escritorio: guardar al disco y abrir ───
                 if st.button("Guardar Archivo .std", type="primary"):
