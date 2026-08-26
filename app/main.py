@@ -1117,16 +1117,15 @@ else:
                         except Exception as e:
                             pass
             else:
-                # ─── Modo Web: Ubicación se elige al guardar ───
-                st.markdown("**Ubicación:**")
-                st.markdown("<div style='font-size: 11px; color: #64748b; margin-top: -8px; margin-bottom: 8px;'>Se selecciona al guardar el archivo</div>", unsafe_allow_html=True)
-        
+                # ─── Modo Web: UI completa en JS (dirHandle vive en JS) ───
+                pass  # El bloque web se renderiza abajo con components.html
+
             # Obtener nombres de STAAD
             import prediseno
             db_or = prediseno.cargar_base_datos_excel()
             db_w = prediseno.PERFILES_W
             name_to_staad = {p['nombre']: p.get('nombre_staad', p['nombre']) for p in db_or + db_w}
-        
+
             selected_profiles = {}
             all_grps = {**prediseno.clasificar_columnas(model), **{k: v for k, v in model.groups.items() if k.startswith(('_CS', '_CI', '_CV'))}}
             for g in all_grps.keys():
@@ -1138,71 +1137,113 @@ else:
                     if top_5:
                         ui_name = top_5[0]['perfil']['nombre']
                         st.session_state[f"sel_{g}"] = ui_name
-                
+
                 if ui_name:
                     staad_name = name_to_staad.get(ui_name)
                     if staad_name:
                         selected_profiles[g] = staad_name
-                    
+
             staad_text = write_staad(model, selected_profiles=selected_profiles)
-        
+
             if _is_web:
-                # ─── Modo Web: File System Access API (showSaveFilePicker) ───
+                # ─── Modo Web: Ubicación + Guardar completo en un solo componente JS ───
                 clean_name = "".join(c for c in file_name_export if c.isalnum() or c in " ._-").strip()
                 if not clean_name.endswith(".std"):
                     clean_name += ".std"
-                
-                import base64
-                staad_b64 = base64.b64encode(staad_text.encode("utf-8")).decode("utf-8")
-                
-                save_js = f"""
-                <div style="margin-top: 4px;">
-                    <button id="saveBtn" style="
-                        background: #ba281b; color: white; border: none; border-radius: 4px;
-                        padding: 8px 16px; font-size: 13px; cursor: pointer; width: 100%;
-                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                        box-shadow: 0px 1px 3px rgba(0,0,0,0.1); transition: all 0.2s;
-                    " onmouseover="this.style.background='#9d2116'" onmouseout="this.style.background='#ba281b'">
-                        Guardar Archivo .std
-                    </button>
+
+                import base64 as _b64
+                staad_b64 = _b64.b64encode(staad_text.encode("utf-8")).decode("utf-8")
+
+                web_ui = f"""
+                <style>
+                  * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+                  body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                         background: transparent; }}
+                  .label {{ font-weight: 600; font-size: 14px; color: #0f172a;
+                            margin-bottom: 6px; display: block; }}
+                  .row {{ display: flex; gap: 6px; margin-bottom: 12px; }}
+                  .path-input {{
+                    flex: 1; padding: 5px 10px; font-size: 12px; color: #374151;
+                    border: 1px solid #d1d5db; border-radius: 6px;
+                    background: #f9fafb; outline: none;
+                    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+                  }}
+                  .folder-btn {{
+                    width: 40px; height: 36px; border: 1px solid #d1d5db;
+                    border-radius: 6px; background: #f9fafb; cursor: pointer;
+                    font-size: 16px; display: flex; align-items: center;
+                    justify-content: center; flex-shrink: 0; transition: background 0.15s;
+                  }}
+                  .folder-btn:hover {{ background: #e5e7eb; }}
+                  .save-btn {{
+                    width: 100%; padding: 8px 16px; background: #ba281b; color: white;
+                    border: none; border-radius: 4px; font-size: 13px; font-weight: 500;
+                    cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+                    transition: background 0.2s; letter-spacing: 0.01em;
+                  }}
+                  .save-btn:hover {{ background: #9d2116; }}
+                  .save-btn:disabled {{ background: #adb5bd; cursor: not-allowed; }}
+                  .status {{ font-size: 11px; margin-top: 6px; display: none; }}
+                  .status.ok {{ color: #16a34a; display: block; }}
+                  .status.err {{ color: #dc2626; display: block; }}
+                </style>
+
+                <span class="label">Ubicación:</span>
+                <div class="row">
+                  <input id="pathDisplay" class="path-input" readonly
+                         value="Selecciona una carpeta..." />
+                  <button class="folder-btn" id="folderBtn" title="Examinar...">📁</button>
                 </div>
+                <button class="save-btn" id="saveBtn" disabled>Guardar Archivo .std</button>
+                <div id="status" class="status"></div>
+
                 <script>
-                    const fileContent = atob("{staad_b64}");
-                    const fileName = "{clean_name}";
-                    
-                    document.getElementById("saveBtn").addEventListener("click", async () => {{
-                        try {{
-                            // Intentar File System Access API (Chrome, Edge, Opera)
-                            if (window.showSaveFilePicker) {{
-                                const handle = await window.showSaveFilePicker({{
-                                    suggestedName: fileName,
-                                    types: [{{
-                                        description: "STAAD.Pro File",
-                                        accept: {{ "text/plain": [".std"] }}
-                                    }}]
-                                }});
-                                const writable = await handle.createWritable();
-                                await writable.write(fileContent);
-                                await writable.close();
-                            }} else {{
-                                // Fallback: descarga clásica para Firefox/Safari
-                                const blob = new Blob([fileContent], {{ type: "text/plain" }});
-                                const url = URL.createObjectURL(blob);
-                                const a = document.createElement("a");
-                                a.href = url;
-                                a.download = fileName;
-                                a.click();
-                                URL.revokeObjectURL(url);
-                            }}
-                        }} catch (e) {{
-                            if (e.name !== "AbortError") {{
-                                console.error("Error al guardar:", e);
-                            }}
-                        }}
-                    }});
+                  const FILE_NAME = "{clean_name}";
+                  const FILE_B64  = "{staad_b64}";
+
+                  let dirHandle = null;
+
+                  function b64ToBytes(b64) {{
+                    const bin = atob(b64);
+                    const buf = new Uint8Array(bin.length);
+                    for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+                    return buf;
+                  }}
+
+                  // ── Botón carpeta ──
+                  document.getElementById("folderBtn").addEventListener("click", async () => {{
+                    try {{
+                      dirHandle = await window.showDirectoryPicker({{ mode: "readwrite" }});
+                      document.getElementById("pathDisplay").value = dirHandle.name;
+                      document.getElementById("saveBtn").disabled = false;
+                      setStatus("", "");
+                    }} catch (e) {{
+                      if (e.name !== "AbortError") setStatus("Error al seleccionar carpeta.", "err");
+                    }}
+                  }});
+
+                  // ── Botón guardar ──
+                  document.getElementById("saveBtn").addEventListener("click", async () => {{
+                    if (!dirHandle) {{ setStatus("Primero selecciona una carpeta.", "err"); return; }}
+                    try {{
+                      const fileHandle = await dirHandle.getFileHandle(FILE_NAME, {{ create: true }});
+                      const writable   = await fileHandle.createWritable();
+                      await writable.write(b64ToBytes(FILE_B64));
+                      await writable.close();
+                      setStatus("✓ Guardado en: " + dirHandle.name + "\\\\" + FILE_NAME, "ok");
+                    }} catch (e) {{
+                      setStatus("Error al guardar: " + e.message, "err");
+                    }}
+                  }});
+
+                  function setStatus(msg, cls) {{
+                    const el = document.getElementById("status");
+                    el.textContent = msg;
+                    el.className = "status " + cls;
+                  }}
                 </script>
                 """
-                components.html(save_js, height=45)
+                components.html(web_ui, height=140)
             else:
                 # ─── Modo Escritorio: guardar al disco y abrir ───
                 if st.button("Guardar Archivo .std", type="primary"):
