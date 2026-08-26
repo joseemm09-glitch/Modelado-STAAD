@@ -1158,32 +1158,34 @@ else:
                 <style>
                   * {{ box-sizing: border-box; margin: 0; padding: 0; }}
                   body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                         background: transparent; }}
-                  .label {{ font-weight: 600; font-size: 14px; color: #0f172a;
-                            margin-bottom: 6px; display: block; }}
-                  .row {{ display: flex; gap: 6px; margin-bottom: 12px; }}
+                         background: transparent; font-size: 13px; }}
+                  .label {{ font-weight: 600; font-size: 13px; color: #0f172a;
+                            margin-bottom: 5px; display: block; }}
+                  .row {{ display: flex; gap: 5px; margin-bottom: 10px; align-items: center; }}
                   .path-input {{
-                    flex: 1; padding: 5px 10px; font-size: 12px; color: #374151;
+                    flex: 1; padding: 4px 8px; font-size: 11px; color: #374151;
                     border: 1px solid #d1d5db; border-radius: 6px;
-                    background: #f9fafb; outline: none;
+                    background: #f9fafb; outline: none; height: 32px;
                     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
                   }}
                   .folder-btn {{
-                    width: 40px; height: 36px; border: 1px solid #d1d5db;
+                    width: 36px; height: 32px; border: 1px solid #d1d5db;
                     border-radius: 6px; background: #f9fafb; cursor: pointer;
-                    font-size: 16px; display: flex; align-items: center;
+                    font-size: 14px; display: flex; align-items: center;
                     justify-content: center; flex-shrink: 0; transition: background 0.15s;
+                    padding: 0;
                   }}
                   .folder-btn:hover {{ background: #e5e7eb; }}
+                  .folder-btn:disabled {{ opacity: 0.5; cursor: not-allowed; }}
                   .save-btn {{
-                    width: 100%; padding: 8px 16px; background: #ba281b; color: white;
-                    border: none; border-radius: 4px; font-size: 13px; font-weight: 500;
+                    padding: 6px 14px; background: #ba281b; color: white;
+                    border: none; border-radius: 4px; font-size: 12.5px; font-weight: 500;
                     cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.15);
-                    transition: background 0.2s; letter-spacing: 0.01em;
+                    transition: background 0.2s; width: auto;
                   }}
                   .save-btn:hover {{ background: #9d2116; }}
-                  .save-btn:disabled {{ background: #adb5bd; cursor: not-allowed; }}
-                  .status {{ font-size: 11px; margin-top: 6px; display: none; }}
+                  .save-btn:disabled {{ background: #adb5bd; cursor: not-allowed; box-shadow: none; }}
+                  .status {{ font-size: 10.5px; margin-top: 5px; display: none; }}
                   .status.ok {{ color: #16a34a; display: block; }}
                   .status.err {{ color: #dc2626; display: block; }}
                 </style>
@@ -1243,7 +1245,7 @@ else:
                   }}
                 </script>
                 """
-                components.html(web_ui, height=140)
+                components.html(web_ui, height=125)
             else:
                 # ─── Modo Escritorio: guardar al disco y abrir ───
                 if st.button("Guardar Archivo .std", type="primary"):
