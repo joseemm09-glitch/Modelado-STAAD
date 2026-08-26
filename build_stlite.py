@@ -199,13 +199,13 @@ def build():
                 dismissed = true;
                 if (observer) observer.disconnect();
                 
-                // Dar 1.2 segundos adicionales para asegurar que todo el 3D y CSS se haya pintado suavemente
+                // Dar 3.0 segundos adicionales para asegurar que todo el 3D y CSS se haya pintado suavemente
                 setTimeout(() => {{
                     if (splash) {{
                         splash.style.opacity = "0";
                         setTimeout(() => splash.remove(), 600);
                     }}
-                }}, 1200);
+                }}, 3000);
             }}
         }}
 
