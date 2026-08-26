@@ -42,6 +42,8 @@ def build():
     files_json = json.dumps(files_dict, ensure_ascii=False)
     files_json = files_json.replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
     
+    logo_base64 = files_dict.get('staad_blue.ico', {}).get('base64', '')
+    
     html_template = f"""<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -49,7 +51,7 @@ def build():
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
     <title>Naves Industriales STAAD.Pro</title>
-    <link rel="icon" type="image/x-icon" href="data:image/x-icon;base64,{files_dict.get('staad_blue.ico', {}).get('base64', '')}" />
+    <link rel="icon" type="image/x-icon" href="data:image/x-icon;base64,{logo_base64}" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@stlite/mountable@0.73.1/build/stlite.css" />
     <style>
         body, html, #root {{
@@ -58,10 +60,105 @@ def build():
             width: 100vw;
             height: 100vh;
             overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f8fafc;
+        }}
+
+        /* Ocultar popups técnicos de stlite (Loading Pyodide, Mounting files, etc.) */
+        [class*="toast"], [class*="Toast"], [class*="stlite-toast"], [data-testid="stToast"] {{
+            display: none !important;
+            opacity: 0 !important;
+            visibility: hidden !important;
+            pointer-events: none !important;
+        }}
+
+        /* Pantalla de carga profesional */
+        #splash-screen {{
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: #f8fafc;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 999999;
+            transition: opacity 0.5s ease;
+        }}
+
+        .splash-card {{
+            background: #ffffff;
+            padding: 32px 40px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);
+            border: 1px solid #e2e8f0;
+            text-align: center;
+            max-width: 360px;
+            width: 90%;
+            animation: fadeIn 0.4s ease-out;
+        }}
+
+        .splash-logo {{
+            width: 72px;
+            height: 72px;
+            border-radius: 16px;
+            box-shadow: 0 8px 16px rgba(0, 92, 178, 0.2);
+            margin-bottom: 16px;
+        }}
+
+        .splash-title {{
+            font-size: 19px;
+            font-weight: 600;
+            color: #0f172a;
+            margin: 0 0 6px 0;
+            letter-spacing: -0.3px;
+        }}
+
+        .splash-subtitle {{
+            font-size: 13px;
+            color: #64748b;
+            margin: 0 0 24px 0;
+        }}
+
+        .splash-spinner {{
+            width: 30px;
+            height: 30px;
+            border: 3px solid #e2e8f0;
+            border-top: 3px solid #005cb2;
+            border-radius: 50%;
+            margin: 0 auto 12px auto;
+            animation: spin 0.8s linear infinite;
+        }}
+
+        .splash-status {{
+            font-size: 12px;
+            color: #94a3b8;
+            margin: 0;
+            font-weight: 500;
+        }}
+
+        @keyframes spin {{
+            0% {{ transform: rotate(0deg); }}
+            100% {{ transform: rotate(360deg); }}
+        }}
+
+        @keyframes fadeIn {{
+            from {{ opacity: 0; transform: translateY(8px); }}
+            to {{ opacity: 1; transform: translateY(0); }}
         }}
     </style>
 </head>
 <body>
+    <div id="splash-screen">
+        <div class="splash-card">
+            <img src="data:image/x-icon;base64,{logo_base64}" class="splash-logo" alt="Logo" />
+            <h1 class="splash-title">Naves Industriales STAAD.Pro</h1>
+            <p class="splash-subtitle">M.I. José Ramón Márquez Montes</p>
+            <div class="splash-spinner"></div>
+            <p class="splash-status">Iniciando aplicación...</p>
+        </div>
+    </div>
     <div id="root"></div>
     <script src="https://cdn.jsdelivr.net/npm/@stlite/mountable@0.73.1/build/stlite.js"></script>
     <script>
@@ -80,6 +177,20 @@ def build():
                 processedFiles[path] = bytes;
             }}
         }}
+
+        const splash = document.getElementById("splash-screen");
+        const observer = new MutationObserver(() => {{
+            if (document.querySelector('[data-testid="stAppViewContainer"]') || document.querySelector('.stApp')) {{
+                setTimeout(() => {{
+                    if (splash) {{
+                        splash.style.opacity = "0";
+                        setTimeout(() => splash.remove(), 500);
+                    }}
+                }}, 300);
+                observer.disconnect();
+            }}
+        }});
+        observer.observe(document.getElementById("root"), {{ childList: true, subtree: true }});
 
         stlite.mount({{
             requirements: ["plotly"],
