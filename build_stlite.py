@@ -92,7 +92,14 @@ def build():
     output_index = os.path.join(ROOT_DIR, "index.html")
     with open(output_index, "w", encoding="utf-8") as f:
         f.write(html_template)
-    print(f"Generated {output_index} successfully!")
+        
+    public_dir = os.path.join(ROOT_DIR, "public")
+    os.makedirs(public_dir, exist_ok=True)
+    output_public_index = os.path.join(public_dir, "index.html")
+    with open(output_public_index, "w", encoding="utf-8") as f:
+        f.write(html_template)
+        
+    print(f"Generated {output_index} and {output_public_index} successfully!")
 
 if __name__ == "__main__":
     build()
