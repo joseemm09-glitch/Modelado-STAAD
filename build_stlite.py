@@ -40,6 +40,7 @@ def build():
             }
             
     files_json = json.dumps(files_dict, ensure_ascii=False)
+    files_json = files_json.replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
     
     html_template = f"""<!DOCTYPE html>
 <html lang="es">
