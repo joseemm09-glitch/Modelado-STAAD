@@ -155,7 +155,12 @@ def write_staad(model, selected_profiles=None):
     out.append("MEMBER")
     
     # Group names mapping
+
     group_map = {
+    }
+    for j in range(model.nSpan):
+        group_map[f'_LARGUEROS_{j}'] = model.groups.get(f'_LARGUEROS_{j}', [])
+    group_map.update({
         '_COL': model.groups.get('_COL', []),
         '_COLVIENTO': model.groups.get('_COLVIENTO', []),
         '_CS': model.groups.get('_CS', []),
@@ -172,7 +177,7 @@ def write_staad(model, selected_profiles=None):
             model.groups.get('_MONTANTES_PERIM', []) + 
             model.groups.get('_DIAG_PERIM', [])
         ))),
-        '_LARGUEROS': model.groups.get('_LARGUEROS', []),
+
         '_JOISTGRAL': model.groups.get('_JOISTGRAL', []),
         '_JPUNTAL': model.groups.get('_JPUNTAL', []),
         '_ARMADURA_CENTRAL': sorted(list(set(
@@ -214,7 +219,7 @@ def write_staad(model, selected_profiles=None):
             model.groups.get('_MONTANTES_SEC', []) + 
             model.groups.get('_DIAG_SEC', [])
         )))
-    }
+    })
     
     for name, members in group_map.items():
         if members:
@@ -439,29 +444,69 @@ def write_staad(model, selected_profiles=None):
     cargas_text = CARGAS_TEMPLATE
             
     # Reemplazar Carga Muerta (LOAD 1)
-    cm_load_str = f"**** CM CUBIERTA: {model.c_muerta} KG/M2 *****\nMEMBER LOAD\n_LARGUEROS UNI GY -{format_num(model.load_cm)}"
+    cm_load_lines = [f"**** CM CUBIERTA: {model.c_muerta} KG/M2 *****\nMEMBER LOAD"]
+    for j in range(model.nSpan):
+        if model.groups[f'_LARGUEROS_{j}']:
+            load_cm = (model.c_muerta * (model.Larm_list[j] / model.subdiv_list[j])) / 100.0
+            cm_load_lines.append(f"_LARGUEROS_{j} UNI GY -{format_num(load_cm)}")
     if model.groups.get('_CS_SEC'):
-        cm_load_str += f"\n_CS_SEC UNI GY -{format_num(model.load_cm)}"
+        load_cm = (model.c_muerta * (model.Larm_list[0] / model.subdiv_list[0])) / 100.0
+        cm_load_lines.append(f"_CS_SEC UNI GY -{format_num(load_cm)}")
+    cm_load_str = "\n".join(cm_load_lines)
     cargas_text = cargas_text.replace(
         "**** CM CUBIERTA: 39.50 KG/M² *****",
         cm_load_str
     )
     # Añadir Carga Viva (LOAD 5)
-    cv_load_str = f"**** CV CUBIERTA: {model.c_viva} KG/M2 *****\nMEMBER LOAD\n_LARGUEROS UNI GY -{format_num(model.load_cv)}"
+    cv_load_lines = [f"**** CV CUBIERTA: {model.c_viva} KG/M2 *****\nMEMBER LOAD"]
+    for j in range(model.nSpan):
+        if model.groups[f'_LARGUEROS_{j}']:
+            load_cv = (model.c_viva * (model.Larm_list[j] / model.subdiv_list[j])) / 100.0
+            cv_load_lines.append(f"_LARGUEROS_{j} UNI GY -{format_num(load_cv)}")
     if model.groups.get('_CS_SEC'):
-        cv_load_str += f"\n_CS_SEC UNI GY -{format_num(model.load_cv)}"
+        load_cv = (model.c_viva * (model.Larm_list[0] / model.subdiv_list[0])) / 100.0
+        cv_load_lines.append(f"_CS_SEC UNI GY -{format_num(load_cv)}")
+    cv_load_str = "\n".join(cv_load_lines)
     cargas_text = cargas_text.replace(
         "**** CV CUBIERTA: 100 KG/M2 *****\nMEMBER LOAD",
         cv_load_str
     )
     # Añadir Granizo (LOAD 15)
-    granizo_load_str = f"**** CARGA DE GRANIZO: {model.c_granizo} KG/M2 *****\nMEMBER LOAD\n_LARGUEROS UNI GY -{format_num(model.load_granizo)}"
+    granizo_load_lines = [f"**** CARGA DE GRANIZO: {model.c_granizo} KG/M2 *****\nMEMBER LOAD"]
+    for j in range(model.nSpan):
+        if model.groups[f'_LARGUEROS_{j}']:
+            load_granizo = (model.c_granizo * (model.Larm_list[j] / model.subdiv_list[j])) / 100.0
+            granizo_load_lines.append(f"_LARGUEROS_{j} UNI GY -{format_num(load_granizo)}")
     if model.groups.get('_CS_SEC'):
-        granizo_load_str += f"\n_CS_SEC UNI GY -{format_num(model.load_granizo)}"
+        load_granizo = (model.c_granizo * (model.Larm_list[0] / model.subdiv_list[0])) / 100.0
+        granizo_load_lines.append(f"_CS_SEC UNI GY -{format_num(load_granizo)}")
+    granizo_load_str = "\n".join(granizo_load_lines)
     cargas_text = cargas_text.replace(
         "**** CARGA DE GRANIZO: 60 KG/M2 *****",
         granizo_load_str
     )
+
+    def write_column_wind_loads(col_list, v_wind, col_trib_dict, dir_axis, sign):
+        # Groups columns by load magnitude and generates STAAD lines
+        load_groups = {}
+        for c in col_list:
+            if c in col_trib_dict:
+                trib = col_trib_dict[c]
+                w = (v_wind * trib) / 100.0
+                w_rounded = round(w, 3)
+                if w_rounded not in load_groups:
+                    load_groups[w_rounded] = []
+                load_groups[w_rounded].append(c)
+        
+        lines = []
+        for w, members in load_groups.items():
+            if members:
+                rng = group_ranges(members)
+                if rng:
+                    tokens = rng.split(" ") + ["UNI", dir_axis, format_num(w * sign)]
+                    lines.append(build_lines(tokens, 72))
+        return lines
+
     
     # Función auxiliar para viento
     def wind_block(wind_type, model):
@@ -490,138 +535,142 @@ def write_staad(model, selected_profiles=None):
             if is_tiltup:
                 lines.append(pl(model.plate_groups['X0'], 'GX', model.v_barlovento, 1))
             else:
-                lines.append(gl(model.wind_cols['X0_CORNER'], 'GX', model.w_barl_x_co, 1))
-                lines.append(gl(model.wind_cols['X0_INNER'], 'GX', model.w_barl_x_in, 1))
-                lines.append(gl(model.wind_cols.get('X0_WINDCOL', []), 'GX', model.w_barl_x_in, 1))
+                lines.extend(write_column_wind_loads(model.wind_cols['X0_CORNER'], model.v_barlovento, model.col_trib_x, 'GX', 1))
+                lines.extend(write_column_wind_loads(model.wind_cols['X0_INNER'], model.v_barlovento, model.col_trib_x, 'GX', 1))
+                lines.extend(write_column_wind_loads(model.wind_cols.get('X0_WINDCOL', []), model.v_barlovento, model.col_trib_x, 'GX', 1))
                 
             lines.append(f"******SOTAVENTO: {model.v_sotavento} KG/M2******")
             if is_tiltup:
                 lines.append(pl(model.plate_groups['XMAX'], 'GX', model.v_sotavento, 1))
             else:
-                lines.append(gl(model.wind_cols['XMAX_CORNER'], 'GX', model.w_sot_x_co, 1))
-                lines.append(gl(model.wind_cols['XMAX_INNER'], 'GX', model.w_sot_x_in, 1))
-                lines.append(gl(model.wind_cols.get('XMAX_WINDCOL', []), 'GX', model.w_sot_x_in, 1))
+                lines.extend(write_column_wind_loads(model.wind_cols['XMAX_CORNER'], model.v_sotavento, model.col_trib_x, 'GX', 1))
+                lines.extend(write_column_wind_loads(model.wind_cols['XMAX_INNER'], model.v_sotavento, model.col_trib_x, 'GX', 1))
+                lines.extend(write_column_wind_loads(model.wind_cols.get('XMAX_WINDCOL', []), model.v_sotavento, model.col_trib_x, 'GX', 1))
                 
             lines.append(f"******LATERALES 1: {model.v_laterales} KG/M2******")
             if is_tiltup:
                 lines.append(pl(model.plate_groups['Z0'], 'GZ', model.v_laterales, -1))
             else:
-                lines.append(gl(model.wind_cols['Z0_CORNER'], 'GZ', model.w_lat_z_co, -1))
-                lines.append(gl(model.wind_cols['Z0_INNER'], 'GZ', model.w_lat_z_in, -1))
-                lines.append(gl(model.wind_cols.get('Z0_WINDCOL', []), 'GZ', model.w_lat_z_in, -1))
+                lines.extend(write_column_wind_loads(model.wind_cols['Z0_CORNER'], model.v_laterales, model.col_trib_z, 'GZ', -1))
+                lines.extend(write_column_wind_loads(model.wind_cols['Z0_INNER'], model.v_laterales, model.col_trib_z, 'GZ', -1))
+                lines.extend(write_column_wind_loads(model.wind_cols.get('Z0_WINDCOL', []), model.v_laterales, model.col_trib_z, 'GZ', -1))
                 
             lines.append(f"******LATERALES 2: {model.v_laterales} KG/M2******")
             if is_tiltup:
                 lines.append(pl(model.plate_groups['ZMAX'], 'GZ', model.v_laterales, 1))
             else:
-                lines.append(gl(model.wind_cols['ZMAX_CORNER'], 'GZ', model.w_lat_z_co, 1))
-                lines.append(gl(model.wind_cols['ZMAX_INNER'], 'GZ', model.w_lat_z_in, 1))
-                lines.append(gl(model.wind_cols.get('ZMAX_WINDCOL', []), 'GZ', model.w_lat_z_in, 1))
+                lines.extend(write_column_wind_loads(model.wind_cols['ZMAX_CORNER'], model.v_laterales, model.col_trib_z, 'GZ', 1))
+                lines.extend(write_column_wind_loads(model.wind_cols['ZMAX_INNER'], model.v_laterales, model.col_trib_z, 'GZ', 1))
+                lines.extend(write_column_wind_loads(model.wind_cols.get('ZMAX_WINDCOL', []), model.v_laterales, model.col_trib_z, 'GZ', 1))
                 
         elif wind_type == "X-":
             lines.append(f"******BARLOVENTO: {model.v_barlovento} KG/M2******")
             if is_tiltup:
                 lines.append(pl(model.plate_groups['XMAX'], 'GX', model.v_barlovento, -1))
             else:
-                lines.append(gl(model.wind_cols['XMAX_CORNER'], 'GX', model.w_barl_x_co, -1))
-                lines.append(gl(model.wind_cols['XMAX_INNER'], 'GX', model.w_barl_x_in, -1))
-                lines.append(gl(model.wind_cols.get('XMAX_WINDCOL', []), 'GX', model.w_barl_x_in, -1))
+                lines.extend(write_column_wind_loads(model.wind_cols['XMAX_CORNER'], model.v_barlovento, model.col_trib_x, 'GX', -1))
+                lines.extend(write_column_wind_loads(model.wind_cols['XMAX_INNER'], model.v_barlovento, model.col_trib_x, 'GX', -1))
+                lines.extend(write_column_wind_loads(model.wind_cols.get('XMAX_WINDCOL', []), model.v_barlovento, model.col_trib_x, 'GX', -1))
                 
             lines.append(f"******SOTAVENTO: {model.v_sotavento} KG/M2******")
             if is_tiltup:
                 lines.append(pl(model.plate_groups['X0'], 'GX', model.v_sotavento, -1))
             else:
-                lines.append(gl(model.wind_cols['X0_CORNER'], 'GX', model.w_sot_x_co, -1))
-                lines.append(gl(model.wind_cols['X0_INNER'], 'GX', model.w_sot_x_in, -1))
-                lines.append(gl(model.wind_cols.get('X0_WINDCOL', []), 'GX', model.w_sot_x_in, -1))
+                lines.extend(write_column_wind_loads(model.wind_cols['X0_CORNER'], model.v_sotavento, model.col_trib_x, 'GX', -1))
+                lines.extend(write_column_wind_loads(model.wind_cols['X0_INNER'], model.v_sotavento, model.col_trib_x, 'GX', -1))
+                lines.extend(write_column_wind_loads(model.wind_cols.get('X0_WINDCOL', []), model.v_sotavento, model.col_trib_x, 'GX', -1))
                 
             lines.append(f"******LATERALES 1: {model.v_laterales} KG/M2******")
             if is_tiltup:
                 lines.append(pl(model.plate_groups['Z0'], 'GZ', model.v_laterales, -1))
             else:
-                lines.append(gl(model.wind_cols['Z0_CORNER'], 'GZ', model.w_lat_z_co, -1))
-                lines.append(gl(model.wind_cols['Z0_INNER'], 'GZ', model.w_lat_z_in, -1))
-                lines.append(gl(model.wind_cols.get('Z0_WINDCOL', []), 'GZ', model.w_lat_z_in, -1))
+                lines.extend(write_column_wind_loads(model.wind_cols['Z0_CORNER'], model.v_laterales, model.col_trib_z, 'GZ', -1))
+                lines.extend(write_column_wind_loads(model.wind_cols['Z0_INNER'], model.v_laterales, model.col_trib_z, 'GZ', -1))
+                lines.extend(write_column_wind_loads(model.wind_cols.get('Z0_WINDCOL', []), model.v_laterales, model.col_trib_z, 'GZ', -1))
                 
             lines.append(f"******LATERALES 2: {model.v_laterales} KG/M2******")
             if is_tiltup:
                 lines.append(pl(model.plate_groups['ZMAX'], 'GZ', model.v_laterales, 1))
             else:
-                lines.append(gl(model.wind_cols['ZMAX_CORNER'], 'GZ', model.w_lat_z_co, 1))
-                lines.append(gl(model.wind_cols['ZMAX_INNER'], 'GZ', model.w_lat_z_in, 1))
-                lines.append(gl(model.wind_cols.get('ZMAX_WINDCOL', []), 'GZ', model.w_lat_z_in, 1))
+                lines.extend(write_column_wind_loads(model.wind_cols['ZMAX_CORNER'], model.v_laterales, model.col_trib_z, 'GZ', 1))
+                lines.extend(write_column_wind_loads(model.wind_cols['ZMAX_INNER'], model.v_laterales, model.col_trib_z, 'GZ', 1))
+                lines.extend(write_column_wind_loads(model.wind_cols.get('ZMAX_WINDCOL', []), model.v_laterales, model.col_trib_z, 'GZ', 1))
                 
         elif wind_type == "Z+":
             lines.append(f"******BARLOVENTO: {model.v_barlovento} KG/M2******")
             if is_tiltup:
                 lines.append(pl(model.plate_groups['Z0'], 'GZ', model.v_barlovento, 1))
             else:
-                lines.append(gl(model.wind_cols['Z0_CORNER'], 'GZ', model.w_barl_z_co, 1))
-                lines.append(gl(model.wind_cols['Z0_INNER'], 'GZ', model.w_barl_z_in, 1))
-                lines.append(gl(model.wind_cols.get('Z0_WINDCOL', []), 'GZ', model.w_barl_z_in, 1))
+                lines.extend(write_column_wind_loads(model.wind_cols['Z0_CORNER'], model.v_barlovento, model.col_trib_z, 'GZ', 1))
+                lines.extend(write_column_wind_loads(model.wind_cols['Z0_INNER'], model.v_barlovento, model.col_trib_z, 'GZ', 1))
+                lines.extend(write_column_wind_loads(model.wind_cols.get('Z0_WINDCOL', []), model.v_barlovento, model.col_trib_z, 'GZ', 1))
                 
             lines.append(f"******SOTAVENTO: {model.v_sotavento} KG/M2******")
             if is_tiltup:
                 lines.append(pl(model.plate_groups['ZMAX'], 'GZ', model.v_sotavento, 1))
             else:
-                lines.append(gl(model.wind_cols['ZMAX_CORNER'], 'GZ', model.w_sot_z_co, 1))
-                lines.append(gl(model.wind_cols['ZMAX_INNER'], 'GZ', model.w_sot_z_in, 1))
-                lines.append(gl(model.wind_cols.get('ZMAX_WINDCOL', []), 'GZ', model.w_sot_z_in, 1))
+                lines.extend(write_column_wind_loads(model.wind_cols['ZMAX_CORNER'], model.v_sotavento, model.col_trib_z, 'GZ', 1))
+                lines.extend(write_column_wind_loads(model.wind_cols['ZMAX_INNER'], model.v_sotavento, model.col_trib_z, 'GZ', 1))
+                lines.extend(write_column_wind_loads(model.wind_cols.get('ZMAX_WINDCOL', []), model.v_sotavento, model.col_trib_z, 'GZ', 1))
                 
             lines.append(f"******LATERALES 1: {model.v_laterales} KG/M2******")
             if is_tiltup:
                 lines.append(pl(model.plate_groups['X0'], 'GX', model.v_laterales, -1))
             else:
-                lines.append(gl(model.wind_cols['X0_CORNER'], 'GX', model.w_lat_x_co, -1))
-                lines.append(gl(model.wind_cols['X0_INNER'], 'GX', model.w_lat_x_in, -1))
-                lines.append(gl(model.wind_cols.get('X0_WINDCOL', []), 'GX', model.w_lat_x_in, -1))
+                lines.extend(write_column_wind_loads(model.wind_cols['X0_CORNER'], model.v_laterales, model.col_trib_x, 'GX', -1))
+                lines.extend(write_column_wind_loads(model.wind_cols['X0_INNER'], model.v_laterales, model.col_trib_x, 'GX', -1))
+                lines.extend(write_column_wind_loads(model.wind_cols.get('X0_WINDCOL', []), model.v_laterales, model.col_trib_x, 'GX', -1))
                 
             lines.append(f"******LATERALES 2: {model.v_laterales} KG/M2******")
             if is_tiltup:
                 lines.append(pl(model.plate_groups['XMAX'], 'GX', model.v_laterales, 1))
             else:
-                lines.append(gl(model.wind_cols['XMAX_CORNER'], 'GX', model.w_lat_x_co, 1))
-                lines.append(gl(model.wind_cols['XMAX_INNER'], 'GX', model.w_lat_x_in, 1))
-                lines.append(gl(model.wind_cols.get('XMAX_WINDCOL', []), 'GX', model.w_lat_x_in, 1))
+                lines.extend(write_column_wind_loads(model.wind_cols['XMAX_CORNER'], model.v_laterales, model.col_trib_x, 'GX', 1))
+                lines.extend(write_column_wind_loads(model.wind_cols['XMAX_INNER'], model.v_laterales, model.col_trib_x, 'GX', 1))
+                lines.extend(write_column_wind_loads(model.wind_cols.get('XMAX_WINDCOL', []), model.v_laterales, model.col_trib_x, 'GX', 1))
                 
         elif wind_type == "Z-":
             lines.append(f"******BARLOVENTO: {model.v_barlovento} KG/M2******")
             if is_tiltup:
                 lines.append(pl(model.plate_groups['ZMAX'], 'GZ', model.v_barlovento, -1))
             else:
-                lines.append(gl(model.wind_cols['ZMAX_CORNER'], 'GZ', model.w_barl_z_co, -1))
-                lines.append(gl(model.wind_cols['ZMAX_INNER'], 'GZ', model.w_barl_z_in, -1))
-                lines.append(gl(model.wind_cols.get('ZMAX_WINDCOL', []), 'GZ', model.w_barl_z_in, -1))
+                lines.extend(write_column_wind_loads(model.wind_cols['ZMAX_CORNER'], model.v_barlovento, model.col_trib_z, 'GZ', -1))
+                lines.extend(write_column_wind_loads(model.wind_cols['ZMAX_INNER'], model.v_barlovento, model.col_trib_z, 'GZ', -1))
+                lines.extend(write_column_wind_loads(model.wind_cols.get('ZMAX_WINDCOL', []), model.v_barlovento, model.col_trib_z, 'GZ', -1))
                 
             lines.append(f"******SOTAVENTO: {model.v_sotavento} KG/M2******")
             if is_tiltup:
                 lines.append(pl(model.plate_groups['Z0'], 'GZ', model.v_sotavento, -1))
             else:
-                lines.append(gl(model.wind_cols['Z0_CORNER'], 'GZ', model.w_sot_z_co, -1))
-                lines.append(gl(model.wind_cols['Z0_INNER'], 'GZ', model.w_sot_z_in, -1))
-                lines.append(gl(model.wind_cols.get('Z0_WINDCOL', []), 'GZ', model.w_sot_z_in, -1))
+                lines.extend(write_column_wind_loads(model.wind_cols['Z0_CORNER'], model.v_sotavento, model.col_trib_z, 'GZ', -1))
+                lines.extend(write_column_wind_loads(model.wind_cols['Z0_INNER'], model.v_sotavento, model.col_trib_z, 'GZ', -1))
+                lines.extend(write_column_wind_loads(model.wind_cols.get('Z0_WINDCOL', []), model.v_sotavento, model.col_trib_z, 'GZ', -1))
                 
             lines.append(f"******LATERALES 1: {model.v_laterales} KG/M2******")
             if is_tiltup:
                 lines.append(pl(model.plate_groups['X0'], 'GX', model.v_laterales, -1))
             else:
-                lines.append(gl(model.wind_cols['X0_CORNER'], 'GX', model.w_lat_x_co, -1))
-                lines.append(gl(model.wind_cols['X0_INNER'], 'GX', model.w_lat_x_in, -1))
-                lines.append(gl(model.wind_cols.get('X0_WINDCOL', []), 'GX', model.w_lat_x_in, -1))
+                lines.extend(write_column_wind_loads(model.wind_cols['X0_CORNER'], model.v_laterales, model.col_trib_x, 'GX', -1))
+                lines.extend(write_column_wind_loads(model.wind_cols['X0_INNER'], model.v_laterales, model.col_trib_x, 'GX', -1))
+                lines.extend(write_column_wind_loads(model.wind_cols.get('X0_WINDCOL', []), model.v_laterales, model.col_trib_x, 'GX', -1))
                 
             lines.append(f"******LATERALES 2: {model.v_laterales} KG/M2******")
             if is_tiltup:
                 lines.append(pl(model.plate_groups['XMAX'], 'GX', model.v_laterales, 1))
             else:
-                lines.append(gl(model.wind_cols['XMAX_CORNER'], 'GX', model.w_lat_x_co, 1))
-                lines.append(gl(model.wind_cols['XMAX_INNER'], 'GX', model.w_lat_x_in, 1))
-                lines.append(gl(model.wind_cols.get('XMAX_WINDCOL', []), 'GX', model.w_lat_x_in, 1))
+                lines.extend(write_column_wind_loads(model.wind_cols['XMAX_CORNER'], model.v_laterales, model.col_trib_x, 'GX', 1))
+                lines.extend(write_column_wind_loads(model.wind_cols['XMAX_INNER'], model.v_laterales, model.col_trib_x, 'GX', 1))
+                lines.extend(write_column_wind_loads(model.wind_cols.get('XMAX_WINDCOL', []), model.v_laterales, model.col_trib_x, 'GX', 1))
         
         if is_tiltup:
             lines.append("MEMBER LOAD")
             
         lines.append(f"**** SUCCIÓN : {model.v_succion} KG/M2 *****")
-        lines.append(build_lines(["_LARGUEROS", "UNI", "GY", format_num(model.load_succion)], 72))
+        for j in range(model.nSpan):
+            dist_largueros = model.Larm_list[j] / model.subdiv_list[j]
+            load_succion = (model.v_succion * dist_largueros) / 100.0
+            if model.groups.get(f'_LARGUEROS_{j}'):
+                lines.append(build_lines([f"_LARGUEROS_{j}", "UNI", "GY", format_num(load_succion)], 72))
         
         return "\n".join([x for x in lines if x])
         
@@ -669,10 +718,11 @@ def write_staad(model, selected_profiles=None):
             tokens = rng.split(" ") + [f"F{axis}", format_num(sign * load_val)]
             return build_lines(tokens, 72)
             
-        lines.append(joint_load(model.seismic_nodes['corner'], model.seismic_loads['corner']))
-        lines.append(joint_load(model.seismic_nodes['edge_x'], model.seismic_loads['edge_x']))
-        lines.append(joint_load(model.seismic_nodes['edge_z'], model.seismic_loads['edge_z']))
-        lines.append(joint_load(model.seismic_nodes['interior'], model.seismic_loads['interior']))
+        for j in range(model.nSpan + 1):
+            lines.append(joint_load(model.seismic_nodes[j]['corner'], model.seismic_loads[j]['corner']))
+            lines.append(joint_load(model.seismic_nodes[j]['edge_x'], model.seismic_loads[j]['edge_x']))
+            lines.append(joint_load(model.seismic_nodes[j]['edge_z'], model.seismic_loads[j]['edge_z']))
+            lines.append(joint_load(model.seismic_nodes[j]['interior'], model.seismic_loads[j]['interior']))
         
         return "\n".join([x for x in lines if x])
         

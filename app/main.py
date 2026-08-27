@@ -155,6 +155,22 @@ st.markdown("""
         border-color: #005cb2 !important;
     }
 
+    div[data-testid="stNumberInputStepDown"],
+    div[data-testid="stNumberInputStepUp"],
+    div[data-testid="stNumberInput"] button {
+        width: 1.5rem !important;
+        height: 1.5rem !important;
+        min-width: 1.5rem !important;
+        padding: 0 !important;
+        display: inline-flex !important;
+    }
+    div[data-testid="stNumberInputStepDown"] svg,
+    div[data-testid="stNumberInputStepUp"] svg,
+    div[data-testid="stNumberInput"] button svg {
+        width: 12px !important;
+        height: 12px !important;
+    }
+
     /* Botones de incremento y decremento (+ y -) de stNumberInput */
     div[data-testid="stNumberInput"] button:hover,
     div[data-testid="stNumberInput"] button:focus,
@@ -191,6 +207,7 @@ st.markdown("""
         background: transparent !important;
         box-shadow: none !important;
         margin-bottom: 7px !important;
+        margin-right: 15px !important;
     }
 
     section[data-testid="stSidebar"] div[data-testid="stExpander"] details,
@@ -395,8 +412,8 @@ st.markdown("""
     
     /* Reducir ancho de la barra lateral */
     section[data-testid="stSidebar"] {
-        min-width: 220px !important;
-        max-width: 240px !important;
+        min-width: 275px !important;
+        max-width: 300px !important;
     }
     
     /* Reducir padding superior de la aplicación para aprovechar espacio */
@@ -417,6 +434,26 @@ st.markdown("""
         visibility: hidden !important;
         height: 0 !important;
     }
+    
+    /* Estilos para títulos de widgets en submenús (expanders) y sidebar */
+    div[data-testid="stExpander"] label p, section[data-testid="stSidebar"] label p {
+        font-size: 15px !important;
+        font-weight: bold !important;
+        color: #0F172A !important;
+    }
+
+    /* Estilos para "Consideraciones Especiales" */
+    div[data-testid="stVerticalBlock"]:has(> div > div > div > div > span#extremos-border) {
+        border: 1px solid #3b82f6;
+        border-radius: 8px;
+        padding: 10px;
+        margin-bottom: 15px;
+        margin-top: -5px;
+    }
+    div[data-testid="stVerticalBlock"]:has(> div > div > div > div > span#extremos-border) input[type="number"] {
+        pointer-events: none;
+    }
+    .widget-title { font-size: 12px; font-weight: 600; margin-bottom: 5px; color: #0F172A; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -435,7 +472,12 @@ defaults = {
     "max_wind_dist": 8.0,
     "wall_type": "Metálico",
     "current_panel": "Main",
-    "subdiv_warning": False
+    "subdiv_warning": False,
+    "dif_lengths": False,
+    "larm_ext1": 15.24,
+    "larm_ext2": 15.24,
+    "subdiv_ext1": 10,
+    "subdiv_ext2": 10
 }
 for k, v in defaults.items():
     if k not in st.session_state:
@@ -448,14 +490,28 @@ def update_val(key):
     st.session_state[key] = st.session_state["_" + key]
 
 def update_subdiv():
-    val = st.session_state._subdiv
+    val = int(st.session_state['_subdiv'])
     if val % 2 != 0:
         val += 1
         st.session_state.subdiv_warning = True
     else:
         st.session_state.subdiv_warning = False
     st.session_state.subdiv = val
-    st.session_state._subdiv = val
+    st.session_state['_subdiv'] = val
+
+def update_subdiv_ext1():
+    val = int(st.session_state['_subdiv_ext1'])
+    if val % 2 != 0:
+        val += 1
+    st.session_state.subdiv_ext1 = val
+    st.session_state['_subdiv_ext1'] = val
+
+def update_subdiv_ext2():
+    val = int(st.session_state['_subdiv_ext2'])
+    if val % 2 != 0:
+        val += 1
+    st.session_state.subdiv_ext2 = val
+    st.session_state['_subdiv_ext2'] = val
 
 def update_larm():
     st.session_state.larm = st.session_state._larm
@@ -467,6 +523,24 @@ def update_larm():
     st.session_state.subdiv = max(2, int(needed))
     st.session_state['_subdiv'] = st.session_state.subdiv
     st.session_state.subdiv_warning = False
+
+def update_larm_ext1():
+    st.session_state.larm_ext1 = st.session_state._larm_ext1
+    length = st.session_state.larm_ext1
+    needed = math.ceil(length / 1.524)
+    if needed % 2 != 0:
+        needed += 1
+    st.session_state.subdiv_ext1 = max(2, int(needed))
+    st.session_state['_subdiv_ext1'] = st.session_state.subdiv_ext1
+
+def update_larm_ext2():
+    st.session_state.larm_ext2 = st.session_state._larm_ext2
+    length = st.session_state.larm_ext2
+    needed = math.ceil(length / 1.524)
+    if needed % 2 != 0:
+        needed += 1
+    st.session_state.subdiv_ext2 = max(2, int(needed))
+    st.session_state['_subdiv_ext2'] = st.session_state.subdiv_ext2
     
     st.session_state.harm = math.ceil((length / 12.5) * 10) / 10.0
     st.session_state['_harm'] = st.session_state.harm
@@ -539,7 +613,12 @@ try:
         st.session_state.max_wind_dist,
         st.session_state.wall_type,
         sec_trusses_j,
-        st.session_state.get('resorte_val', '1,000,000').replace(',', '')
+        st.session_state.get('resorte_val', '1,000,000').replace(',', ''),
+        dif_lengths=st.session_state.dif_lengths,
+        larm_ext1=st.session_state.larm_ext1,
+        larm_ext2=st.session_state.larm_ext2,
+        subdiv_ext1=st.session_state.subdiv_ext1,
+        subdiv_ext2=st.session_state.subdiv_ext2
     )
 except Exception as e:
     st.error(f"Error generando la geometría: {e}")
@@ -609,8 +688,9 @@ with st.sidebar:
         st.radio("Tipo de Muros", ["Metálico", "Tilt-Up"], index=wt_idx, key="_wall_type", on_change=update_val, args=("wall_type",), horizontal=True)
         
         with st.expander("Dimensiones Generales", expanded=False):
-            st.number_input("Longitud de Armaduras (m)", min_value=1.0, step=0.1, value=st.session_state.larm, key="_larm", on_change=update_larm)
-            st.number_input("Longitud de Joists (m)", min_value=1.0, step=0.1, value=st.session_state.ljoist, key="_ljoist", on_change=update_val, args=("ljoist",))
+            st.number_input("Longitud de Armaduras (m) (Principal)", min_value=1.0, step=3.048, format="%.2f", value=st.session_state.larm, key="_larm", on_change=update_larm)
+            
+            st.number_input("Longitud de Joists (m)", min_value=1.0, step=None, value=st.session_state.ljoist, key="_ljoist", on_change=update_val, args=("ljoist",))
             
             st.number_input("Número de Bahías (Profundidad)", min_value=1, step=1, value=st.session_state.nbay, key="_nbay", on_change=update_val, args=("nbay",))
             st.number_input("Número de Entre-ejes (Ancho)", min_value=1, step=1, value=st.session_state.nspan, key="_nspan", on_change=update_val, args=("nspan",))
@@ -630,6 +710,7 @@ with st.sidebar:
             # Relación de Separación (Sep)
             sep_val = st.session_state.larm / st.session_state.subdiv
             st.markdown(f"<div style='font-size: 11px; color: #64748b; margin-top: -6px; margin-bottom: 8px;'>Sep = {sep_val:.2f} m.</div>", unsafe_allow_html=True)
+
 
         with st.expander("Cubierta", expanded=False):
             rt_idx = 1 if st.session_state.roof_type == "2 Aguas" else 0
@@ -687,6 +768,25 @@ with st.sidebar:
                     st.number_input("Separación Máxima (m)", min_value=1.0, step=0.1, value=float(st.session_state.max_wind_dist), key="_max_wind_dist", on_change=update_val, args=("max_wind_dist",))
         else:
             st.session_state.add_wind_cols = False
+            
+        with st.expander("Consideraciones Especiales", expanded=False):
+            if st.session_state.nspan >= 2:
+                st.checkbox("Diferentes longitudes (Extremos)", value=st.session_state.dif_lengths, key="_dif_lengths", on_change=update_val, args=("dif_lengths",))
+                if st.session_state.dif_lengths:
+                    with st.container():
+                        st.markdown("<span id='extremos-border'></span><p class='widget-title' style='margin-top: -5px;'>Extremo 1 (X=0)</p>", unsafe_allow_html=True)
+                        st.number_input("Longitud (m)", min_value=1.0, step=3.048, format="%.2f", value=st.session_state.larm_ext1, key="_larm_ext1", on_change=update_larm_ext1)
+                        st.number_input("Subdivisiones", min_value=2, step=2, value=st.session_state.subdiv_ext1, key="_subdiv_ext1", on_change=update_subdiv_ext1)
+                        sep_val1 = st.session_state.larm_ext1 / st.session_state.subdiv_ext1
+                        st.markdown(f"<div style='font-size: 11px; color: #64748b; margin-top: -6px; margin-bottom: 8px;'>Sep = {sep_val1:.2f} m.</div>", unsafe_allow_html=True)
+                        
+                        if st.session_state.nspan > 2:
+                            st.markdown("<p class='widget-title' style='margin-top: 10px;'>Extremo 2 (X=MAX)</p>", unsafe_allow_html=True)
+                            st.number_input("Longitud (m)", min_value=1.0, step=3.048, format="%.2f", value=st.session_state.larm_ext2, key="_larm_ext2", on_change=update_larm_ext2)
+                            st.number_input("Subdivisiones", min_value=2, step=2, value=st.session_state.subdiv_ext2, key="_subdiv_ext2", on_change=update_subdiv_ext2)
+                            sep_val2 = st.session_state.larm_ext2 / st.session_state.subdiv_ext2
+                            st.markdown(f"<div style='font-size: 11px; color: #64748b; margin-top: -6px; margin-bottom: 8px;'>Sep = {sep_val2:.2f} m.</div>", unsafe_allow_html=True)
+
         render_siblings_bottom(nav_group1, "Geometría")
 
     elif panel == "Cargas":
