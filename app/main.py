@@ -477,7 +477,13 @@ defaults = {
     "larm_ext1": 15.24,
     "larm_ext2": 15.24,
     "subdiv_ext1": 10,
-    "subdiv_ext2": 10
+    "subdiv_ext2": 10,
+    "ext_bays_active": False,
+    "ext_bl": False,
+    "ext_br": False,
+    "ext_tl": False,
+    "ext_tr": False,
+    "ext_height_mode": "Primer Entre-Eje completo"
 }
 for k, v in defaults.items():
     if k not in st.session_state:
@@ -618,7 +624,13 @@ try:
         larm_ext1=st.session_state.larm_ext1,
         larm_ext2=st.session_state.larm_ext2,
         subdiv_ext1=st.session_state.subdiv_ext1,
-        subdiv_ext2=st.session_state.subdiv_ext2
+        subdiv_ext2=st.session_state.subdiv_ext2,
+        ext_bays_active=st.session_state.ext_bays_active,
+        ext_bl=st.session_state.ext_bl,
+        ext_br=st.session_state.ext_br,
+        ext_tl=st.session_state.ext_tl,
+        ext_tr=st.session_state.ext_tr,
+        ext_height_mode=st.session_state.ext_height_mode
     )
 except Exception as e:
     st.error(f"Error generando la geometría: {e}")
@@ -769,6 +781,19 @@ with st.sidebar:
         else:
             st.session_state.add_wind_cols = False
             
+        with st.expander("Bahías de Extensión", expanded=False):
+            st.checkbox("Incluir Bahías de Extensión", value=st.session_state.ext_bays_active, key="_ext_bays_active", on_change=update_val, args=("ext_bays_active",))
+            if st.session_state.ext_bays_active:
+                st.radio("Altura Libre", ["Primer Entre-Eje completo", "Altura mínima en esquinas"], index=0 if st.session_state.ext_height_mode == "Primer Entre-Eje completo" else 1, key="_ext_height_mode", on_change=update_val, args=("ext_height_mode",))
+                st.markdown("<p class='widget-title' style='margin-top: 5px;'>Esquinas con Extensión:</p>", unsafe_allow_html=True)
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.checkbox("Frontal - Izq (X=0, Z=0)", value=st.session_state.ext_bl, key="_ext_bl", on_change=update_val, args=("ext_bl",))
+                    st.checkbox("Trasera - Izq (X=0, Z=Max)", value=st.session_state.ext_tl, key="_ext_tl", on_change=update_val, args=("ext_tl",))
+                with col2:
+                    st.checkbox("Frontal - Der (X=Max, Z=0)", value=st.session_state.ext_br, key="_ext_br", on_change=update_val, args=("ext_br",))
+                    st.checkbox("Trasera - Der (X=Max, Z=Max)", value=st.session_state.ext_tr, key="_ext_tr", on_change=update_val, args=("ext_tr",))
+                
         with st.expander("Consideraciones Especiales", expanded=False):
             if st.session_state.nspan >= 2:
                 st.checkbox("Diferentes longitudes (Extremos)", value=st.session_state.dif_lengths, key="_dif_lengths", on_change=update_val, args=("dif_lengths",))

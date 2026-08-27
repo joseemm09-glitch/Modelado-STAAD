@@ -33,6 +33,13 @@ class StaadModel:
         self.resorte_val = resorte_val
         self.wall_type = wall_type
         
+        self.ext_bays_active = kwargs.get('ext_bays_active', False)
+        self.ext_bl = kwargs.get('ext_bl', False)
+        self.ext_br = kwargs.get('ext_br', False)
+        self.ext_tl = kwargs.get('ext_tl', False)
+        self.ext_tr = kwargs.get('ext_tr', False)
+        self.ext_height_mode = kwargs.get('ext_height_mode', "Primer Entre-Eje completo")
+        
         self.sec_trusses_j = sec_trusses_j if sec_trusses_j else []
         if self.sec_trusses_j:
             import math
@@ -80,6 +87,17 @@ class StaadModel:
         self.HtLibre = self.HLibre_m * self.scale
         self.total_width = sum(self.Lx_list)
         self.Lx = self.Lx_list[0] # Legacy fallback if needed outside generate
+        
+        self.y_shift_ext = 0.0
+        if self.ext_bays_active and self.ext_height_mode == "Primer Entre-Eje completo":
+            slope = self.slope_pct / 100.0
+            W_left = 2 * (self.Lx_list[0] / self.subdiv_list[0]) if (self.ext_bl or self.ext_tl) else 0.0
+            W_right = 2 * (self.Lx_list[-1] / self.subdiv_list[-1]) if (self.ext_br or self.ext_tr) else 0.0
+            
+            if self.roof_type == "1 Agua":
+                self.y_shift_ext = W_left * slope
+            elif self.roof_type == "2 Aguas":
+                self.y_shift_ext = max(W_left * slope, W_right * slope)
         
         self.col_trib_z = {}
         self.col_trib_x = {}
@@ -218,10 +236,10 @@ class StaadModel:
     def get_y_offset(self, global_x):
         slope = self.slope_pct / 100.0
         if self.roof_type == "1 Agua":
-            return global_x * slope
+            return global_x * slope + self.y_shift_ext
         elif self.roof_type == "2 Aguas":
-            return min(global_x, self.total_width - global_x) * slope
-        return 0.0
+            return min(global_x, self.total_width - global_x) * slope + self.y_shift_ext
+        return self.y_shift_ext
 
 
 
@@ -753,14 +771,44 @@ class StaadModel:
                 # No release
                 pass
             else:
-                # Not split: release both start and end
                 self.rel_larg_start.append(mem_id)
                 self.rel_larg_end.append(mem_id)
                 
+        # --- Generar Bahías de Extensión ---
+        self._generate_extensions()
+
         # --- Generación de Placas para Tilt-Up ---
         if self.wall_type == "Tilt-Up":
             # 1. Caras Z=0 y Z=ZMAX (A lo largo de X)
             for i in [0, self.nBay]:
+                is_front = (i == 0)
+                ext_left = self.ext_bl if is_front else self.ext_tl
+                ext_right = self.ext_br if is_front else self.ext_tr
+                
+                if self.ext_bays_active and ext_left:
+                    baseZ = i * self.Lz
+                    L0 = self.Lx_list[0] / self.subdiv_list[0]
+                    for k in range(2):
+                        xn1 = -2 * L0 + k * L0
+                        xn2 = -2 * L0 + (k + 1) * L0
+                        
+                        yn_bot1 = self.HtLibre + self.get_y_offset(xn1)
+                        yn_top1 = self.HtLibre + self.HtArmad + self.get_y_offset(xn1)
+                        yn_bot2 = self.HtLibre + self.get_y_offset(xn2)
+                        yn_top2 = self.HtLibre + self.HtArmad + self.get_y_offset(xn2)
+                        
+                        n_b1 = self.get_or_create_node(xn1, 0.0, baseZ)
+                        n_b2 = self.get_or_create_node(xn2, 0.0, baseZ)
+                        n_ci1 = self.get_or_create_node(xn1, yn_bot1, baseZ)
+                        n_ci2 = self.get_or_create_node(xn2, yn_bot2, baseZ)
+                        n_cs1 = self.get_or_create_node(xn1, yn_top1, baseZ)
+                        n_cs2 = self.get_or_create_node(xn2, yn_top2, baseZ)
+                        
+                        p1 = self.add_plate(n_b1, n_b2, n_ci2, n_ci1)
+                        p2 = self.add_plate(n_ci1, n_ci2, n_cs2, n_cs1)
+                        group_key = 'Z0' if is_front else 'ZMAX'
+                        self.plate_groups[group_key].extend([p1, p2])
+                
                 for j in range(self.nSpan):
                     baseZ = i * self.Lz
                     # En estas caras, generamos 2 placas por cada separación de la armadura
@@ -801,13 +849,102 @@ class StaadModel:
                         if n_b2 not in self.wind_base_nodes:
                             self.wind_base_nodes.append(n_b2)
 
+                if self.ext_bays_active and ext_right:
+                    baseZ = i * self.Lz
+                    L0 = self.Lx_list[-1] / self.subdiv_list[-1]
+                    for k in range(2):
+                        xn1 = self.total_width + k * L0
+                        xn2 = self.total_width + (k + 1) * L0
+                        
+                        yn_bot1 = self.HtLibre + self.get_y_offset(xn1)
+                        yn_top1 = self.HtLibre + self.HtArmad + self.get_y_offset(xn1)
+                        yn_bot2 = self.HtLibre + self.get_y_offset(xn2)
+                        yn_top2 = self.HtLibre + self.HtArmad + self.get_y_offset(xn2)
+                        
+                        n_b1 = self.get_or_create_node(xn1, 0.0, baseZ)
+                        n_b2 = self.get_or_create_node(xn2, 0.0, baseZ)
+                        n_ci1 = self.get_or_create_node(xn1, yn_bot1, baseZ)
+                        n_ci2 = self.get_or_create_node(xn2, yn_bot2, baseZ)
+                        n_cs1 = self.get_or_create_node(xn1, yn_top1, baseZ)
+                        n_cs2 = self.get_or_create_node(xn2, yn_top2, baseZ)
+                        
+                        p1 = self.add_plate(n_b1, n_b2, n_ci2, n_ci1)
+                        p2 = self.add_plate(n_ci1, n_ci2, n_cs2, n_cs1)
+                        group_key = 'Z0' if is_front else 'ZMAX'
+                        self.plate_groups[group_key].extend([p1, p2])
+
             # 2. Caras X=0 y X=XMAX (A lo largo de Z)
             for j in [0, self.nSpan]:
                 baseX = self.get_x(j)
                 yn_bot = self.HtLibre + self.get_y_offset(baseX)
                 yn_top = self.HtLibre + self.HtArmad + self.get_y_offset(baseX)
                 
+                is_left = (j == 0)
+                
                 for i in range(self.nBay):
+                    is_ext = False
+                    if is_left and i == 0 and self.ext_bays_active and self.ext_bl: is_ext = True
+                    if is_left and i == self.nBay - 1 and self.ext_bays_active and self.ext_tl: is_ext = True
+                    if not is_left and i == 0 and self.ext_bays_active and self.ext_br: is_ext = True
+                    if not is_left and i == self.nBay - 1 and self.ext_bays_active and self.ext_tr: is_ext = True
+                    
+                    if is_ext:
+                        j_span = 0 if is_left else self.nSpan - 1
+                        L0 = self.Lx_list[j_span] / self.subdiv_list[j_span]
+                        W_ext = 2 * L0
+                        ext_x = baseX - W_ext if is_left else baseX + W_ext
+                        
+                        yn_ext_bot = self.HtLibre + self.get_y_offset(ext_x)
+                        yn_ext_top = self.HtLibre + self.HtArmad + self.get_y_offset(ext_x)
+                        
+                        Nz = math.ceil(self.Ljoist_m / 4.0)
+                        step_z = self.Lz / Nz
+                        for nz in range(Nz):
+                            zn1 = i * self.Lz + nz * step_z
+                            zn2 = i * self.Lz + (nz + 1) * step_z
+                            
+                            n_b1 = self.get_or_create_node(ext_x, 0.0, zn1)
+                            n_b2 = self.get_or_create_node(ext_x, 0.0, zn2)
+                            n_ci1 = self.get_or_create_node(ext_x, yn_ext_bot, zn1)
+                            n_ci2 = self.get_or_create_node(ext_x, yn_ext_bot, zn2)
+                            n_cs1 = self.get_or_create_node(ext_x, yn_ext_top, zn1)
+                            n_cs2 = self.get_or_create_node(ext_x, yn_ext_top, zn2)
+                            
+                            p1 = self.add_plate(n_b1, n_b2, n_ci2, n_ci1)
+                            p2 = self.add_plate(n_ci1, n_ci2, n_cs2, n_cs1)
+                            group_key = 'X0' if is_left else 'XMAX'
+                            self.plate_groups[group_key].extend([p1, p2])
+                            
+                        inner_z = (i + 1) * self.Lz if i == 0 else i * self.Lz
+                        Nx = 2
+                        step_x = W_ext / Nx
+                        for nx in range(Nx):
+                            x1 = ext_x + nx * step_x if is_left else ext_x - nx * step_x
+                            x2 = ext_x + (nx + 1) * step_x if is_left else ext_x - (nx + 1) * step_x
+                            
+                            y_bot1 = self.HtLibre + self.get_y_offset(x1)
+                            y_top1 = self.HtLibre + self.HtArmad + self.get_y_offset(x1)
+                            y_bot2 = self.HtLibre + self.get_y_offset(x2)
+                            y_top2 = self.HtLibre + self.HtArmad + self.get_y_offset(x2)
+                            
+                            n_b1 = self.get_or_create_node(x1, 0.0, inner_z)
+                            n_b2 = self.get_or_create_node(x2, 0.0, inner_z)
+                            n_ci1 = self.get_or_create_node(x1, y_bot1, inner_z)
+                            n_ci2 = self.get_or_create_node(x2, y_bot2, inner_z)
+                            n_cs1 = self.get_or_create_node(x1, y_top1, inner_z)
+                            n_cs2 = self.get_or_create_node(x2, y_top2, inner_z)
+                            
+                            if is_left:
+                                p1 = self.add_plate(n_b1, n_b2, n_ci2, n_ci1)
+                                p2 = self.add_plate(n_ci1, n_ci2, n_cs2, n_cs1)
+                            else:
+                                p1 = self.add_plate(n_b2, n_b1, n_ci1, n_ci2)
+                                p2 = self.add_plate(n_ci2, n_ci1, n_cs1, n_cs2)
+                            
+                            g_key = 'Z0' if inner_z == 0 else ('ZMAX' if inner_z == self.nBay * self.Lz else ('Z0' if i==0 else 'ZMAX'))
+                            self.plate_groups[g_key].extend([p1, p2])
+                        
+                        continue
                     Nz = math.ceil(self.Ljoist_m / 4.0)
                     step_z = self.Lz / Nz
                     for nz in range(Nz):
@@ -879,3 +1016,144 @@ class StaadModel:
                 self.base_nodes.remove(nid)
 
         return self
+        
+    def _generate_extensions(self):
+        if not self.ext_bays_active:
+            return
+            
+        corners = []
+        if self.ext_bl: corners.append(('bl', 0, 0)) # left, front (X=0, Z=0 to Z=Lz)
+        if self.ext_tl: corners.append(('tl', 0, self.nBay - 1)) # left, back
+        if self.ext_br: corners.append(('br', self.nSpan, 0)) # right, front
+        if self.ext_tr: corners.append(('tr', self.nSpan, self.nBay - 1)) # right, back
+        
+        for corner, j_idx, i_start in corners:
+            is_left = (j_idx == 0)
+            is_front = (i_start == 0)
+            
+            # Dimensiones de la extensión
+            j_span = 0 if is_left else self.nSpan - 1
+            L0 = self.Lx_list[j_span] / self.subdiv_list[j_span]
+            W_ext = 2 * L0
+            
+            # Coordenadas X
+            base_x = self.get_x(j_idx)
+            ext_x = base_x - W_ext if is_left else base_x + W_ext
+            mid_x = base_x - L0 if is_left else base_x + L0
+            
+            i_end = i_start + 1
+            z_start = i_start * self.Lz
+            z_end = i_end * self.Lz
+            
+            # Remover columnas principales de la cara X expuesta al viento
+            if self.wall_type != "Tilt-Up":
+                x_key = 'X0' if is_left else 'XMAX'
+                for z_val in [z_start, z_end]:
+                    is_corner = (z_val == 0 or z_val == self.nBay * self.Lz)
+                    list_key = f"{x_key}_CORNER" if is_corner else f"{x_key}_INNER"
+                    if list_key in self.wind_cols:
+                        to_remove = []
+                        for mem_id in self.wind_cols[list_key]:
+                            n1, n2 = self.members[mem_id]
+                            x1, y1, z1 = self.nodes[n1]
+                            if abs(x1 - base_x) < 0.1 and abs(z1 - z_val) < 0.1:
+                                to_remove.append(mem_id)
+                        for mem_id in to_remove:
+                            self.wind_cols[list_key].remove(mem_id)
+            
+            # Nodos de la extensión en Z_start y Z_end
+            for z in [z_start, z_end]:
+                # Nodos exteriores
+                y_ext_bot = self.HtLibre + self.get_y_offset(ext_x)
+                y_ext_top = self.HtLibre + self.HtArmad + self.get_y_offset(ext_x)
+                
+                nid_base = self.get_or_create_node(ext_x, 0.0, z)
+                nid_ci = self.get_or_create_node(ext_x, y_ext_bot, z)
+                nid_cs = self.get_or_create_node(ext_x, y_ext_top, z)
+                
+                if nid_base not in self.wind_base_nodes:
+                    self.wind_base_nodes.append(nid_base)
+                
+                # Nodos medios
+                y_mid_bot = self.HtLibre + self.get_y_offset(mid_x)
+                y_mid_top = self.HtLibre + self.HtArmad + self.get_y_offset(mid_x)
+                
+                nid_ci_mid = self.get_or_create_node(mid_x, y_mid_bot, z)
+                nid_cs_mid = self.get_or_create_node(mid_x, y_mid_top, z)
+                
+                # Nodos principales (ya existen en el modelo)
+                nid_ci_main = self.get_or_create_node(base_x, self.HtLibre + self.get_y_offset(base_x), z)
+                nid_cs_main = self.get_or_create_node(base_x, self.HtLibre + self.HtArmad + self.get_y_offset(base_x), z)
+                
+                # Columna exterior
+                col1 = self.add_member(nid_base, nid_ci, '_COL')
+                col2 = self.add_member(nid_ci, nid_cs, '_COL')
+                
+                if self.wall_type != "Tilt-Up":
+                    total_h = self.HtLibre + self.HtArmad + self.get_y_offset(ext_x)
+                    h_rounded = math.ceil(total_h)
+                    if h_rounded not in getattr(self, 'col_heights', {}):
+                        self.col_heights = getattr(self, 'col_heights', {})
+                        self.col_heights[h_rounded] = []
+                    self.col_heights[h_rounded].extend([col1, col2])
+                    
+                    trib_x = self.Ljoist_m / self.wind_col_N if getattr(self, 'wind_col_N', 1) else self.Lz / 2.0
+                    trib_z = W_ext / 2.0
+                    
+                    self.col_trib_z[col1] = trib_z
+                    self.col_trib_z[col2] = trib_z
+                    self.col_trib_x[col1] = trib_x / 2.0
+                    self.col_trib_x[col2] = trib_x / 2.0
+                    
+                    is_corner_z = (z == 0 or z == self.nBay * self.Lz)
+                    x_key = 'X0' if is_left else 'XMAX'
+                    list_key_x = f"{x_key}_CORNER" if is_corner_z else f"{x_key}_INNER"
+                    
+                    z_key = 'Z0' if z == 0 else 'ZMAX'
+                    list_key_z = f"{z_key}_CORNER"
+                    
+                    if list_key_x in self.wind_cols: self.wind_cols[list_key_x].extend([col1, col2])
+                    if is_corner_z and list_key_z in self.wind_cols: self.wind_cols[list_key_z].extend([col1, col2])
+                    
+                    a_node = (trib_x / 2.0) * trib_z
+                    w_total = self.cm_sismo + self.cv_sismo
+                    seismic_load = math.ceil((a_node * w_total * self.seismic_v) * 10) / 10.0
+                    self.node_seismic_loads[nid_cs] = seismic_load
+                
+                # Cuerda Inferior y Superior
+                grp_ci = '_CI_PERIM' if (z == 0 or z == self.nBay * self.Lz) and self.wall_type != "Tilt-Up" else '_CI'
+                grp_cs = '_CS_PERIM' if (z == 0 or z == self.nBay * self.Lz) and self.wall_type != "Tilt-Up" else '_CS'
+                
+                if is_left:
+                    self.add_member(nid_ci, nid_ci_mid, grp_ci)
+                    self.add_member(nid_ci_mid, nid_ci_main, grp_ci)
+                    self.add_member(nid_cs, nid_cs_mid, grp_cs)
+                    self.add_member(nid_cs_mid, nid_cs_main, grp_cs)
+                else:
+                    self.add_member(nid_ci_main, nid_ci_mid, grp_ci)
+                    self.add_member(nid_ci_mid, nid_ci, grp_ci)
+                    self.add_member(nid_cs_main, nid_cs_mid, grp_cs)
+                    self.add_member(nid_cs_mid, nid_cs, grp_cs)
+                
+                # Montantes
+                grp_mont = '_MONTANTES_PERIM' if (z == 0 or z == self.nBay * self.Lz) and self.wall_type != "Tilt-Up" else '_MONTANTES'
+                self.add_member(nid_ci, nid_cs, grp_mont)
+                self.add_member(nid_ci_mid, nid_cs_mid, grp_mont)
+                
+                # Diagonales
+                grp_diag = '_DIAG_PERIM' if (z == 0 or z == self.nBay * self.Lz) and self.wall_type != "Tilt-Up" else '_DIAG'
+                if is_left:
+                    self.add_member(nid_cs_main, nid_ci_mid, grp_diag)
+                    self.add_member(nid_cs_mid, nid_ci, grp_diag)
+                else:
+                    self.add_member(nid_ci_main, nid_cs_mid, grp_diag)
+                    self.add_member(nid_ci_mid, nid_cs, grp_diag)
+                
+            # Largueros en la extensión
+            for y_roof, x_roof in [(y_ext_top, ext_x), (y_mid_top, mid_x)]:
+                nid_start = self.get_or_create_node(x_roof, y_roof, z_start)
+                nid_end = self.get_or_create_node(x_roof, y_roof, z_end)
+                self.add_member(nid_start, nid_end, '_LARGUEROS')
+                self.groups.setdefault('_JOISTGRAL', []).append(len(self.members)-1)
+                self.rel_larg_start.append(len(self.members)-1)
+                self.rel_larg_end.append(len(self.members)-1)
