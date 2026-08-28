@@ -1221,9 +1221,7 @@ class StaadModel:
                 # Generar Truss (solo en pórticos interiores, ya que en Z perimetral el Tilt-Up soporta todo)
                 if not is_z_perimeter:
                     # Columnas (Soportando la armadura interior de la extensión)
-                    nid_base_ext = self.get_or_create_node(ext_x, 0.0, z)
-                    self.add_member(nid_base_ext, nodes_ci[0], '_COL')
-                    self.add_member(nodes_ci[0], nodes_cs[0], '_COL')
+                    # En ext_x no hay columna porque va directo al muro Tilt-Up
                     
                     nid_base_int = self.get_or_create_node(base_x, 0.0, z)
                     self.add_member(nid_base_int, nodes_ci[ext_subdiv], '_COL')

@@ -485,7 +485,7 @@ st.markdown("<div style='color: gray; margin-top: -15px; margin-bottom: 20px; ma
 
 # Inicializar estado para variables por defecto
 defaults = {
-    "larm": 15.24, "ljoist": 12.20, "nbay": 7, "nspan": 4, 
+    "larm": 15.24, "ljoist": 12.192, "nbay": 7, "nspan": 4, 
     "harm": 1.30, "hlib": 9.75, "subdiv": 10,
     "roof_type": "2 Aguas", "slope_pct": 5.0, "support_type": "FIXED",
     "c_muerta": 30.0, "c_viva": 100.0, "c_granizo": 60.0,
@@ -569,6 +569,11 @@ def update_larm():
     st.session_state.subdiv = max(2, int(needed))
     st.session_state['_subdiv'] = st.session_state.subdiv
     st.session_state.subdiv_warning = False
+    
+    # Auto-actualizar Peralte de Armadura
+    avg_harm = (length / 10.0 + length / 15.0) / 2.0
+    st.session_state.harm = round(avg_harm, 1)
+    st.session_state['_harm'] = st.session_state.harm
 
 def update_larm_ext1():
     st.session_state.larm_ext1 = st.session_state._larm_ext1
@@ -761,7 +766,7 @@ with st.sidebar:
         with st.expander("Dimensiones Generales", expanded=False):
             st.number_input("Longitud de Armaduras (m) (Principal)", min_value=1.0, step=3.048, format="%.2f", value=st.session_state.larm, key="_larm", on_change=update_larm)
             
-            st.number_input("Longitud de Joists (m)", min_value=1.0, step=None, value=st.session_state.ljoist, key="_ljoist", on_change=update_val, args=("ljoist",))
+            st.number_input("Longitud de Joists (m)", min_value=1.0, step=3.048, format="%.2f", value=st.session_state.ljoist, key="_ljoist", on_change=update_val, args=("ljoist",))
             
             st.number_input("Número de Bahías (Profundidad)", min_value=1, step=1, value=st.session_state.nbay, key="_nbay", on_change=update_val, args=("nbay",))
             st.number_input("Número de Entre-ejes (Ancho)", min_value=1, step=1, value=st.session_state.nspan, key="_nspan", on_change=update_val, args=("nspan",))
@@ -1269,7 +1274,14 @@ else:
             st.markdown("<div class='ios-glass-marker'></div>", unsafe_allow_html=True)
         
             st.markdown("**Nombre Proyecto:**")
-            file_name_export = st.text_input("proj_name", value="Modelo.std", label_visibility="collapsed")
+            
+            # Contenedor para simular el sufijo
+            col_in1, col_in2 = st.columns([4, 1])
+            with col_in1:
+                file_name_export = st.text_input("proj_name", value="Modelo", label_visibility="collapsed")
+            with col_in2:
+                st.markdown("<div style='color: #aaa; margin-top: 8px; font-weight: 500; font-family: \"Aptos Display\", sans-serif;'>.std</div>", unsafe_allow_html=True)
+                
             st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
         
             # Detectar si estamos en entorno web (stlite/Pyodide) o escritorio
@@ -1483,9 +1495,7 @@ else:
 
         with st.container():
             st.markdown("<div class='ios-glass-marker'></div>", unsafe_allow_html=True)
-            st.subheader("Elementos")
             num_wind_cols = len(model.groups.get('_COLVIENTO', []))
-            wind_cols_line = f"&emsp;• Columnas (Viento): {num_wind_cols}<br>" if num_wind_cols > 0 else ""
             num_purlins = (st.session_state.nspan + 1) * st.session_state.nbay + st.session_state.nspan * (st.session_state.subdiv - 1) * st.session_state.nbay
         
             # Deduct purlins replaced by secondary trusses
@@ -1493,10 +1503,12 @@ else:
             num_purlins -= (num_sec_trusses_axes * st.session_state.nbay)
         
             num_sec_trusses_total = num_sec_trusses_axes * st.session_state.nbay
+            wind_cols_line = f"&emsp;• Columnas (Viento): {num_wind_cols}<br>" if num_wind_cols > 0 else ""
             sec_trusses_line = f"&emsp;• Armaduras (Secundarias): {num_sec_trusses_total}<br>" if num_sec_trusses_total > 0 else ""
-        
+            
             st.markdown(f"""
-            <div style='line-height: 1.8;'>
+            <h3 style="font-family: 'Aptos Display', 'Segoe UI', sans-serif; font-size: 1.35rem; font-weight: 600; color: #1e293b; margin-bottom: 12px; margin-top: 5px;">Elementos</h3>
+            <div style="font-family: 'Aptos Display', 'Segoe UI', sans-serif; line-height: 1.8; color: #334155; font-size: 1rem;">
                 • Columnas: {(st.session_state.nbay + 1) * (st.session_state.nspan + 1)}<br>
                 {wind_cols_line}• Armaduras: {(st.session_state.nbay + 1) * st.session_state.nspan}<br>
                 {sec_trusses_line}• Contravientos: {len(model.groups.get('_CVH', []))}<br>
