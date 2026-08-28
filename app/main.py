@@ -1273,7 +1273,7 @@ else:
         with st.container():
             st.markdown("<div class='ios-glass-marker'></div>", unsafe_allow_html=True)
         
-            st.markdown("**Nombre Proyecto:**")
+            st.markdown("<div style=\"font-family: 'Aptos Display', 'Segoe UI', sans-serif; font-size: 1rem; font-weight: 700; color: #1e293b; margin-bottom: 5px;\">Nombre Proyecto:</div>", unsafe_allow_html=True)
             
             # Contenedor para simular el sufijo
             col_in1, col_in2 = st.columns([4, 1])
@@ -1295,7 +1295,7 @@ else:
         
             if not _is_web:
                 # ─── Modo Escritorio: selector de carpeta + guardar al disco ───
-                st.markdown("**Ubicación:**")
+                st.markdown("<div style=\"font-family: 'Aptos Display', 'Segoe UI', sans-serif; font-size: 1rem; font-weight: 700; color: #1e293b; margin-bottom: 5px;\">Ubicación:</div>", unsafe_allow_html=True)
             
                 if 'export_path' not in st.session_state:
                     st.session_state.export_path = r'C:\Users\josee\OneDrive\Escritorio\MODELOS GENERADOS'
@@ -1503,16 +1503,17 @@ else:
             num_purlins -= (num_sec_trusses_axes * st.session_state.nbay)
         
             num_sec_trusses_total = num_sec_trusses_axes * st.session_state.nbay
-            wind_cols_line = f"&emsp;• Columnas (Viento): {num_wind_cols}<br>" if num_wind_cols > 0 else ""
-            sec_trusses_line = f"&emsp;• Armaduras (Secundarias): {num_sec_trusses_total}<br>" if num_sec_trusses_total > 0 else ""
+            wind_cols_line = f"&emsp;<span style='font-weight:700; color:#1e293b;'>• Columnas (Viento):</span> <span style='font-weight:700; color:#1e3a8a;'>{num_wind_cols}</span><br>" if num_wind_cols > 0 else ""
+            sec_trusses_line = f"&emsp;<span style='font-weight:700; color:#1e293b;'>• Armaduras (Secundarias):</span> <span style='font-weight:700; color:#1e3a8a;'>{num_sec_trusses_total}</span><br>" if num_sec_trusses_total > 0 else ""
             
             st.markdown(f"""
-            <h3 style="font-family: 'Aptos Display', 'Segoe UI', sans-serif; font-size: 1.35rem; font-weight: 600; color: #1e293b; margin-bottom: 12px; margin-top: 5px;">Elementos</h3>
+            <h3 style="font-family: 'Aptos Display', 'Segoe UI', sans-serif; font-size: 1.35rem; font-weight: 700; color: #0f172a; margin-bottom: 2px; margin-top: -25px;">Elementos</h3>
+            <hr style="border: 0; border-top: 1px solid #e2e8f0; margin-top: 5px; margin-bottom: 12px;">
             <div style="font-family: 'Aptos Display', 'Segoe UI', sans-serif; line-height: 1.8; color: #334155; font-size: 1rem;">
-                • Columnas: {(st.session_state.nbay + 1) * (st.session_state.nspan + 1)}<br>
-                {wind_cols_line}• Armaduras: {(st.session_state.nbay + 1) * st.session_state.nspan}<br>
-                {sec_trusses_line}• Contravientos: {len(model.groups.get('_CVH', []))}<br>
-                • Largueros: {num_purlins}
+                <span style='font-weight:700; color:#1e293b;'>• Columnas:</span> <span style='font-weight:700; color:#1e3a8a;'>{(st.session_state.nbay + 1) * (st.session_state.nspan + 1)}</span><br>
+                {wind_cols_line}<span style='font-weight:700; color:#1e293b;'>• Armaduras:</span> <span style='font-weight:700; color:#1e3a8a;'>{(st.session_state.nbay + 1) * st.session_state.nspan}</span><br>
+                {sec_trusses_line}<span style='font-weight:700; color:#1e293b;'>• Contravientos:</span> <span style='font-weight:700; color:#1e3a8a;'>{len(model.groups.get('_CVH', []))}</span><br>
+                <span style='font-weight:700; color:#1e293b;'>• Largueros:</span> <span style='font-weight:700; color:#1e3a8a;'>{num_purlins}</span>
             </div>
             <div style='height: 25px;'></div>
             """, unsafe_allow_html=True)
