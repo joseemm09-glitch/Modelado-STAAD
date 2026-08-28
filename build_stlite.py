@@ -53,6 +53,10 @@ def build():
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
     <title>Naves Industriales STAAD.Pro</title>
     <link rel="icon" type="image/x-icon" href="data:image/x-icon;base64,{logo_base64}" />
+    <link rel="apple-touch-icon" href="data:image/x-icon;base64,{logo_base64}" />
+    <meta name="theme-color" content="#005cb2" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@stlite/mountable@0.73.1/build/stlite.css" />
     <style>
         :root {{

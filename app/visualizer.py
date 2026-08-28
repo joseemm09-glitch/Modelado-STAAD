@@ -1,6 +1,9 @@
 import plotly.graph_objects as go
 
 def get_group_color(group_name):
+    if group_name.startswith('_LARGUEROS'):
+        return 'gray'
+        
     colors = {
         '_COL': 'dodgerblue',
         '_COLVIENTO': 'limegreen',
@@ -12,7 +15,6 @@ def get_group_color(group_name):
         '_DIAG': 'purple',
         '_MONTANTES_PERIM': 'green',
         '_DIAG_PERIM': 'purple',
-        '_LARGUEROS': 'gray',
         '_JOISTGRAL': 'gray',
         '_JPUNTAL': 'darkslategray',
         '_CVH': 'black',
@@ -38,7 +40,9 @@ def plot_model(model, show_supports=False, highlight_ids=None, highlight_colors=
             member_to_group[m] = grp_name
 
     # We group lines by group to draw them in a consistent order in the legend.
-    group_order = ['_COL', '_COLVIENTO', '_CS', '_CI', '_CS_PERIM', '_CI_PERIM', '_MONTANTES', '_DIAG', '_MONTANTES_PERIM', '_DIAG_PERIM', '_LARGUEROS', '_JOISTGRAL', '_JPUNTAL', '_CVH', '_CS_SEC', '_CI_SEC', '_MONTANTES_SEC', '_DIAG_SEC']
+    # Find all LARGUEROS groups and append them
+    largueros_groups = [g for g in model.groups.keys() if g.startswith('_LARGUEROS')]
+    group_order = ['_COL', '_COLVIENTO', '_CS', '_CI', '_CS_PERIM', '_CI_PERIM', '_MONTANTES', '_DIAG', '_MONTANTES_PERIM', '_DIAG_PERIM'] + largueros_groups + ['_JOISTGRAL', '_JPUNTAL', '_CVH', '_CS_SEC', '_CI_SEC', '_MONTANTES_SEC', '_DIAG_SEC']
     
     if highlight_ids is not None or highlight_colors is not None:
         lines_by_group = {
@@ -95,19 +99,36 @@ def plot_model(model, show_supports=False, highlight_ids=None, highlight_colors=
                     opacity=0.45 if grp_name == 'faded' else 1.0
                 ))
     else:
+        largueros_added = False
         for grp in group_order:
             data = lines_by_group[grp]
             if data['x']:
-                lw = 3 if grp in ['_LARGUEROS', '_JOISTGRAL', '_JPUNTAL'] else 4
+                lw = 3 if (grp.startswith('_LARGUEROS') or grp in ['_JOISTGRAL', '_JPUNTAL']) else 4
                 hidden_legend_groups = ['_CS', '_CI', '_CS_PERIM', '_CI_PERIM', '_MONTANTES', '_DIAG', '_MONTANTES_PERIM', '_DIAG_PERIM', '_CS_SEC', '_CI_SEC', '_MONTANTES_SEC', '_DIAG_SEC']
+                
+                is_larguero = grp.startswith('_LARGUEROS')
+                show_leg = (grp not in hidden_legend_groups)
+                trace_name = grp
+                leg_group = None
+                
+                if is_larguero:
+                    trace_name = '_LARGUEROS'
+                    leg_group = '_LARGUEROS'
+                    if largueros_added:
+                        show_leg = False
+                    else:
+                        largueros_added = True
+                        show_leg = True
+                        
                 fig.add_trace(go.Scatter3d(
                     x=data['x'],
                     y=data['z'],
                     z=data['y'],
                     mode='lines',
                     line=dict(color=data['color'], width=lw),
-                    name=grp,
-                    showlegend=(grp not in hidden_legend_groups)
+                    name=trace_name,
+                    showlegend=show_leg,
+                    legendgroup=leg_group
                 ))
                 
         if lines_by_group['unknown']['x']:
@@ -118,7 +139,8 @@ def plot_model(model, show_supports=False, highlight_ids=None, highlight_colors=
                 z=data['y'],
                 mode='lines',
                 line=dict(color=data['color'], width=4),
-                name='Otros'
+                name='Otros',
+                showlegend=False
             ))
         
     # Plot plates if any (Tilt-Up)

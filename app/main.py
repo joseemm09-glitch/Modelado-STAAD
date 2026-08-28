@@ -32,6 +32,19 @@ st.set_page_config(page_title="Naves Industriales STAAD.Pro", page_icon=page_ico
 
 st.markdown("""
 <style>
+/* Mobile layout adjustments for Plotly 3D Viewer */
+@media screen and (max-width: 768px) {
+    div[data-testid="stPlotlyChart"],
+    div[data-testid="stPlotlyChart"] iframe,
+    div[data-testid="stPlotlyChart"] .js-plotly-plot, 
+    div[data-testid="stPlotlyChart"] .plot-container.plotly, 
+    div[data-testid="stPlotlyChart"] .svg-container {
+        height: 450px !important;
+        min-height: 450px !important;
+        max-height: 450px !important;
+    }
+}
+
 /* iOS Liquid Glass Effect for containers */
 div[data-testid="stVerticalBlock"]:has(> div.element-container div.ios-glass-marker) {
     background: rgba(255, 255, 255, 0.45);
@@ -289,7 +302,7 @@ st.markdown("""
     /* Asegurar que el texto dentro de los botones no sea bold y reducir 1 punto el tamaño */
     button, button p, button div, button span {
         font-weight: normal !important;
-        font-size: 12.5px !important;
+        font-size: 13.5px !important;
     }
 
     /* Botones principales (Azul Sólido) */
@@ -297,7 +310,7 @@ st.markdown("""
         background: #005cb2 !important;
         color: white !important;
         font-weight: normal !important;
-        font-size: 12.5px !important;
+        font-size: 13.5px !important;
         border-radius: 4px !important;
         width: 100% !important;
         margin: 0 auto !important;
@@ -327,7 +340,7 @@ st.markdown("""
         border: 1px solid #ddd !important;
         padding: 3px 10px !important;
         width: auto !important;
-        font-size: 12px !important;
+        font-size: 13px !important;
         font-weight: normal !important;
         box-shadow: 0px 1px 2px rgba(0,0,0,0.05) !important;
         border-radius: 4px !important;
@@ -483,8 +496,12 @@ defaults = {
     "ext_br": False,
     "ext_tl": False,
     "ext_tr": False,
-    "ext_height_mode": "Primer Entre-Eje completo"
+    "ext_height_mode": "Primer Entre-Eje completo",
+    "ext_larm": 15.24,
+    "ext_subdiv": 10,
+    "ext_depth": 2
 }
+
 for k, v in defaults.items():
     if k not in st.session_state:
         st.session_state[k] = v
@@ -494,6 +511,19 @@ def go_panel(p):
 
 def update_val(key):
     st.session_state[key] = st.session_state["_" + key]
+
+def update_ext_bays_active():
+    active = st.session_state["_ext_bays_active"]
+    st.session_state["ext_bays_active"] = active
+    if active:
+        st.session_state.ext_bl = True
+        st.session_state.ext_br = True
+        st.session_state.ext_tl = True
+        st.session_state.ext_tr = True
+        st.session_state._ext_bl = True
+        st.session_state._ext_br = True
+        st.session_state._ext_tl = True
+        st.session_state._ext_tr = True
 
 def update_subdiv():
     val = int(st.session_state['_subdiv'])
@@ -550,6 +580,22 @@ def update_larm_ext2():
     
     st.session_state.harm = math.ceil((length / 12.5) * 10) / 10.0
     st.session_state['_harm'] = st.session_state.harm
+
+def update_larm_ext_bays():
+    st.session_state.ext_larm = st.session_state._ext_larm
+    length = st.session_state.ext_larm
+    needed = math.ceil(length / 1.524)
+    if needed % 2 != 0:
+        needed += 1
+    st.session_state.ext_subdiv = max(2, int(needed))
+    st.session_state['_ext_subdiv'] = st.session_state.ext_subdiv
+
+def update_subdiv_ext_bays():
+    val = int(st.session_state['_ext_subdiv'])
+    if val % 2 != 0:
+        val += 1
+    st.session_state.ext_subdiv = val
+    st.session_state['_ext_subdiv'] = val
 
 def update_c_viva():
     st.session_state.c_viva = st.session_state._c_viva
@@ -630,7 +676,10 @@ try:
         ext_br=st.session_state.ext_br,
         ext_tl=st.session_state.ext_tl,
         ext_tr=st.session_state.ext_tr,
-        ext_height_mode=st.session_state.ext_height_mode
+        ext_height_mode=st.session_state.ext_height_mode,
+        ext_larm=st.session_state.ext_larm,
+        ext_subdiv=st.session_state.ext_subdiv,
+        ext_depth=st.session_state.ext_depth
     )
 except Exception as e:
     st.error(f"Error generando la geometría: {e}")
@@ -781,20 +830,9 @@ with st.sidebar:
         else:
             st.session_state.add_wind_cols = False
             
-        with st.expander("Bahías de Extensión", expanded=False):
-            st.checkbox("Incluir Bahías de Extensión", value=st.session_state.ext_bays_active, key="_ext_bays_active", on_change=update_val, args=("ext_bays_active",))
-            if st.session_state.ext_bays_active:
-                st.radio("Altura Libre", ["Primer Entre-Eje completo", "Altura mínima en esquinas"], index=0 if st.session_state.ext_height_mode == "Primer Entre-Eje completo" else 1, key="_ext_height_mode", on_change=update_val, args=("ext_height_mode",))
-                st.markdown("<p class='widget-title' style='margin-top: 5px;'>Esquinas con Extensión:</p>", unsafe_allow_html=True)
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.checkbox("Frontal - Izq (X=0, Z=0)", value=st.session_state.ext_bl, key="_ext_bl", on_change=update_val, args=("ext_bl",))
-                    st.checkbox("Trasera - Izq (X=0, Z=Max)", value=st.session_state.ext_tl, key="_ext_tl", on_change=update_val, args=("ext_tl",))
-                with col2:
-                    st.checkbox("Frontal - Der (X=Max, Z=0)", value=st.session_state.ext_br, key="_ext_br", on_change=update_val, args=("ext_br",))
-                    st.checkbox("Trasera - Der (X=Max, Z=Max)", value=st.session_state.ext_tr, key="_ext_tr", on_change=update_val, args=("ext_tr",))
-                
-        with st.expander("Consideraciones Especiales", expanded=False):
+        st.markdown("<hr style='border-top: 1px solid #cce5ff;'>", unsafe_allow_html=True)
+        
+        with st.expander("Armaduras diferentes (Extremos)", expanded=False):
             if st.session_state.nspan >= 2:
                 st.checkbox("Diferentes longitudes (Extremos)", value=st.session_state.dif_lengths, key="_dif_lengths", on_change=update_val, args=("dif_lengths",))
                 if st.session_state.dif_lengths:
@@ -811,6 +849,29 @@ with st.sidebar:
                             st.number_input("Subdivisiones", min_value=2, step=2, value=st.session_state.subdiv_ext2, key="_subdiv_ext2", on_change=update_subdiv_ext2)
                             sep_val2 = st.session_state.larm_ext2 / st.session_state.subdiv_ext2
                             st.markdown(f"<div style='font-size: 11px; color: #64748b; margin-top: -6px; margin-bottom: 8px;'>Sep = {sep_val2:.2f} m.</div>", unsafe_allow_html=True)
+
+        if st.session_state.wall_type == "Tilt-Up":
+            with st.expander("Bahías de Extensión", expanded=False):
+                st.checkbox("Incluir Bahías de Extensión", value=st.session_state.ext_bays_active, key="_ext_bays_active", on_change=update_ext_bays_active)
+                if st.session_state.ext_bays_active:
+                    st.radio("Profundidad (Entre-ejes Z)", [1, 2], index=1 if st.session_state.ext_depth == 2 else 0, key="_ext_depth", on_change=update_val, args=("ext_depth",), horizontal=True)
+                    
+                    st.markdown("<p class='widget-title' style='margin-top: 10px;'>Geometría de la Armadura</p>", unsafe_allow_html=True)
+                    st.number_input("Longitud (m)", min_value=1.0, step=3.048, format="%.2f", value=st.session_state.ext_larm, key="_ext_larm", on_change=update_larm_ext_bays)
+                    st.number_input("Subdivisiones", min_value=2, step=2, value=st.session_state.ext_subdiv, key="_ext_subdiv", on_change=update_subdiv_ext_bays)
+
+                    sep_ext = st.session_state.ext_larm / st.session_state.ext_subdiv
+                    st.markdown(f"<div style='font-size: 11px; color: #64748b; margin-top: -6px; margin-bottom: 8px;'>Sep = {sep_ext:.2f} m.</div>", unsafe_allow_html=True)
+                    
+                    st.radio("Altura Libre", ["Primer Entre-Eje completo", "Altura mínima en esquinas"], index=0 if st.session_state.ext_height_mode == "Primer Entre-Eje completo" else 1, key="_ext_height_mode", on_change=update_val, args=("ext_height_mode",))
+                    st.markdown("<p class='widget-title' style='margin-top: 5px;'>Esquinas con Extensión:</p>", unsafe_allow_html=True)
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.checkbox("1", value=st.session_state.ext_bl, key="_ext_bl", on_change=update_val, args=("ext_bl",))
+                        st.checkbox("2", value=st.session_state.ext_tl, key="_ext_tl", on_change=update_val, args=("ext_tl",))
+                    with col2:
+                        st.checkbox("3", value=st.session_state.ext_br, key="_ext_br", on_change=update_val, args=("ext_br",))
+                        st.checkbox("4", value=st.session_state.ext_tr, key="_ext_tr", on_change=update_val, args=("ext_tr",))
 
         render_siblings_bottom(nav_group1, "Geometría")
 
