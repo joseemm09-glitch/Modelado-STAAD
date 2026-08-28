@@ -26,6 +26,16 @@ from model import StaadModel
 from staad_writer import write_staad
 from visualizer import plot_model
 
+# Import configurations
+is_mobile_client = False
+try:
+    import js
+    if js.window.innerWidth <= 768:
+        is_mobile_client = True
+except Exception:
+    pass
+
+
 icono_path = os.path.join(os.path.dirname(__file__), "..", "staad_blue.ico")
 page_icon = icono_path if os.path.exists(icono_path) else "🏢"
 st.set_page_config(page_title="Naves Industriales STAAD.Pro", page_icon=page_icon, layout="wide")
