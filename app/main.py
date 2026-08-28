@@ -314,9 +314,9 @@ st.markdown("""
         border-radius: 0 0 6px 6px !important;
     }
 
-    /* Asegurar que el texto dentro de los botones no sea bold y reducir 1 punto el tamaño */
+    /* Ajuste de fuente para los botones */
     button, button p, button div, button span {
-        font-weight: normal !important;
+        font-weight: 600 !important;
         font-size: 13.5px !important;
     }
 
@@ -324,7 +324,7 @@ st.markdown("""
     section[data-testid="stSidebar"] button[kind="primary"] {
         background: #005cb2 !important;
         color: white !important;
-        font-weight: normal !important;
+        font-weight: 600 !important;
         font-size: 13.5px !important;
         border-radius: 4px !important;
         width: 100% !important;
@@ -356,7 +356,7 @@ st.markdown("""
         padding: 3px 10px !important;
         width: auto !important;
         font-size: 13px !important;
-        font-weight: normal !important;
+        font-weight: 600 !important;
         box-shadow: 0px 1px 2px rgba(0,0,0,0.05) !important;
         border-radius: 4px !important;
         margin-bottom: 4px !important;
@@ -373,7 +373,7 @@ st.markdown("""
     div[data-testid="stMainBlockContainer"] button[kind="primary"] {
         background: #ba281b !important;
         color: white !important;
-        font-weight: normal !important;
+        font-weight: 600 !important;
         border-radius: 4px !important;
         border: none !important;
         box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.1) !important;
@@ -405,7 +405,7 @@ st.markdown("""
     section[data-testid="stSidebar"] div[data-testid="stElementContainer"]:has(div.grey-btn-marker) + div[data-testid="stElementContainer"] button {
         background: #6c757d !important;
         color: white !important;
-        font-weight: normal !important;
+        font-weight: 600 !important;
         border-radius: 4px !important;
         border: none !important;
         width: 100% !important;
@@ -568,7 +568,7 @@ def update_larm():
     st.session_state.larm = st.session_state._larm
     # Auto-actualizar
     length = st.session_state.larm
-    needed = math.ceil(length / 1.524)
+    needed = math.ceil(length / 1.525)
     if needed % 2 != 0:
         needed += 1
     st.session_state.subdiv = max(2, int(needed))
@@ -583,7 +583,7 @@ def update_larm():
 def update_larm_ext1():
     st.session_state.larm_ext1 = st.session_state._larm_ext1
     length = st.session_state.larm_ext1
-    needed = math.ceil(length / 1.524)
+    needed = math.ceil(length / 1.525)
     if needed % 2 != 0:
         needed += 1
     st.session_state.subdiv_ext1 = max(2, int(needed))
@@ -592,7 +592,7 @@ def update_larm_ext1():
 def update_larm_ext2():
     st.session_state.larm_ext2 = st.session_state._larm_ext2
     length = st.session_state.larm_ext2
-    needed = math.ceil(length / 1.524)
+    needed = math.ceil(length / 1.525)
     if needed % 2 != 0:
         needed += 1
     st.session_state.subdiv_ext2 = max(2, int(needed))
@@ -604,7 +604,7 @@ def update_larm_ext2():
 def update_larm_ext_bays():
     st.session_state.ext_larm = st.session_state._ext_larm
     length = st.session_state.ext_larm
-    needed = math.ceil(length / 1.524)
+    needed = math.ceil(length / 1.525)
     if needed % 2 != 0:
         needed += 1
     st.session_state.ext_subdiv = max(2, int(needed))
@@ -1266,7 +1266,7 @@ else:
         
         if is_mobile_client:
             fig.update_layout(
-                scene_camera=dict(eye=dict(x=3.0, y=3.0, z=3.0))
+                scene_camera=dict(eye=dict(x=-3.0, y=-3.0, z=3.0))
             )
             
         st.plotly_chart(fig, use_container_width=True, config={
@@ -1377,44 +1377,46 @@ else:
                 web_ui = f"""
                 <style>
                   * {{ box-sizing: border-box; margin: 0; padding: 0; }}
-                  body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                         background: transparent; font-size: 13px; }}
-                  .label {{ font-weight: 600; font-size: 13px; color: #0f172a;
-                            margin-bottom: 5px; display: block; }}
-                  .row {{ display: flex; gap: 5px; margin-bottom: 10px; align-items: center; }}
+                  body {{ font-family: 'Aptos Display', 'Segoe UI', sans-serif;
+                         background: transparent; }}
+                  .label {{ font-family: 'Aptos Display', 'Segoe UI', sans-serif; font-size: 1rem; font-weight: 700; color: #1e293b; margin-bottom: 5px; display: block; }}
+                  .row {{ display: flex; margin-bottom: 10px; width: 100%; }}
                   .path-input {{
-                    flex: none; width: 40%; padding: 4px 8px; font-size: 11px; color: #374151;
-                    border: 1px solid #d1d5db; border-radius: 6px;
-                    background: #f9fafb; outline: none; height: 32px;
+                    flex: 3; padding: 8px 12px; font-size: 0.9rem; color: #374151;
+                    border: none; border-radius: 8px;
+                    background: #f9fafb; outline: none; height: 38px;
                     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
                   }}
-                  .folder-btn {{
-                    width: 36px; height: 32px; border: 1px solid #d1d5db;
-                    border-radius: 6px; background: #f9fafb; cursor: pointer;
-                    font-size: 14px; display: flex; align-items: center;
-                    justify-content: center; flex-shrink: 0; transition: background 0.15s;
-                    padding: 0;
+                  .btn-container {{
+                    flex: 1; padding-left: 10px;
                   }}
-                  .folder-btn:hover {{ background: #e5e7eb; }}
-                  .folder-btn:disabled {{ opacity: 0.5; cursor: not-allowed; }}
+                  .folder-btn {{
+                    width: 100%; height: 38px; border: 1px solid rgba(49, 51, 63, 0.2);
+                    border-radius: 8px; background: #ffffff; cursor: pointer;
+                    font-size: 1rem; display: flex; align-items: center;
+                    justify-content: center; transition: background 0.15s;
+                    color: #31333f; font-weight: 400;
+                  }}
+                  .folder-btn:hover {{ border-color: #ba281b; color: #ba281b; }}
                   .save-btn {{
-                    padding: 6px 14px; background: #ba281b; color: white;
-                    border: none; border-radius: 4px; font-size: 12.5px; font-weight: 500;
-                    cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.15);
-                    transition: background 0.2s; width: auto;
+                    padding: 0.5rem 1rem; background: #ba281b; color: white;
+                    border: none; border-radius: 4px; font-size: 1rem; font-weight: 600;
+                    cursor: pointer; box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.1);
+                    transition: all 0.2s ease-in-out; font-family: 'Aptos Display', 'Segoe UI', sans-serif;
                   }}
                   .save-btn:hover {{ background: #9d2116; }}
-                  .save-btn:disabled {{ background: #adb5bd; cursor: not-allowed; box-shadow: none; }}
-                  .status {{ font-size: 10.5px; margin-top: 5px; display: none; }}
+                  .save-btn:disabled {{ opacity: 0.8; cursor: not-allowed; }}
+                  .status {{ font-size: 0.85rem; margin-top: 5px; display: none; }}
                   .status.ok {{ color: #16a34a; display: block; }}
                   .status.err {{ color: #dc2626; display: block; }}
                 </style>
 
                 <span class="label">Ubicación:</span>
                 <div class="row">
-                  <input id="pathDisplay" class="path-input" readonly
-                         value="Selecciona una carpeta..." />
-                  <button class="folder-btn" id="folderBtn" title="Examinar...">📁</button>
+                  <input id="pathDisplay" class="path-input" readonly value="Selecciona una carpeta..." />
+                  <div class="btn-container">
+                    <button class="folder-btn" id="folderBtn" title="Examinar...">📁</button>
+                  </div>
                 </div>
                 <button class="save-btn" id="saveBtn" disabled>Guardar Archivo .std</button>
                 <div id="status" class="status"></div>
@@ -1514,7 +1516,7 @@ else:
             elementos_html = f"""
             <div style="font-family: 'Aptos Display', 'Segoe UI', sans-serif; font-size: 1rem; font-weight: 700; color: #1e293b; margin-bottom: 0px; margin-top: -5px;">Elementos</div>
             <hr style="border: 0; border-top: 1px solid #e2e8f0; margin-top: 0px; margin-bottom: 0px;">
-            <div style="font-family: 'Aptos Display', 'Segoe UI', sans-serif; line-height: 1.5; color: #334155; font-size: 13px; padding-bottom: 15px; padding-left: 15px;">
+            <div style="font-family: 'Aptos Display', 'Segoe UI', sans-serif; line-height: 1.8; color: #334155; font-size: 13px; padding-bottom: 15px; padding-left: 15px;">
                 <span style='font-weight:700; color:#1e293b;'>• Columnas:</span> <span style='font-weight:700; color:#1e3a8a;'>{(st.session_state.nbay + 1) * (st.session_state.nspan + 1)}</span><br>
                 {wind_cols_line}<span style='font-weight:700; color:#1e293b;'>• Armaduras:</span> <span style='font-weight:700; color:#1e3a8a;'>{(st.session_state.nbay + 1) * st.session_state.nspan}</span><br>
                 {sec_trusses_line}<span style='font-weight:700; color:#1e293b;'>• Contravientos:</span> <span style='font-weight:700; color:#1e3a8a;'>{len(model.groups.get('_CVH', []))}</span><br>
@@ -1543,15 +1545,24 @@ else:
             harm = st.session_state.harm
             slope_pct = st.session_state.slope_pct
             
+            y_shift_ext = 0.0
+            if st.session_state.get('ext_bays_active', False) and st.session_state.get('ext_height_mode', "") == "Altura mínima en esquinas":
+                w_left = st.session_state.get('ext_larm', 15.24) if (st.session_state.get('ext_bl', False) or st.session_state.get('ext_tl', False)) else 0.0
+                w_right = st.session_state.get('ext_larm', 15.24) if (st.session_state.get('ext_br', False) or st.session_state.get('ext_tr', False)) else 0.0
+                if st.session_state.roof_type == "1 Agua":
+                    y_shift_ext = w_left * (slope_pct / 100.0)
+                else:
+                    y_shift_ext = max(w_left, w_right) * (slope_pct / 100.0)
+
             if st.session_state.roof_type == "2 Aguas":
-                h_max = hlib + harm + (ancho_total / 2.0) * (slope_pct / 100.0)
+                h_max = hlib + harm + (ancho_total / 2.0) * (slope_pct / 100.0) + y_shift_ext
             else:
-                h_max = hlib + harm + ancho_total * (slope_pct / 100.0)
+                h_max = hlib + harm + ancho_total * (slope_pct / 100.0) + y_shift_ext
                 
             geometria_html = f"""
             <div style="font-family: 'Aptos Display', 'Segoe UI', sans-serif; font-size: 1rem; font-weight: 700; color: #1e293b; margin-bottom: 0px; margin-top: -5px;">Geometría</div>
             <hr style="border: 0; border-top: 1px solid #e2e8f0; margin-top: 0px; margin-bottom: 0px;">
-            <div style="font-family: 'Aptos Display', 'Segoe UI', sans-serif; line-height: 1.5; color: #334155; font-size: 13px; padding-bottom: 15px; padding-left: 15px;">
+            <div style="font-family: 'Aptos Display', 'Segoe UI', sans-serif; line-height: 1.8; color: #334155; font-size: 13px; padding-bottom: 15px; padding-left: 15px;">
                 <span style='font-weight:700; color:#1e293b;'>• Largo:</span> <span style='font-weight:700; color:#1e3a8a;'>{largo_total:.2f} m</span><br>
                 <span style='font-weight:700; color:#1e293b;'>• Ancho:</span> <span style='font-weight:700; color:#1e3a8a;'>{ancho_total:.2f} m</span><br>
                 <span style='font-weight:700; color:#1e293b;'>• Altura Libre:</span> <span style='font-weight:700; color:#1e3a8a;'>{hlib:.2f} m</span><br>

@@ -159,7 +159,15 @@ def clasificar_columnas(model):
         grupos["CV-1"].append(mem_id)
             
     # Filtrar los que están vacíos
-    return {k: v for k, v in grupos.items() if len(v) > 0}
+    resultado = {k: v for k, v in grupos.items() if len(v) > 0}
+    
+    # Asegurar que en Tilt-Up siempre existan los grupos de columnas para prediseño manual
+    if getattr(model, 'wall_type', '') == "Tilt-Up":
+        for g in ["C-1", "C-2", "C-3", "C-4"]:
+            if g not in resultado:
+                resultado[g] = []
+                
+    return resultado
 
 def predisenar_grupo(nombre_grupo, model, usar_2w=False):
     """
@@ -174,6 +182,34 @@ def predisenar_grupo(nombre_grupo, model, usar_2w=False):
     else:
         perfiles = perfiles_base
         
+    # Heurística rápida para Muros Tilt-Up (Aproximación inicial solicitada)
+    if getattr(model, 'wall_type', '') == "Tilt-Up" and nombre_grupo in ["C-1", "C-2", "C-3", "C-4"]:
+        if nombre_grupo == "C-1":
+            target_name = "OR 14\"x14\"x3/8\""
+            alternatives = ["OR 14\"x14\"x1/2\"", "OR 16\"x16\"x5/16\"", "OR 16\"x16\"x3/8\"", "OR 14\"x14\"x5/16\""]
+        elif nombre_grupo == "C-2":
+            target_name = "OR 12\"x12\"x3/8\""
+            alternatives = ["OR 12\"x12\"x1/2\"", "OR 14\"x14\"x5/16\"", "OR 14\"x14\"x1/4\"", "OR 12\"x12\"x5/16\""]
+        elif nombre_grupo == "C-3":
+            target_name = "OR 10\"x10\"x5/16\""
+            alternatives = ["OR 10\"x10\"x3/8\"", "OR 12\"x12\"x1/4\"", "OR 12\"x12\"x5/16\"", "OR 10\"x10\"x1/4\""]
+        elif nombre_grupo == "C-4":
+            target_name = "OR 8\"x8\"x1/4\""
+            alternatives = ["OR 8\"x8\"x5/16\"", "OR 10\"x10\"x3/16\"", "OR 10\"x10\"x1/4\"", "OR 8\"x8\"x3/16\""]
+            
+        resultados_tiltup = []
+        for p in perfiles:
+            if p["nombre"] == target_name:
+                resultados_tiltup.append({"perfil": p, "ratio": 0.80})
+                break
+        for alt in alternatives:
+            for p in perfiles:
+                if p["nombre"] == alt:
+                    resultados_tiltup.append({"perfil": p, "ratio": 0.85})
+                    break
+        if resultados_tiltup:
+            return resultados_tiltup
+
     # Extraer parámetros del modelo
     L_span = model.Larm_m
     L_bay = model.Ljoist_m

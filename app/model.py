@@ -92,7 +92,7 @@ class StaadModel:
         self.Lx = self.Lx_list[0] # Legacy fallback if needed outside generate
         
         self.y_shift_ext = 0.0
-        if self.ext_bays_active and self.ext_height_mode == "Primer Entre-Eje completo":
+        if self.ext_bays_active and self.ext_height_mode == "Altura mínima en esquinas":
             slope = self.slope_pct / 100.0
             W_left = self.ext_larm if (self.ext_bl or self.ext_tl) else 0.0
             W_right = self.ext_larm if (self.ext_br or self.ext_tr) else 0.0
