@@ -1219,8 +1219,9 @@ if st.session_state.current_panel == "Diseño":
         fig = plot_model(model, show_supports=True, highlight_ids=h_ids, highlight_colors=h_colors)
         
         # Cube aspect ratio to prevent clipping, and zoomed out slightly
+        cam_zoom = 3.6 if is_mobile_client else 1.8
         fig.update_layout(
-            scene_camera=dict(eye=dict(x=1.8, y=1.8, z=1.8)),
+            scene_camera=dict(eye=dict(x=cam_zoom, y=cam_zoom, z=cam_zoom)),
             margin=dict(l=0, r=0, b=0, t=0),
             scene=dict(aspectmode='data')
         )
@@ -1242,6 +1243,12 @@ else:
         if highlight_col != "Ninguno" and highlight_col in prediseno.clasificar_columnas(model):
             highlight_ids = prediseno.clasificar_columnas(model).get(highlight_col, [])
         fig = plot_model(model, show_supports=show_sup, highlight_ids=highlight_ids)
+        
+        if is_mobile_client:
+            fig.update_layout(
+                scene_camera=dict(eye=dict(x=3.0, y=3.0, z=3.0))
+            )
+            
         st.plotly_chart(fig, use_container_width=True, config={
             'displaylogo': False,
             'modeBarButtonsToRemove': ['resetCameraDefault3d', 'resetCameraLastSave3d', 'hoverClosest3d', 'tableRotation']
