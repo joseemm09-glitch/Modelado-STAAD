@@ -379,7 +379,7 @@ def plot_model(model, show_supports=False, highlight_ids=None, highlight_colors=
             xanchor="right",
             x=0.95
         ),
-        height=680
+        height=550
     )
 
     return fig

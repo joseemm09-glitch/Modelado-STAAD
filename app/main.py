@@ -61,10 +61,10 @@ div[data-testid="stVerticalBlock"]:has(> div.element-container div.ios-glass-mar
     backdrop-filter: blur(15px);
     -webkit-backdrop-filter: blur(15px);
     border-radius: 16px;
-    padding: 15px 20px;
+    padding: 12px 16px;
     box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
     border: 1px solid rgba(255, 255, 255, 0.8);
-    margin-bottom: 20px;
+    margin-bottom: 10px;
     position: relative;
     top: -95px;
     z-index: 99;
@@ -102,6 +102,11 @@ div.element-container:has(div.path-marker) {
 hr {
     margin: 15px 0 !important;
     border-top: 1px solid rgba(0,0,0,0.1) !important;
+}
+/* Reduce overall top padding to avoid scroll */
+.block-container {
+    padding-top: 1.5rem !important;
+    padding-bottom: 1rem !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -1506,17 +1511,56 @@ else:
             wind_cols_line = f"&emsp;<span style='font-weight:700; color:#1e293b;'>• Columnas (Viento):</span> <span style='font-weight:700; color:#1e3a8a;'>{num_wind_cols}</span><br>" if num_wind_cols > 0 else ""
             sec_trusses_line = f"&emsp;<span style='font-weight:700; color:#1e293b;'>• Armaduras (Secundarias):</span> <span style='font-weight:700; color:#1e3a8a;'>{num_sec_trusses_total}</span><br>" if num_sec_trusses_total > 0 else ""
             
-            st.markdown(f"""
-            <h3 style="font-family: 'Aptos Display', 'Segoe UI', sans-serif; font-size: 1.35rem; font-weight: 700; color: #0f172a; margin-bottom: 2px; margin-top: -25px;">Elementos</h3>
-            <hr style="border: 0; border-top: 1px solid #e2e8f0; margin-top: 5px; margin-bottom: 12px;">
-            <div style="font-family: 'Aptos Display', 'Segoe UI', sans-serif; line-height: 1.8; color: #334155; font-size: 1rem;">
+            elementos_html = f"""
+            <div style="font-family: 'Aptos Display', 'Segoe UI', sans-serif; font-size: 1rem; font-weight: 700; color: #1e293b; margin-bottom: 0px; margin-top: -5px;">Elementos</div>
+            <hr style="border: 0; border-top: 1px solid #e2e8f0; margin-top: 0px; margin-bottom: 0px;">
+            <div style="font-family: 'Aptos Display', 'Segoe UI', sans-serif; line-height: 1.5; color: #334155; font-size: 13px; padding-bottom: 15px; padding-left: 15px;">
                 <span style='font-weight:700; color:#1e293b;'>• Columnas:</span> <span style='font-weight:700; color:#1e3a8a;'>{(st.session_state.nbay + 1) * (st.session_state.nspan + 1)}</span><br>
                 {wind_cols_line}<span style='font-weight:700; color:#1e293b;'>• Armaduras:</span> <span style='font-weight:700; color:#1e3a8a;'>{(st.session_state.nbay + 1) * st.session_state.nspan}</span><br>
                 {sec_trusses_line}<span style='font-weight:700; color:#1e293b;'>• Contravientos:</span> <span style='font-weight:700; color:#1e3a8a;'>{len(model.groups.get('_CVH', []))}</span><br>
                 <span style='font-weight:700; color:#1e293b;'>• Largueros:</span> <span style='font-weight:700; color:#1e3a8a;'>{num_purlins}</span>
             </div>
-            <div style='height: 25px;'></div>
-            """, unsafe_allow_html=True)
+            """
+            
+            st.markdown(elementos_html, unsafe_allow_html=True)
+            
+        with st.container():
+            st.markdown("<div class='ios-glass-marker'></div>", unsafe_allow_html=True)
+            
+            largo_total = st.session_state.ljoist * st.session_state.nbay
+            
+            if st.session_state.get('dif_lengths', False):
+                if st.session_state.nspan == 1:
+                    ancho_total = st.session_state.get('larm_ext1', st.session_state.larm)
+                elif st.session_state.nspan == 2:
+                    ancho_total = st.session_state.get('larm_ext1', st.session_state.larm) + st.session_state.get('larm_ext2', st.session_state.larm)
+                else:
+                    ancho_total = st.session_state.get('larm_ext1', st.session_state.larm) + st.session_state.get('larm_ext2', st.session_state.larm) + (st.session_state.nspan - 2) * st.session_state.larm
+            else:
+                ancho_total = st.session_state.nspan * st.session_state.larm
+                
+            hlib = st.session_state.hlib
+            harm = st.session_state.harm
+            slope_pct = st.session_state.slope_pct
+            
+            if st.session_state.roof_type == "2 Aguas":
+                h_max = hlib + harm + (ancho_total / 2.0) * (slope_pct / 100.0)
+            else:
+                h_max = hlib + harm + ancho_total * (slope_pct / 100.0)
+                
+            geometria_html = f"""
+            <div style="font-family: 'Aptos Display', 'Segoe UI', sans-serif; font-size: 1rem; font-weight: 700; color: #1e293b; margin-bottom: 0px; margin-top: -5px;">Geometría</div>
+            <hr style="border: 0; border-top: 1px solid #e2e8f0; margin-top: 0px; margin-bottom: 0px;">
+            <div style="font-family: 'Aptos Display', 'Segoe UI', sans-serif; line-height: 1.5; color: #334155; font-size: 13px; padding-bottom: 15px; padding-left: 15px;">
+                <span style='font-weight:700; color:#1e293b;'>• Largo:</span> <span style='font-weight:700; color:#1e3a8a;'>{largo_total:.2f} m</span><br>
+                <span style='font-weight:700; color:#1e293b;'>• Ancho:</span> <span style='font-weight:700; color:#1e3a8a;'>{ancho_total:.2f} m</span><br>
+                <span style='font-weight:700; color:#1e293b;'>• Altura Libre:</span> <span style='font-weight:700; color:#1e3a8a;'>{hlib:.2f} m</span><br>
+                <span style='font-weight:700; color:#1e293b;'>• Altura Máxima:</span> <span style='font-weight:700; color:#1e3a8a;'>{h_max:.2f} m</span><br>
+                <span style='font-weight:700; color:#1e293b;'>• Pendiente:</span> <span style='font-weight:700; color:#1e3a8a;'>{slope_pct:.1f} %</span>
+            </div>
+            """
+            
+            st.markdown(geometria_html, unsafe_allow_html=True)
 
 # Javascript para hacer que los expanders funcionen como acordeón
 components.html(
