@@ -1396,27 +1396,27 @@ else:
                   body {{ font-family: 'Aptos Display', 'Segoe UI', sans-serif;
                          background: transparent; }}
                   .label {{ font-family: 'Aptos Display', 'Segoe UI', sans-serif; font-size: 1rem; font-weight: 700; color: #1e293b; margin-bottom: 5px; display: block; }}
-                  .row {{ display: flex; margin-bottom: 10px; width: 100%; }}
+                  .row {{ display: flex; position: relative; margin-bottom: 10px; width: 78%; align-items: center; }}
                   .path-input {{
-                    flex: 3; padding: 8px 12px; font-size: 0.9rem; color: #374151;
-                    border: none; border-radius: 8px;
+                    width: 100%; padding: 8px 32px 8px 12px; font-size: 0.85rem; color: #374151;
+                    border: 1px solid rgba(49, 51, 63, 0.2); border-radius: 8px;
                     background: #f9fafb; outline: none; height: 38px;
                     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
                   }}
                   .btn-container {{
-                    flex: 1; padding-left: 10px;
+                    position: absolute; right: 4px; height: 28px; width: 28px; padding: 0;
                   }}
                   .folder-btn {{
-                    width: 100%; height: 38px; border: 1px solid rgba(49, 51, 63, 0.2);
-                    border-radius: 8px; background: #ffffff; cursor: pointer;
+                    width: 100%; height: 100%; border: none; border-radius: 4px; background: transparent; cursor: pointer;
                     font-size: 1rem; display: flex; align-items: center;
                     justify-content: center; transition: background 0.15s;
-                    color: #31333f; font-weight: 400;
+                    color: #31333f;
                   }}
-                  .folder-btn:hover {{ border-color: #ba281b; color: #ba281b; }}
+                  .folder-btn:hover {{ background: rgba(0,0,0,0.05); }}
                   .save-btn {{
+                    margin-top: 15px;
                     padding: 0.5rem 1rem; background: #ba281b; color: white;
-                    border: none; border-radius: 4px; font-size: 1rem; font-weight: 600;
+                    border: none; border-radius: 4px; font-size: 14px; font-weight: 600;
                     cursor: pointer; box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.1);
                     transition: all 0.2s ease-in-out; font-family: 'Aptos Display', 'Segoe UI', sans-serif;
                   }}
@@ -1483,7 +1483,7 @@ else:
                   }}
                 </script>
                 """
-                components.html(web_ui, height=125)
+                components.html(web_ui, height=140)
             else:
                 # ─── Modo Escritorio: guardar al disco y abrir ───
                 if st.button("Guardar Archivo .std", type="primary"):
