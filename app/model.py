@@ -127,7 +127,7 @@ class StaadModel:
             '_MONTANTES_SEC': [],
             '_DIAG_SEC': []
         }
-        for j in range(self.nSpan):
+        for j in range(self.nSpan + 1):
             self.groups[f"_LARGUEROS_{j}"] = []
         
         self.wind_cols = {

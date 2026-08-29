@@ -1,11 +1,18 @@
 import sys
-sys.path.append('app')
+import os
+sys.path.append(os.path.abspath('app'))
 from model import StaadModel
-model = StaadModel(15.24, 1.5, 2, 1, 1, 8, 10, '2 Aguas', 10, 'PINNED', 20, 20, 0, 30, 20, 0, 0, 0.1, 2, 20, 20, True, 5, 'Tilt-Up', [], '1000000', dif_lengths=False, ext_bays_active=True, ext_bl=True, ext_tl=True, ext_br=True, ext_tr=True, ext_depth=2, ext_larm=15.24, ext_subdiv=10, ext_height_mode='Primer Entre-Eje completo')
-print(f'Members: {len(model.members)}')
-print(f'Plates: {len(model.plates)}')
-print(f'ext_depth: {model.ext_depth}')
-print(f'ext_larm: {model.ext_larm}')
-print('Trusses (CI):', len(model.groups.get('_CI', [])))
-print('Trusses (CS):', len(model.groups.get('_CS', [])))
-print('Joists:', len(model.groups.get('_JOISTGRAL', [])))
+
+m = StaadModel(
+    Larm_m=10.0, Ljoist_m=5.0, nBay=4, nSpan=3, HArmad_m=1.0, HLibre_m=6.0, numSubdiv=2,
+    roof_type="1 Agua", slope_pct=10.0, add_wind_cols=False
+)
+m.generate()
+
+print("nSpan =", m.nSpan)
+for j in range(m.nSpan + 1):
+    grp = f'_LARGUEROS_{j}'
+    print(f"{grp}: {m.groups.get(grp, [])}")
+
+print("_JOISTGRAL:", m.groups.get('_JOISTGRAL', []))
+print("_JPUNTAL:", m.groups.get('_JPUNTAL', []))
