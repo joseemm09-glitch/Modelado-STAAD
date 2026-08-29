@@ -616,6 +616,9 @@ class StaadModel:
                             
                             col_wind = self.add_member(nid_base, nid_roof, '_COLVIENTO')
                             
+                            trib_x = self.Ljoist_m / self.wind_col_N
+                            self.col_trib_x[col_wind] = trib_x
+                            
                             if j == 0:
                                 self.wind_cols['X0_WINDCOL'].append(col_wind)
                             else:
@@ -798,6 +801,9 @@ class StaadModel:
                             nid_base = self.add_node(x_node, 0.0, i * self.Lz, is_wind_base=True)
                             
                             col_wind = self.add_member(nid_base, closest_node, '_COLVIENTO')
+                            
+                            trib_z = self.Lx_list[j] / self.wind_col_Z_M_list[j]
+                            self.col_trib_z[col_wind] = trib_z
                             
                             # Release at the top: MY, MZ, FX
                             self.release_end_fx.append(col_wind)
