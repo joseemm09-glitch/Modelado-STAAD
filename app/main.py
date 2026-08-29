@@ -647,10 +647,22 @@ elif sec_mode == "Todos los Ejes":
         sec_trusses_j = list(range(0, st.session_state.nspan + 1))
 elif sec_mode == "Personalizado":
     mid_j = st.session_state.nspan / 2.0
+    actual_nspan = st.session_state.nspan
+    shift_j = 0
+    if st.session_state.get('ext_bays_active', False):
+        if st.session_state.get('ext_bl', False) or st.session_state.get('ext_tl', False):
+            actual_nspan += 1
+            shift_j = 1
+        if st.session_state.get('ext_br', False) or st.session_state.get('ext_tr', False):
+            actual_nspan += 1
+            
+    mid_j = actual_nspan / 2.0
+    
     if st.session_state.wall_type == "Tilt-Up":
-        interior_j = list(range(1, st.session_state.nspan))
+        interior_j = [j + shift_j for j in range(1, st.session_state.nspan)]
     else:
-        interior_j = list(range(0, st.session_state.nspan + 1))
+        interior_j = [j + shift_j for j in range(0, st.session_state.nspan + 1)]
+        
     interior_j.sort(key=lambda j: (abs(j - mid_j), j))
     interior_j = interior_j[:10]
     
@@ -830,17 +842,21 @@ with st.sidebar:
             if sec_mode == "Personalizado":
                 st.write("Ejes:")
                 # Ordenar del centro hacia afuera
-                mid_j = st.session_state.nspan / 2.0
+                mid_j = model.nSpan / 2.0
+                shift_j = 0
+                if st.session_state.get('ext_bays_active', False) and (st.session_state.get('ext_bl', False) or st.session_state.get('ext_tl', False)):
+                    shift_j = 1
+                    
                 if st.session_state.wall_type == "Tilt-Up":
-                    interior_j = list(range(1, st.session_state.nspan))
+                    interior_j = [j + shift_j for j in range(1, st.session_state.nspan)]
                 else:
-                    interior_j = list(range(0, st.session_state.nspan + 1))
+                    interior_j = [j + shift_j for j in range(0, st.session_state.nspan + 1)]
                 interior_j.sort(key=lambda j: (abs(j - mid_j), j))
                 interior_j = interior_j[:10] # Limitar a 10 ejes máximo
                 
                 selected_ejes = st.session_state.get('sec_truss_custom_ejes', [])
                 for j in interior_j:
-                    st.checkbox(f"X = {j * st.session_state.larm:.2f} m", value=(j in selected_ejes), key=f"sec_eje_{j}")
+                    st.checkbox(f"Eje {j+1} (X = {model.get_x(j):.2f} m)", value=(j in selected_ejes), key=f"sec_eje_{j}")
 
         if st.session_state.wall_type != "Tilt-Up":
             with st.expander("Columnas de Viento", expanded=False):
@@ -1517,8 +1533,8 @@ else:
             <div style="font-family: 'Aptos Display', 'Segoe UI', sans-serif; font-size: 1rem; font-weight: 700; color: #1e293b; margin-bottom: 0px; margin-top: -5px;">Elementos</div>
             <hr style="border: 0; border-top: 1px solid #e2e8f0; margin-top: 0px; margin-bottom: 0px;">
             <div style="font-family: 'Aptos Display', 'Segoe UI', sans-serif; line-height: 1.8; color: #334155; font-size: 13px; padding-bottom: 15px; padding-left: 15px;">
-                <span style='font-weight:700; color:#1e293b;'>• Columnas:</span> <span style='font-weight:700; color:#1e3a8a;'>{(st.session_state.nbay + 1) * (st.session_state.nspan + 1)}</span><br>
-                {wind_cols_line}<span style='font-weight:700; color:#1e293b;'>• Armaduras:</span> <span style='font-weight:700; color:#1e3a8a;'>{(st.session_state.nbay + 1) * st.session_state.nspan}</span><br>
+                <span style='font-weight:700; color:#1e293b;'>• Columnas Principales:</span> <span style='font-weight:700; color:#1e3a8a;'>{len(model.groups.get('_COL', []))}</span><br>
+                {wind_cols_line}<span style='font-weight:700; color:#1e293b;'>• Ejes Transversales (Armaduras):</span> <span style='font-weight:700; color:#1e3a8a;'>{model.nSpan + 1}</span><br>
                 {sec_trusses_line}<span style='font-weight:700; color:#1e293b;'>• Contravientos:</span> <span style='font-weight:700; color:#1e3a8a;'>{len(model.groups.get('_CVH', []))}</span><br>
                 <span style='font-weight:700; color:#1e293b;'>• Largueros:</span> <span style='font-weight:700; color:#1e3a8a;'>{num_purlins}</span>
             </div>
@@ -1531,15 +1547,7 @@ else:
             
             largo_total = st.session_state.ljoist * st.session_state.nbay
             
-            if st.session_state.get('dif_lengths', False):
-                if st.session_state.nspan == 1:
-                    ancho_total = st.session_state.get('larm_ext1', st.session_state.larm)
-                elif st.session_state.nspan == 2:
-                    ancho_total = st.session_state.get('larm_ext1', st.session_state.larm) + st.session_state.get('larm_ext2', st.session_state.larm)
-                else:
-                    ancho_total = st.session_state.get('larm_ext1', st.session_state.larm) + st.session_state.get('larm_ext2', st.session_state.larm) + (st.session_state.nspan - 2) * st.session_state.larm
-            else:
-                ancho_total = st.session_state.nspan * st.session_state.larm
+            ancho_total = model.total_width / model.scale
                 
             hlib = st.session_state.hlib
             harm = st.session_state.harm

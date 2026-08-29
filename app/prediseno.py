@@ -138,6 +138,76 @@ def clasificar_columnas(model):
     
     tol = 0.1
     
+    is_tilt_up = getattr(model, 'wall_type', '') == "Tilt-Up"
+    
+    if is_tilt_up:
+        # Extraer coordenadas X de las bahías de extensión
+        x_ext = []
+        if getattr(model, 'ext_bays_active', False):
+            if getattr(model, 'ext_bl', False) or getattr(model, 'ext_tl', False):
+                x_ext.append(round(model.get_x(0), 2))
+            if getattr(model, 'ext_br', False) or getattr(model, 'ext_tr', False):
+                x_ext.append(round(model.get_x(model.nSpan), 2))
+                
+        # Agrupar columnas por coordenada X
+        x_groups = {}
+        for mem_id in model.groups.get('_COL', []):
+            n1, n2 = model.members[mem_id]
+            x, y, z = model.nodes[n1]
+            rx = round(x, 2)
+            if rx not in x_groups: x_groups[rx] = []
+            x_groups[rx].append(mem_id)
+            
+        x_main_keys = [rx for rx in x_groups.keys() if rx not in x_ext]
+        
+        grupos_tiltup = {}
+        group_num = 1
+        
+        if x_main_keys:
+            x_center = (max(x_main_keys) + min(x_main_keys)) / 2.0
+            
+            # Agrupar las de main por distancia al centro
+            dist_groups = {}
+            for rx in x_main_keys:
+                d = round(abs(rx - x_center), 2)
+                if d not in dist_groups: dist_groups[d] = []
+                dist_groups[d].extend(x_groups[rx])
+                
+            sorted_dists = sorted(dist_groups.keys())
+            
+            # C-1: Centrales
+            grupos_tiltup[f"C-{group_num}"] = dist_groups[sorted_dists[0]]
+            group_num += 1
+            
+            # C-2: Intermedias (si hay, agrupar TODAS las distancias intermedias)
+            if len(sorted_dists) > 2:
+                mid_cols = []
+                for d in sorted_dists[1:-1]:
+                    mid_cols.extend(dist_groups[d])
+                grupos_tiltup[f"C-{group_num}"] = mid_cols
+                group_num += 1
+                
+            # Últimos ejes completos (si son distintos de los centrales)
+            if len(sorted_dists) > 1:
+                grupos_tiltup[f"C-{group_num}"] = dist_groups[sorted_dists[-1]]
+                group_num += 1
+                
+        # Bahías de extensión
+        ext_cols = []
+        for rx in x_ext:
+            if rx in x_groups:
+                ext_cols.extend(x_groups[rx])
+        
+        if ext_cols:
+            grupos_tiltup[f"C-{group_num}"] = ext_cols
+            
+        cv_cols = model.groups.get('_COLVIENTO', [])
+        if cv_cols:
+            grupos_tiltup["CV-1"] = cv_cols
+            
+        return grupos_tiltup
+
+    # Lógica normal para naves metálicas
     for mem_id in model.groups.get('_COL', []):
         n1, n2 = model.members[mem_id]
         x, y, z = model.nodes[n1]
@@ -154,20 +224,10 @@ def clasificar_columnas(model):
         else:
             grupos["C-1"].append(mem_id)
             
-    # Agregar columnas de viento
     for mem_id in model.groups.get('_COLVIENTO', []):
         grupos["CV-1"].append(mem_id)
             
-    # Filtrar los que están vacíos
-    resultado = {k: v for k, v in grupos.items() if len(v) > 0}
-    
-    # Asegurar que en Tilt-Up siempre existan los grupos de columnas para prediseño manual
-    if getattr(model, 'wall_type', '') == "Tilt-Up":
-        for g in ["C-1", "C-2", "C-3", "C-4"]:
-            if g not in resultado:
-                resultado[g] = []
-                
-    return resultado
+    return {k: v for k, v in grupos.items() if len(v) > 0}
 
 def predisenar_grupo(nombre_grupo, model, usar_2w=False):
     """
@@ -183,17 +243,22 @@ def predisenar_grupo(nombre_grupo, model, usar_2w=False):
         perfiles = perfiles_base
         
     # Heurística rápida para Muros Tilt-Up (Aproximación inicial solicitada)
-    if getattr(model, 'wall_type', '') == "Tilt-Up" and nombre_grupo in ["C-1", "C-2", "C-3", "C-4"]:
-        if nombre_grupo == "C-1":
+    if getattr(model, 'wall_type', '') == "Tilt-Up" and nombre_grupo.startswith("C-"):
+        try:
+            g_idx = int(nombre_grupo.split("-")[1])
+        except:
+            g_idx = 1
+            
+        if g_idx == 1:
             target_name = "OR 14\"x14\"x3/8\""
             alternatives = ["OR 14\"x14\"x1/2\"", "OR 16\"x16\"x5/16\"", "OR 16\"x16\"x3/8\"", "OR 14\"x14\"x5/16\""]
-        elif nombre_grupo == "C-2":
+        elif g_idx == 2:
             target_name = "OR 12\"x12\"x3/8\""
             alternatives = ["OR 12\"x12\"x1/2\"", "OR 14\"x14\"x5/16\"", "OR 14\"x14\"x1/4\"", "OR 12\"x12\"x5/16\""]
-        elif nombre_grupo == "C-3":
+        elif g_idx == 3:
             target_name = "OR 10\"x10\"x5/16\""
             alternatives = ["OR 10\"x10\"x3/8\"", "OR 12\"x12\"x1/4\"", "OR 12\"x12\"x5/16\"", "OR 10\"x10\"x1/4\""]
-        elif nombre_grupo == "C-4":
+        else:
             target_name = "OR 8\"x8\"x1/4\""
             alternatives = ["OR 8\"x8\"x5/16\"", "OR 10\"x10\"x3/16\"", "OR 10\"x10\"x1/4\"", "OR 8\"x8\"x3/16\""]
             

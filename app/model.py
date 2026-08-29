@@ -821,7 +821,7 @@ class StaadModel:
             
         # Collect all joist members
         all_joists = []
-        for j in range(self.nSpan):
+        for j in range(self.nSpan + 1):
             all_joists.extend(self.groups.get(f'_LARGUEROS_{j}', []))
         for mem_id in self.groups.get('_LARGUEROS', []):
             all_joists.append(mem_id)
@@ -1131,7 +1131,7 @@ class StaadModel:
             
         # Collect all joist members
         all_joists = []
-        for j in range(self.nSpan):
+        for j in range(self.nSpan + 1):
             all_joists.extend(self.groups.get(f'_LARGUEROS_{j}', []))
         for mem_id in self.groups.get('_LARGUEROS', []):
             all_joists.append(mem_id)
