@@ -1079,35 +1079,32 @@ class StaadModel:
                         if n_b2 not in self.wind_base_nodes:
                             self.wind_base_nodes.append(n_b2)
             
-            # 3. Liberaciones en armaduras que llegan a placas (X=0 y X=XMAX o Z=0 y Z=ZMAX)
-            for mem_id in self.groups.get('_CI', []):
+            # 3. Liberaciones en armaduras que llegan a placas (Muros Tilt-Up)
+            plate_nodes = set()
+            for pid, (n1, n2, n3, n4) in self.plates.items():
+                plate_nodes.update([n1, n2, n3, n4])
+                
+            for mem_id in self.groups.get('_CI', []) + self.groups.get('_CI_PERIM', []):
                 n1, n2 = self.members[mem_id]
-                x1, y1, z1 = self.nodes[n1]
-                x2, y2, z2 = self.nodes[n2]
-                tol = 1.0 # 1 cm tol
-                if abs(x1 - 0) < tol or abs(x1 - self.total_width) < tol:
+                if n1 in plate_nodes:
                     if mem_id not in self.rel_tiltup_start:
                         self.rel_tiltup_start.append(mem_id)
                         if mem_id in self.rel_csci_start:
                             self.rel_csci_start.remove(mem_id)
-                if abs(x2 - 0) < tol or abs(x2 - self.total_width) < tol:
+                if n2 in plate_nodes:
                     if mem_id not in self.rel_tiltup_end:
                         self.rel_tiltup_end.append(mem_id)
                         if mem_id in self.rel_csci_end:
                             self.rel_csci_end.remove(mem_id)
                             
-            total_depth = self.Lz * self.nBay
             for mem_id in self.groups.get('_CI_SEC', []):
                 n1, n2 = self.members[mem_id]
-                x1, y1, z1 = self.nodes[n1]
-                x2, y2, z2 = self.nodes[n2]
-                tol = 1.0 # 1 cm tol
-                if abs(z1 - 0) < tol or abs(z1 - total_depth) < tol:
+                if n1 in plate_nodes:
                     if mem_id not in self.rel_tiltup_start:
                         self.rel_tiltup_start.append(mem_id)
                         if mem_id in self.rel_ci_sec_start:
                             self.rel_ci_sec_start.remove(mem_id)
-                if abs(z2 - 0) < tol or abs(z2 - total_depth) < tol:
+                if n2 in plate_nodes:
                     if mem_id not in self.rel_tiltup_end:
                         self.rel_tiltup_end.append(mem_id)
                         if mem_id in self.rel_ci_sec_end:
