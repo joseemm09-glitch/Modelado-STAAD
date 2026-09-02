@@ -527,6 +527,14 @@ def go_panel(p):
 def update_val(key):
     st.session_state[key] = st.session_state["_" + key]
 
+def update_dif_lengths():
+    st.session_state.dif_lengths = st.session_state._dif_lengths
+    if st.session_state.dif_lengths:
+        st.session_state.larm_ext1 = st.session_state.larm
+        st.session_state.larm_ext2 = st.session_state.larm
+        st.session_state.subdiv_ext1 = st.session_state.subdiv
+        st.session_state.subdiv_ext2 = st.session_state.subdiv
+
 def update_ext_bays_active():
     active = st.session_state["_ext_bays_active"]
     st.session_state["ext_bays_active"] = active
@@ -539,6 +547,13 @@ def update_ext_bays_active():
         st.session_state._ext_br = True
         st.session_state._ext_tl = True
         st.session_state._ext_tr = True
+        
+        if st.session_state.dif_lengths:
+            st.session_state.ext_larm = st.session_state.larm_ext1
+            st.session_state.ext_subdiv = st.session_state.subdiv_ext1
+        else:
+            st.session_state.ext_larm = st.session_state.larm
+            st.session_state.ext_subdiv = st.session_state.subdiv
 
 def update_subdiv():
     val = int(st.session_state['_subdiv'])
@@ -659,9 +674,9 @@ elif sec_mode == "Personalizado":
     mid_j = actual_nspan / 2.0
     
     if st.session_state.wall_type == "Tilt-Up":
-        interior_j = [j + shift_j for j in range(1, st.session_state.nspan)]
+        interior_j = list(range(1, st.session_state.nspan))
     else:
-        interior_j = [j + shift_j for j in range(0, st.session_state.nspan + 1)]
+        interior_j = list(range(0, st.session_state.nspan + 1))
         
     interior_j.sort(key=lambda j: (abs(j - mid_j), j))
     interior_j = interior_j[:10]
@@ -773,7 +788,14 @@ with st.sidebar:
         st.button("Catálogo", type="primary", use_container_width=True, on_click=go_panel, args=("Catálogo",), disabled=is_disabled)
         
     elif panel == "Geometría":
-        st.button("⬅ Volver", type="secondary", on_click=go_panel, args=("Main",))
+        c1, c2 = st.columns([5, 3])
+        with c1:
+            st.button("⬅ Volver", type="secondary", use_container_width=True, on_click=go_panel, args=("Main",))
+        with c2:
+            try:
+                st.image(icono_path, use_container_width=True)
+            except:
+                pass
         render_siblings_top(nav_group1, "Geometría")
         st.header("Geometría")
         
@@ -843,21 +865,23 @@ with st.sidebar:
                 st.write("Ejes:")
                 # Ordenar del centro hacia afuera
                 mid_j = model.nSpan / 2.0
-                shift_j = 0
+                shift_eje = 0
                 if st.session_state.get('ext_bays_active', False) and (st.session_state.get('ext_bl', False) or st.session_state.get('ext_tl', False)):
-                    shift_j = 1
+                    shift_eje = 1
                     
                 if st.session_state.wall_type == "Tilt-Up":
-                    interior_j = [j + shift_j for j in range(1, st.session_state.nspan)]
+                    interior_j = list(range(1, st.session_state.nspan))
                 else:
-                    interior_j = [j + shift_j for j in range(0, st.session_state.nspan + 1)]
+                    interior_j = list(range(0, st.session_state.nspan + 1))
                 interior_j.sort(key=lambda j: (abs(j - mid_j), j))
                 interior_j = interior_j[:10] # Limitar a 10 ejes máximo
                 
                 selected_ejes = st.session_state.get('sec_truss_custom_ejes', [])
                 for j in interior_j:
-                    st.checkbox(f"Eje {j+1} (X = {model.get_x(j):.2f} m)", value=(j in selected_ejes), key=f"sec_eje_{j}")
+                    st.checkbox(f"Eje {j + 1 + shift_eje} (X = {model.get_x(j) / 100.0:.2f} m)", value=(j in selected_ejes), key=f"sec_eje_{j}")
 
+        st.markdown("<hr style='border-top: 1px solid #cce5ff;'>", unsafe_allow_html=True)
+        
         if st.session_state.wall_type != "Tilt-Up":
             with st.expander("Columnas de Viento", expanded=False):
                 st.checkbox("Columnas de Viento", value=st.session_state.add_wind_cols, key="_add_wind_cols", on_change=update_val, args=("add_wind_cols",))
@@ -866,11 +890,9 @@ with st.sidebar:
         else:
             st.session_state.add_wind_cols = False
             
-        st.markdown("<hr style='border-top: 1px solid #cce5ff;'>", unsafe_allow_html=True)
-        
         with st.expander("Armaduras diferentes (Extremos)", expanded=False):
             if st.session_state.nspan >= 2:
-                st.checkbox("Diferentes longitudes (Extremos)", value=st.session_state.dif_lengths, key="_dif_lengths", on_change=update_val, args=("dif_lengths",))
+                st.checkbox("Diferentes longitudes (Extremos)", value=st.session_state.dif_lengths, key="_dif_lengths", on_change=update_dif_lengths)
                 if st.session_state.dif_lengths:
                     with st.container():
                         st.markdown("<span id='extremos-border'></span><p class='widget-title' style='margin-top: -5px;'>Extremo 1 (X=0)</p>", unsafe_allow_html=True)
@@ -912,7 +934,14 @@ with st.sidebar:
         render_siblings_bottom(nav_group1, "Geometría")
 
     elif panel == "Cargas":
-        st.button("⬅ Volver", type="secondary", on_click=go_panel, args=("Main",))
+        c1, c2 = st.columns([5, 3])
+        with c1:
+            st.button("⬅ Volver", type="secondary", use_container_width=True, on_click=go_panel, args=("Main",))
+        with c2:
+            try:
+                st.image(icono_path, use_container_width=True)
+            except:
+                pass
         render_siblings_top(nav_group1, "Cargas")
         st.header("Cargas")
         with st.expander("Gravitacionales", expanded=True):
@@ -940,7 +969,14 @@ with st.sidebar:
         render_siblings_bottom(nav_group1, "Cargas")
 
     elif panel == "Prediseño":
-        st.button("⬅ Volver", type="secondary", on_click=go_panel, args=("Main",))
+        c1, c2 = st.columns([5, 3])
+        with c1:
+            st.button("⬅ Volver", type="secondary", use_container_width=True, on_click=go_panel, args=("Main",))
+        with c2:
+            try:
+                st.image(icono_path, use_container_width=True)
+            except:
+                pass
         render_siblings_top(nav_group1, "Prediseño")
         st.header("Prediseño")
         
@@ -979,7 +1015,14 @@ with st.sidebar:
         render_siblings_bottom(nav_group1, "Prediseño")
 
     elif panel == "Diseño":
-        st.button("⬅ Menú Principal", type="secondary", on_click=go_panel, args=("Main",))
+        c1, c2 = st.columns([5, 3])
+        with c1:
+            st.button("⬅ Menú Principal", type="secondary", use_container_width=True, on_click=go_panel, args=("Main",))
+        with c2:
+            try:
+                st.image(icono_path, use_container_width=True)
+            except:
+                pass
         
         st.markdown("<h3 style='margin-top: 10px; margin-bottom: 30px;'>Diseño Estructural</h3>", unsafe_allow_html=True)
         
@@ -1005,7 +1048,14 @@ with st.sidebar:
 
 
     elif panel == "Catálogo":
-        st.button("⬅ Volver", type="secondary", on_click=go_panel, args=("Main",))
+        c1, c2 = st.columns([5, 3])
+        with c1:
+            st.button("⬅ Volver", type="secondary", use_container_width=True, on_click=go_panel, args=("Main",))
+        with c2:
+            try:
+                st.image(icono_path, use_container_width=True)
+            except:
+                pass
         render_siblings_top(nav_group2, "Catálogo")
         st.header("Catálogo")
         render_siblings_bottom(nav_group2, "Catálogo")
