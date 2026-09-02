@@ -191,6 +191,7 @@ class StaadModel:
         
         self.col_heights = {}
         self.ci_int = []
+        self.ci_ly_groups = {}
         
         self.base_nodes = [] # Nodos en la base para asignar SUPPORTS FIXED
         self.wind_base_nodes = []
@@ -274,6 +275,12 @@ class StaadModel:
             return nL3[(i, j + 1)]
         else:
             return upperSub[(i, j, k)]
+
+    def add_ci_ly(self, mem_id, L0_local):
+        ly_val = math.ceil(3 * L0_local)
+        if ly_val not in self.ci_ly_groups:
+            self.ci_ly_groups[ly_val] = []
+        self.ci_ly_groups[ly_val].append(mem_id)
 
     def get_x(self, j):
         return sum(self.Lx_list[:j])
@@ -557,6 +564,7 @@ class StaadModel:
                             self.rel_csci_start.append(mid)
                         else:
                             self.ci_int.append(mid)
+                            self.add_ci_ly(mid, L0_local)
                     leftN = nid
 
                 if not (self.wall_type == "Tilt-Up" and (i == 0 or i == self.nBay)):
@@ -1245,7 +1253,9 @@ class StaadModel:
                     # _CI
                     ci_keys = sorted(nodes_ci.keys())
                     for idx in range(len(ci_keys)-1):
-                        self.add_member(nodes_ci[ci_keys[idx]], nodes_ci[ci_keys[idx+1]], grp_ci)
+                        mid = self.add_member(nodes_ci[ci_keys[idx]], nodes_ci[ci_keys[idx+1]], grp_ci)
+                        if idx > 0 and idx < len(ci_keys) - 2:
+                            self.add_ci_ly(mid, L0_ext)
                         
                     # Montantes y Diagonales (Warren con verticales)
                     for t in range(1, (ext_subdiv // 2) + 1):

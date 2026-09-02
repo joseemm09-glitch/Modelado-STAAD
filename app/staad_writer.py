@@ -799,10 +799,17 @@ def write_staad(model, selected_profiles=None):
         if armadura_perim_str:
             out.append(build_lines(["FYLD", "3515", "MEMB"] + armadura_perim_str.split(" "), 72))
         
-    ci_int_str = group_ranges(model.ci_int)
-    if ci_int_str:
-        ly_val = math.ceil(3 * (model.Lx / model.numSubdiv))
-        out.append(f"LY {ly_val} _CI_INT")
+    if getattr(model, 'ci_ly_groups', {}):
+        for ly_val, members in model.ci_ly_groups.items():
+            if members:
+                m_str = group_ranges(members)
+                out.append(build_lines([f"LY", str(ly_val), "MEMB"] + m_str.split(" "), 72))
+    else:
+        # Fallback
+        ci_int_str = group_ranges(model.ci_int)
+        if ci_int_str:
+            ly_val = math.ceil(3 * (model.Lx / model.numSubdiv))
+            out.append(f"LY {ly_val} _CI_INT")
         
     if cv_str:
         out.append("** CVH **")
