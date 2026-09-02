@@ -1238,13 +1238,19 @@ class StaadModel:
                     # En ext_x no hay columna porque va directo al muro Tilt-Up
                     
                     nid_base_int = self.get_or_create_node(base_x, 0.0, z)
-                    self.add_member(nid_base_int, nodes_ci[ext_subdiv], '_COL')
-                    self.add_member(nodes_ci[ext_subdiv], nodes_cs[ext_subdiv], '_COL')
+                    c1 = self.add_member(nid_base_int, nodes_ci[ext_subdiv], '_COL')
+                    c2 = self.add_member(nodes_ci[ext_subdiv], nodes_cs[ext_subdiv], '_COL')
                     
-                    grp_ci = '_CI'
-                    grp_cs = '_CS'
-                    grp_mont = '_MONTANTES'
-                    grp_diag = '_DIAG'
+                    total_h = self.HtLibre + self.HtArmad + self.get_y_offset(base_x)
+                    h_rounded = math.ceil(total_h)
+                    if h_rounded not in self.col_heights:
+                        self.col_heights[h_rounded] = []
+                    self.col_heights[h_rounded].extend([c1, c2])
+                    
+                    grp_ci = '_CI_PERIM'
+                    grp_cs = '_CS_PERIM'
+                    grp_mont = '_MONTANTES_PERIM'
+                    grp_diag = '_DIAG_PERIM'
                     
                     # _CS
                     for k in range(ext_subdiv):
