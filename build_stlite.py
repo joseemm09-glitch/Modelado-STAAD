@@ -205,7 +205,18 @@ def build():
         let dismissed = false;
         let observer = null;
 
+        function hideSessionStateWarnings() {{
+            const alerts = document.querySelectorAll('[data-testid="stAlert"]');
+            for (let i = 0; i < alerts.length; i++) {{
+                const el = alerts[i];
+                if (el.textContent && el.textContent.includes('was created with a default value')) {{
+                    el.style.display = 'none';
+                }}
+            }}
+        }}
+
         function tryDismiss() {{
+            hideSessionStateWarnings();
             if (dismissed) return;
             // Verificar que los botones del menú y el gráfico o título ya estén completamente dibujados
             const hasSidebarButtons = document.querySelectorAll('section[data-testid="stSidebar"] button').length >= 3;
@@ -217,6 +228,10 @@ def build():
                 dismissed = true;
                 if (observer) observer.disconnect();
                 
+                // Mantener un observer ligero para seguir ocultando alertas de duplicate key si el usuario interactúa
+                const postObserver = new MutationObserver(hideSessionStateWarnings);
+                postObserver.observe(document.getElementById("root"), {{ childList: true, subtree: true }});
+
                 // Dar 5.0 segundos adicionales para asegurar que todo el 3D y CSS se haya pintado suavemente
                 setTimeout(() => {{
                     if (splash) {{
@@ -231,6 +246,7 @@ def build():
         observer.observe(document.getElementById("root"), {{ childList: true, subtree: true }});
 
         const pollInterval = setInterval(() => {{
+            hideSessionStateWarnings();
             tryDismiss();
             if (dismissed) clearInterval(pollInterval);
         }}, 300);
@@ -243,7 +259,8 @@ def build():
                 "theme.primaryColor": "#005cb2",
                 "theme.backgroundColor": "#ffffff",
                 "theme.secondaryBackgroundColor": "#f8fafc",
-                "theme.textColor": "#1e293b"
+                "theme.textColor": "#1e293b",
+                "global.disableWidgetStateDuplicationWarning": true
             }}
         }}, document.getElementById("root"));
     </script>

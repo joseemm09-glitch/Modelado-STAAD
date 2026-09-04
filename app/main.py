@@ -5,6 +5,14 @@ import sys
 import subprocess
 import importlib
 
+# Silenciar advertencia de valores por defecto en widgets con Session State
+try:
+    import streamlit.elements.lib.policies as _policies
+    _policies._shown_default_value_warning = True
+except Exception:
+    pass
+
+
 # Ensure app directory is in sys.path for both local and web environments
 app_dir = os.path.dirname(os.path.abspath(__file__))
 if app_dir not in sys.path:
