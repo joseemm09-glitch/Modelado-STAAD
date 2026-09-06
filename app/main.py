@@ -20,15 +20,21 @@ if app_dir not in sys.path:
 
 import streamlit.components.v1 as components
 
-# Force reload of custom modules to ensure Streamlit hot-reloads them
-import model
-import staad_writer
-import visualizer
-import prediseno
-importlib.reload(model)
-importlib.reload(staad_writer)
-importlib.reload(visualizer)
-importlib.reload(prediseno)
+# Force reload of custom modules to ensure Streamlit hot-reloads them (Only in Local Dev)
+if os.environ.get("LOCAL_DEV") == "1":
+    import model
+    import staad_writer
+    import visualizer
+    import prediseno
+    importlib.reload(model)
+    importlib.reload(staad_writer)
+    importlib.reload(visualizer)
+    importlib.reload(prediseno)
+else:
+    import model
+    import staad_writer
+    import visualizer
+    import prediseno
 
 from model import StaadModel
 from staad_writer import write_staad
@@ -693,48 +699,42 @@ elif sec_mode == "Personalizado":
     st.session_state.sec_truss_custom_ejes = sec_trusses_j
 
 # Build Model
+@st.cache_resource(max_entries=10)
+def get_cached_model(
+    larm, ljoist, nbay, nspan, harm, hlib, subdiv, roof_type, slope_pct, support_type, 
+    c_muerta, c_viva, c_granizo, v_barlovento, v_sotavento, v_laterales, v_succion, 
+    coef_sismico, ductilidad, cm_sismo, cv_sismo, add_wind_cols, max_wind_dist, 
+    wall_type, sec_trusses_j, resorte_val, dif_lengths, larm_ext1, larm_ext2, 
+    subdiv_ext1, subdiv_ext2, ext_bays_active, ext_bl, ext_br, ext_tl, ext_tr, 
+    ext_height_mode, ext_larm, ext_subdiv, ext_depth
+):
+    return StaadModel(
+        larm, ljoist, nbay, nspan, harm, hlib, subdiv, roof_type, slope_pct,
+        support_type, c_muerta, c_viva, c_granizo, v_barlovento, v_sotavento,
+        v_laterales, v_succion, coef_sismico, ductilidad, cm_sismo, cv_sismo,
+        add_wind_cols, max_wind_dist, wall_type, list(sec_trusses_j), resorte_val,
+        dif_lengths=dif_lengths, larm_ext1=larm_ext1, larm_ext2=larm_ext2,
+        subdiv_ext1=subdiv_ext1, subdiv_ext2=subdiv_ext2,
+        ext_bays_active=ext_bays_active, ext_bl=ext_bl, ext_br=ext_br,
+        ext_tl=ext_tl, ext_tr=ext_tr, ext_height_mode=ext_height_mode,
+        ext_larm=ext_larm, ext_subdiv=ext_subdiv, ext_depth=ext_depth
+    )
+
 try:
-    model = StaadModel(
-        st.session_state.larm, 
-        st.session_state.ljoist, 
-        st.session_state.nbay, 
-        st.session_state.nspan, 
-        st.session_state.harm, 
-        st.session_state.hlib, 
-        st.session_state.subdiv, 
-        st.session_state.roof_type, 
-        st.session_state.slope_pct,
-        st.session_state.support_type,
-        st.session_state.c_muerta,
-        st.session_state.c_viva,
-        st.session_state.c_granizo,
-        st.session_state.v_barlovento,
-        st.session_state.v_sotavento,
-        st.session_state.v_laterales,
-        st.session_state.v_succion,
-        st.session_state.coef_sismico,
-        st.session_state.ductilidad,
-        st.session_state.cm_sismo,
-        st.session_state.cv_sismo,
-        st.session_state.add_wind_cols,
-        st.session_state.max_wind_dist,
-        st.session_state.wall_type,
-        sec_trusses_j,
-        st.session_state.get('resorte_val', '1,000,000').replace(',', ''),
-        dif_lengths=st.session_state.dif_lengths,
-        larm_ext1=st.session_state.larm_ext1,
-        larm_ext2=st.session_state.larm_ext2,
-        subdiv_ext1=st.session_state.subdiv_ext1,
-        subdiv_ext2=st.session_state.subdiv_ext2,
-        ext_bays_active=st.session_state.ext_bays_active,
-        ext_bl=st.session_state.ext_bl,
-        ext_br=st.session_state.ext_br,
-        ext_tl=st.session_state.ext_tl,
-        ext_tr=st.session_state.ext_tr,
-        ext_height_mode=st.session_state.ext_height_mode,
-        ext_larm=st.session_state.ext_larm,
-        ext_subdiv=st.session_state.ext_subdiv,
-        ext_depth=st.session_state.ext_depth
+    model = get_cached_model(
+        st.session_state.larm, st.session_state.ljoist, st.session_state.nbay, st.session_state.nspan, 
+        st.session_state.harm, st.session_state.hlib, st.session_state.subdiv, st.session_state.roof_type, 
+        st.session_state.slope_pct, st.session_state.support_type, st.session_state.c_muerta, 
+        st.session_state.c_viva, st.session_state.c_granizo, st.session_state.v_barlovento, 
+        st.session_state.v_sotavento, st.session_state.v_laterales, st.session_state.v_succion, 
+        st.session_state.coef_sismico, st.session_state.ductilidad, st.session_state.cm_sismo, 
+        st.session_state.cv_sismo, st.session_state.add_wind_cols, st.session_state.max_wind_dist, 
+        st.session_state.wall_type, tuple(sec_trusses_j), st.session_state.get('resorte_val', '1,000,000').replace(',', ''), 
+        st.session_state.dif_lengths, st.session_state.larm_ext1, st.session_state.larm_ext2, 
+        st.session_state.subdiv_ext1, st.session_state.subdiv_ext2, st.session_state.ext_bays_active, 
+        st.session_state.ext_bl, st.session_state.ext_br, st.session_state.ext_tl, st.session_state.ext_tr, 
+        st.session_state.ext_height_mode, st.session_state.ext_larm, st.session_state.ext_subdiv, 
+        st.session_state.ext_depth
     )
 except Exception as e:
     st.error(f"Error generando la geometría: {e}")
