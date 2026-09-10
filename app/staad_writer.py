@@ -444,42 +444,60 @@ def write_staad(model, selected_profiles=None):
     cargas_text = CARGAS_TEMPLATE
             
     # Reemplazar Carga Muerta (LOAD 1)
+    def get_trib_x_sec(j_idx):
+        if j_idx == 0:
+            return (model.Larm_list[0] / model.subdiv_list[0]) / 2.0
+        elif j_idx == model.nSpan:
+            return (model.Larm_list[-1] / model.subdiv_list[-1]) / 2.0
+        else:
+            return (model.Larm_list[j_idx-1] / model.subdiv_list[j_idx-1] + model.Larm_list[j_idx] / model.subdiv_list[j_idx]) / 2.0
+
     cm_load_lines = [f"**** CM CUBIERTA: {model.c_muerta} KG/M2 *****\nMEMBER LOAD"]
     for j in range(model.nSpan):
         if model.groups[f'_LARGUEROS_{j}']:
             load_cm = (model.c_muerta * (model.Larm_list[j] / model.subdiv_list[j])) / 100.0
             cm_load_lines.append(f"_LARGUEROS_{j} UNI GY -{format_num(load_cm)}")
-    if model.groups.get('_CS_SEC'):
-        load_cm = (model.c_muerta * (model.Larm_list[0] / model.subdiv_list[0])) / 100.0
-        cm_load_lines.append(f"_CS_SEC UNI GY -{format_num(load_cm)}")
+    for j in range(model.nSpan + 1):
+        if f'_CS_SEC_{j}' in model.groups and model.groups[f'_CS_SEC_{j}']:
+            load_cm = (model.c_muerta * get_trib_x_sec(j)) / 100.0
+            rng = group_ranges(model.groups[f'_CS_SEC_{j}'])
+            if rng: cm_load_lines.append(f"{rng} UNI GY -{format_num(load_cm)}")
     cm_load_str = "\n".join(cm_load_lines)
+    
     cargas_text = cargas_text.replace(
         "**** CM CUBIERTA: 39.50 KG/M² *****",
         cm_load_str
     )
+    
     # Añadir Carga Viva (LOAD 5)
     cv_load_lines = [f"**** CV CUBIERTA: {model.c_viva} KG/M2 *****\nMEMBER LOAD"]
     for j in range(model.nSpan):
         if model.groups[f'_LARGUEROS_{j}']:
             load_cv = (model.c_viva * (model.Larm_list[j] / model.subdiv_list[j])) / 100.0
             cv_load_lines.append(f"_LARGUEROS_{j} UNI GY -{format_num(load_cv)}")
-    if model.groups.get('_CS_SEC'):
-        load_cv = (model.c_viva * (model.Larm_list[0] / model.subdiv_list[0])) / 100.0
-        cv_load_lines.append(f"_CS_SEC UNI GY -{format_num(load_cv)}")
+    for j in range(model.nSpan + 1):
+        if f'_CS_SEC_{j}' in model.groups and model.groups[f'_CS_SEC_{j}']:
+            load_cv = (model.c_viva * get_trib_x_sec(j)) / 100.0
+            rng = group_ranges(model.groups[f'_CS_SEC_{j}'])
+            if rng: cv_load_lines.append(f"{rng} UNI GY -{format_num(load_cv)}")
     cv_load_str = "\n".join(cv_load_lines)
+    
     cargas_text = cargas_text.replace(
         "**** CV CUBIERTA: 100 KG/M2 *****\nMEMBER LOAD",
         cv_load_str
     )
+    
     # Añadir Granizo (LOAD 15)
     granizo_load_lines = [f"**** CARGA DE GRANIZO: {model.c_granizo} KG/M2 *****\nMEMBER LOAD"]
     for j in range(model.nSpan):
         if model.groups[f'_LARGUEROS_{j}']:
             load_granizo = (model.c_granizo * (model.Larm_list[j] / model.subdiv_list[j])) / 100.0
             granizo_load_lines.append(f"_LARGUEROS_{j} UNI GY -{format_num(load_granizo)}")
-    if model.groups.get('_CS_SEC'):
-        load_granizo = (model.c_granizo * (model.Larm_list[0] / model.subdiv_list[0])) / 100.0
-        granizo_load_lines.append(f"_CS_SEC UNI GY -{format_num(load_granizo)}")
+    for j in range(model.nSpan + 1):
+        if f'_CS_SEC_{j}' in model.groups and model.groups[f'_CS_SEC_{j}']:
+            load_granizo = (model.c_granizo * get_trib_x_sec(j)) / 100.0
+            rng = group_ranges(model.groups[f'_CS_SEC_{j}'])
+            if rng: granizo_load_lines.append(f"{rng} UNI GY -{format_num(load_granizo)}")
     granizo_load_str = "\n".join(granizo_load_lines)
     cargas_text = cargas_text.replace(
         "**** CARGA DE GRANIZO: 60 KG/M2 *****",
@@ -718,11 +736,11 @@ def write_staad(model, selected_profiles=None):
             tokens = rng.split(" ") + [f"F{axis}", format_num(sign * load_val)]
             return build_lines(tokens, 72)
             
-        for j in range(model.nSpan + 1):
-            lines.append(joint_load(model.seismic_nodes[j]['corner'], model.seismic_loads[j]['corner']))
-            lines.append(joint_load(model.seismic_nodes[j]['edge_x'], model.seismic_loads[j]['edge_x']))
-            lines.append(joint_load(model.seismic_nodes[j]['edge_z'], model.seismic_loads[j]['edge_z']))
-            lines.append(joint_load(model.seismic_nodes[j]['interior'], model.seismic_loads[j]['interior']))
+        # Agrupar las cargas sísmicas utilizando los nuevos grupos calculados dinámicamente
+        if hasattr(model, 'seismic_load_groups'):
+            for load_val, nodes in model.seismic_load_groups.items():
+                if load_val > 0.0 and nodes:
+                    lines.append(joint_load(nodes, load_val))
         
         return "\n".join([x for x in lines if x])
         

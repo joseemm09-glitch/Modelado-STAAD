@@ -105,6 +105,8 @@ class StaadModel:
         self.col_trib_z = {}
         self.col_trib_x = {}
         self.node_seismic_loads = {}
+        self.node_seismic_areas = {}
+        self.seismic_load_groups = {}
         self.nodes = {}  # node_id: (x, y, z)
         self.members = {}  # member_id: (node1_id, node2_id)
         self.groups = {
@@ -129,6 +131,7 @@ class StaadModel:
         }
         for j in range(self.nSpan + 1):
             self.groups[f"_LARGUEROS_{j}"] = []
+            self.groups[f"_CS_SEC_{j}"] = []
         
         self.wind_cols = {
             'X0_CORNER': [], 'X0_INNER': [],
@@ -141,33 +144,8 @@ class StaadModel:
             'ZMAX_WINDCOL': []
         }
         
-        self.seismic_nodes = []
-        for _ in range(self.nSpan + 1):
-            self.seismic_nodes.append({
-                'corner': [],
-                'edge_x': [],
-                'edge_z': [],
-                'interior': []
-            })
-            
-        self.seismic_loads = []
-        for j in range(self.nSpan + 1):
-            if j == 0:
-                L_trib = self.Larm_list[0] / 2
-            elif j == self.nSpan:
-                L_trib = self.Larm_list[-1] / 2
-            else:
-                L_trib = (self.Larm_list[j-1] + self.Larm_list[j]) / 2
-            
-            carga_sismo_kg_m2 = (self.c_muerta + self.cv_sismo)
-            area_trib_esq = L_trib * (self.Ljoist_m / 2)
-            area_trib_int = L_trib * self.Ljoist_m
-            self.seismic_loads.append({
-                'corner': carga_sismo_kg_m2 * area_trib_esq * self.coef_sismico,
-                'edge_x': carga_sismo_kg_m2 * area_trib_esq * self.coef_sismico,
-                'edge_z': carga_sismo_kg_m2 * area_trib_int * self.coef_sismico,
-                'interior': carga_sismo_kg_m2 * area_trib_int * self.coef_sismico
-            })
+        # Inicialización de áreas tributarias dinámicas de sismo
+        pass
         
         self.rel_csci_start = []
         self.rel_csci_end = []
@@ -359,6 +337,7 @@ class StaadModel:
         for k in range(1, num_subdiv + 1):
             nid = sec_upper[k]
             mid = self.add_member(prev, nid, '_CS_SEC')
+            self.groups[f'_CS_SEC_{j_span}'].append(mid)
             if k == 1 and start_release:
                 self.rel_cs_sec_start.append(mid)
             if k == num_subdiv and end_release:
@@ -490,32 +469,17 @@ class StaadModel:
                             self.wind_cols['ZMAX_INNER'].extend([col1, col2])
                 
                 
-                # Clasificación para Sismo en nodos superiores (Nivel 3)
+                # Área tributaria para Sismo en nodos superiores (Nivel 3)
                 top_node = nL3[(i, j)]
-                is_x_edge = (j == 0 or j == self.nSpan)
-                is_z_edge = (i == 0 or i == self.nBay)
-                
-                if is_x_edge and is_z_edge:
-                    self.seismic_nodes[j]['corner'].append(top_node)
-                elif is_x_edge and not is_z_edge:
-                    self.seismic_nodes[j]['edge_z'].append(top_node) # Borde en X (j=0, j=nSpan), varía i (dirección Z) -> Su área tributaria se reduce en Z, oh wait.
-                    # Corrección: si estamos en el borde X (j=0 o j=nSpan), el ancho en X es Larm_m/2. 
-                    # Entonces corresponde a edge_z (donde usamos Larm_m/2 * Ljoist_m). 
-                    # El nombre edge_z aquí significa que el área tributaria se basa en el perímetro en Z. 
-                    # Vamos a llamarlo correctamente según la fórmula:
-                    # Si is_x_edge, estamos en j=0 o j=nSpan. Aquí el ancho tributario en X es ((self.Lx_list[j] / self.scale / 2)) = Larm_m/2. 
-                    # En Z es completo = Ljoist_m.
-                    # a_edge_z era (self.Larm_m / 2.0) * self.Ljoist_m. Esto coincide.
-                elif is_z_edge and not is_x_edge:
-                    self.seismic_nodes[j]['edge_x'].append(top_node) # Borde en Z (i=0, i=nBay).
+                trib_z_coord = self.Ljoist_m / 2.0 if (i == 0 or i == self.nBay) else self.Ljoist_m
+                if j == 0:
+                    trib_x_coord = self.Larm_list[0] / 2.0
+                elif j == self.nSpan:
+                    trib_x_coord = self.Larm_list[-1] / 2.0
                 else:
-                    self.seismic_nodes[j]['interior'].append(top_node)
-
-                trib_z_sismo = trib_z
-                a_node = trib_x * trib_z_sismo
-                w_total = self.cm_sismo + self.cv_sismo
-                seismic_load = math.ceil((a_node * w_total * self.seismic_v) * 10) / 10.0
-                self.node_seismic_loads[top_node] = seismic_load
+                    trib_x_coord = (self.Larm_list[j-1] + self.Larm_list[j]) / 2.0
+                
+                self.node_seismic_areas[top_node] = trib_x_coord * trib_z_coord
 
 
         # --- Cuerda Superior (Nivel 3) e intermedios ---
@@ -1175,6 +1139,20 @@ class StaadModel:
                 self.rel_larg_start.append(mem_id)
                 self.rel_larg_end.append(mem_id)
 
+        # Cálculo final de cargas sísmicas por nodo tras extensiones
+        w_total = self.cm_sismo + self.cv_sismo
+        self.node_seismic_loads = {}
+        for nid, area in self.node_seismic_areas.items():
+            load = math.ceil((area * w_total * self.seismic_v) * 10) / 10.0
+            self.node_seismic_loads[nid] = load
+
+        # Agrupar nodos por la misma carga sísmica
+        self.seismic_load_groups = {}
+        for nid, load in self.node_seismic_loads.items():
+            if load not in self.seismic_load_groups:
+                self.seismic_load_groups[load] = []
+            self.seismic_load_groups[load].append(nid)
+
         return self
         
     def _generate_extensions(self):
@@ -1229,6 +1207,18 @@ class StaadModel:
                         nid_ci = self.get_or_create_node(x_node, y_bot, z)
                     nodes_ci[k] = nid_ci
                     
+                # Asignar áreas tributarias a la extensión para Sismo
+                trib_z_coord = self.Ljoist_m / 2.0 if (i_val == 0 or i_val == self.nBay) else self.Ljoist_m
+                
+                main_node = nodes_cs[ext_subdiv]
+                if main_node in self.node_seismic_areas:
+                    self.node_seismic_areas[main_node] += (ext_larm / 2.0) * trib_z_coord
+                else:
+                    self.node_seismic_areas[main_node] = (ext_larm / 2.0) * trib_z_coord
+                    
+                outer_node = nodes_cs[0]
+                self.node_seismic_areas[outer_node] = (ext_larm / 2.0) * trib_z_coord
+
                 # Generar Truss (solo en pórticos interiores, ya que en Z perimetral el Tilt-Up soporta todo)
                 if not is_z_perimeter:
                     # Columnas (Soportando la armadura interior de la extensión)
