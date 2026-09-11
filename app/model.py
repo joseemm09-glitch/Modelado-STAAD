@@ -129,8 +129,57 @@ class StaadModel:
             '_MONTANTES_SEC': [],
             '_DIAG_SEC': []
         }
+        # Agrupación de largueros según su separación transversal (s = Larm / subdiv)
+        self.span_larguero_spacing = [
+            round(self.Larm_list[j] / self.subdiv_list[j], 4)
+            for j in range(self.nSpan)
+        ]
+        
+        unique_spacings = []
+        for s in self.span_larguero_spacing:
+            if s not in unique_spacings:
+                unique_spacings.append(s)
+                
+        if self.ext_bays_active:
+            s_ext = round((self.ext_larm / 100.0) / self.ext_subdiv, 4)
+            if s_ext not in unique_spacings:
+                unique_spacings.append(s_ext)
+                
+        self.largueros_group_info = {}
+        self.span_to_larguero_group = {}
+        
+        if len(unique_spacings) <= 1:
+            main_grp = '_LARGUEROS'
+            spacing_val = unique_spacings[0] if unique_spacings else round(self.Larm_m / self.numSubdiv, 4)
+            self.largueros_group_info[main_grp] = {
+                'spacing': spacing_val,
+                'spans': list(range(self.nSpan))
+            }
+            for j in range(self.nSpan + 1):
+                self.span_to_larguero_group[j] = main_grp
+            self.ext_larguero_group = main_grp
+        else:
+            spacing_to_grp = {}
+            for idx, s in enumerate(unique_spacings, 1):
+                grp_name = f"_LARGUEROS_{idx}"
+                spacing_to_grp[s] = grp_name
+                self.largueros_group_info[grp_name] = {
+                    'spacing': s,
+                    'spans': [j for j in range(self.nSpan) if self.span_larguero_spacing[j] == s]
+                }
+            for j in range(self.nSpan):
+                self.span_to_larguero_group[j] = spacing_to_grp[self.span_larguero_spacing[j]]
+            # Para el eje derecho extremo j = nSpan, asociar a la separación del último claro
+            self.span_to_larguero_group[self.nSpan] = spacing_to_grp[self.span_larguero_spacing[-1]]
+            if self.ext_bays_active:
+                s_ext = round((self.ext_larm / 100.0) / self.ext_subdiv, 4)
+                self.ext_larguero_group = spacing_to_grp[s_ext]
+            else:
+                self.ext_larguero_group = self.span_to_larguero_group[0]
+                
+        for grp in self.largueros_group_info.keys():
+            self.groups[grp] = []
         for j in range(self.nSpan + 1):
-            self.groups[f"_LARGUEROS_{j}"] = []
             self.groups[f"_CS_SEC_{j}"] = []
         
         self.wind_cols = {
@@ -174,6 +223,8 @@ class StaadModel:
         self.base_nodes = [] # Nodos en la base para asignar SUPPORTS FIXED
         self.wind_base_nodes = []
         self.plate_groups = {'X0': [], 'XMAX': [], 'Z0': [], 'ZMAX': []}
+        self.ext_corners = []
+        self.ext_outer_roof_nodes = {}
 
         self.node_id = 0
         self.mem_id = 0
@@ -469,18 +520,7 @@ class StaadModel:
                             self.wind_cols['ZMAX_INNER'].extend([col1, col2])
                 
                 
-                # Área tributaria para Sismo en nodos superiores (Nivel 3)
-                top_node = nL3[(i, j)]
-                trib_z_coord = self.Ljoist_m / 2.0 if (i == 0 or i == self.nBay) else self.Ljoist_m
-                if j == 0:
-                    trib_x_coord = self.Larm_list[0] / 2.0
-                elif j == self.nSpan:
-                    trib_x_coord = self.Larm_list[-1] / 2.0
-                else:
-                    trib_x_coord = (self.Larm_list[j-1] + self.Larm_list[j]) / 2.0
-                
-                self.node_seismic_areas[top_node] = trib_x_coord * trib_z_coord
-
+        self.nL3 = nL3
 
         # --- Cuerda Superior (Nivel 3) e intermedios ---
         for i in range(self.nBay + 1):
@@ -642,7 +682,10 @@ class StaadModel:
                                 
                                 self._add_sec_truss_segment(j, A[p], A[p+1], bot_start, bot_end, baseZ + p * segment_length, segment_length, start_rel, end_rel)
                             else:
-                                mem_id = self.add_member(A[p], A[p+1], f'_LARGUEROS_{j}')
+                                grp_name = self.span_to_larguero_group[j]
+                                mem_id = self.add_member(A[p], A[p+1], grp_name)
+                                if grp_name != '_LARGUEROS':
+                                    self.groups['_LARGUEROS'].append(mem_id)
                                 if p == 0:
                                     self.split_purlin_first.append(mem_id)
                                 elif p == N - 1:
@@ -657,7 +700,10 @@ class StaadModel:
                         self._add_sec_truss_segment(j, nL3[(i, j)], nL3[(i + 1, j)], nL2[(i, j)], nL2[(i + 1, j)], baseZ, self.Lz, start_rel, end_rel)
                     else:
                         # Standard larguero
-                        self.add_member(nL3[(i, j)], nL3[(i + 1, j)], f'_LARGUEROS_{j}')
+                        grp_name = self.span_to_larguero_group[j]
+                        mid_lg = self.add_member(nL3[(i, j)], nL3[(i + 1, j)], grp_name)
+                        if grp_name != '_LARGUEROS':
+                            self.groups['_LARGUEROS'].append(mid_lg)
             
             for j in range(self.nSpan):
                 for k in range(1, self.subdiv_list[j]):
@@ -665,6 +711,7 @@ class StaadModel:
                     is_penultimo = (j == self.nSpan - 1 and k == self.subdiv_list[j] - 1)
                     is_wind_strut = self.add_wind_cols and self.wind_col_N > 1 and (is_segundo or is_penultimo) and self.wall_type != "Tilt-Up"
                     for i in range(self.nBay):
+                        grp_name = self.span_to_larguero_group[j]
                         if is_wind_strut:
                             N = self.wind_col_N
                             L0_local = self.Lx_list[j] / self.subdiv_list[j]
@@ -679,12 +726,16 @@ class StaadModel:
                                 A[p] = self.get_or_create_node(x, y, z)
                                 
                             for p in range(N):
-                                mid = self.add_member(A[p], A[p+1], f'_LARGUEROS_{j}')
+                                mid = self.add_member(A[p], A[p+1], grp_name)
+                                if grp_name != '_LARGUEROS':
+                                    self.groups['_LARGUEROS'].append(mid)
                                 if not hasattr(self, 'wind_strut_members'):
                                     self.wind_strut_members = []
                                 self.wind_strut_members.append(mid)
                         else:
-                            self.add_member(upperSub[(i, j, k)], upperSub[(i + 1, j, k)], f'_LARGUEROS_{j}')
+                            mid_sub = self.add_member(upperSub[(i, j, k)], upperSub[(i + 1, j, k)], grp_name)
+                            if grp_name != '_LARGUEROS':
+                                self.groups['_LARGUEROS'].append(mid_sub)
 
         # --- Contravientos Horizontales (_CV) ---
         if self.nBay >= 1 and self.nSpan >= 1:
@@ -786,52 +837,6 @@ class StaadModel:
                             else:
                                 self.wind_cols['ZMAX_WINDCOL'].append(col_wind)
 
-        # Collect all nodes connected to a wind bracing or horizontal truss member
-        puntal_nodes = set()
-        for mem_id in self.groups.get('_CVH', []):
-            n1, n2 = self.members[mem_id]
-            puntal_nodes.add(n1)
-            puntal_nodes.add(n2)
-        for mem_id in self.horizontal_truss_members:
-            n1, n2 = self.members[mem_id]
-            puntal_nodes.add(n1)
-            puntal_nodes.add(n2)
-            
-        # Collect all joist members
-        all_joists = []
-        for j in range(self.nSpan + 1):
-            all_joists.extend(self.groups.get(f'_LARGUEROS_{j}', []))
-        for mem_id in self.groups.get('_LARGUEROS', []):
-            all_joists.append(mem_id)
-            
-        # Classify joists and set releases
-        for mem_id in all_joists:
-            n1, n2 = self.members[mem_id]
-            is_puntal = (n1 in puntal_nodes or n2 in puntal_nodes)
-            if hasattr(self, 'wind_strut_members') and mem_id in self.wind_strut_members:
-                is_puntal = True
-            
-            # Add to the correct group
-            if is_puntal:
-                self.groups['_JPUNTAL'].append(mem_id)
-            else:
-                self.groups['_JOISTGRAL'].append(mem_id)
-                
-            # Releases logic
-            if is_puntal:
-                # No release for JPUNTAL
-                pass
-            elif mem_id in self.split_purlin_first:
-                self.rel_larg_start.append(mem_id)
-            elif mem_id in self.split_purlin_last:
-                self.rel_larg_end.append(mem_id)
-            elif mem_id in self.split_purlin_middle:
-                # No release
-                pass
-            else:
-                self.rel_larg_start.append(mem_id)
-                self.rel_larg_end.append(mem_id)
-                
         # --- Generar Bahías de Extensión ---
         self._generate_extensions()
 
@@ -1105,11 +1110,11 @@ class StaadModel:
             puntal_nodes.add(n2)
             
         # Collect all joist members
-        all_joists = []
-        for j in range(self.nSpan + 1):
-            all_joists.extend(self.groups.get(f'_LARGUEROS_{j}', []))
-        for mem_id in self.groups.get('_LARGUEROS', []):
-            all_joists.append(mem_id)
+        all_joists = list(self.groups.get('_LARGUEROS', []))
+        for grp in self.largueros_group_info.keys():
+            for m in self.groups.get(grp, []):
+                if m not in all_joists:
+                    all_joists.append(m)
             
         # Classify joists and set releases
         for mem_id in all_joists:
@@ -1139,21 +1144,118 @@ class StaadModel:
                 self.rel_larg_start.append(mem_id)
                 self.rel_larg_end.append(mem_id)
 
-        # Cálculo final de cargas sísmicas por nodo tras extensiones
-        w_total = self.cm_sismo + self.cv_sismo
-        self.node_seismic_loads = {}
-        for nid, area in self.node_seismic_areas.items():
-            load = math.ceil((area * w_total * self.seismic_v) * 10) / 10.0
-            self.node_seismic_loads[nid] = load
-
-        # Agrupar nodos por la misma carga sísmica
-        self.seismic_load_groups = {}
-        for nid, load in self.node_seismic_loads.items():
-            if load not in self.seismic_load_groups:
-                self.seismic_load_groups[load] = []
-            self.seismic_load_groups[load].append(nid)
+        # Cálculo y estructuración final de cargas sísmicas nodales tras extensiones
+        self._compute_seismic_nodal_loads(nL3)
 
         return self
+        
+    def _compute_seismic_nodal_loads(self, nL3):
+        w_total = self.cm_sismo + self.cv_sismo
+        ext_w_m = (getattr(self, 'ext_larm', 1524.0) / 100.0) if getattr(self, 'ext_bays_active', False) else 0.0
+
+        # Grupos estructurados por categoría
+        grouped_data = {
+            'ESQUINAS': {},
+            'PERIMETRALES': {},
+            'CENTRALES': {}
+        }
+
+        self.node_seismic_areas = {}
+        node_categories = {}
+
+        # 1. Áreas tributarias del edificio principal
+        for j in range(self.nSpan + 1):
+            for i in range(self.nBay + 1):
+                top_node = nL3[(i, j)]
+                
+                # Clasificación de categoría base
+                is_z_edge = (i == 0 or i == self.nBay)
+                is_x_edge = (j == 0 or j == self.nSpan)
+                
+                if is_z_edge and is_x_edge:
+                    cat = 'ESQUINAS'
+                elif is_z_edge or is_x_edge:
+                    cat = 'PERIMETRALES'
+                else:
+                    cat = 'CENTRALES'
+
+                # Dimensión tributaria en Z
+                trib_z = (self.Ljoist_m / 2.0) if is_z_edge else self.Ljoist_m
+
+                # Dimensión tributaria en X
+                if j == 0:
+                    trib_x = self.Larm_list[0] / 2.0
+                elif j == self.nSpan:
+                    trib_x = self.Larm_list[-1] / 2.0
+                else:
+                    trib_x = (self.Larm_list[j-1] + self.Larm_list[j]) / 2.0
+
+                self.node_seismic_areas[top_node] = trib_x * trib_z
+                node_categories[top_node] = cat
+
+        # 2. Contribución de las bahías de extensión
+        if getattr(self, 'ext_bays_active', False) and ext_w_m > 0.0 and getattr(self, 'ext_corners', None):
+            trib_x_ext = ext_w_m / 2.0
+            
+            for corner_name, j_idx, i_range in self.ext_corners:
+                min_i = i_range[0]
+                max_i = i_range[-1]
+                
+                for i_val in i_range:
+                    # En Z, el borde de la bahía de extensión recibe media bahía; el interior recibe bahía completa
+                    is_edge_in_ext = (i_val == min_i or i_val == max_i)
+                    trib_z_ext = (self.Ljoist_m / 2.0) if is_edge_in_ext else self.Ljoist_m
+                    area_ext = trib_x_ext * trib_z_ext
+                    
+                    # (a) Aporte al nodo del pórtico principal (donde se apoya la extensión)
+                    main_node = nL3[(i_val, j_idx)]
+                    self.node_seismic_areas[main_node] = self.node_seismic_areas.get(main_node, 0.0) + area_ext
+                    
+                    # (b) Nodo exterior en el muro Tilt-Up (k = 0 de la extensión)
+                    outer_node = getattr(self, 'ext_outer_roof_nodes', {}).get((corner_name, i_val))
+                    if outer_node is not None:
+                        is_shared = outer_node in self.node_seismic_areas
+                        self.node_seismic_areas[outer_node] = self.node_seismic_areas.get(outer_node, 0.0) + area_ext
+                        if is_shared:
+                            node_categories[outer_node] = 'PERIMETRALES'
+                        else:
+                            node_categories[outer_node] = 'ESQUINAS' if is_edge_in_ext else 'PERIMETRALES'
+
+        # 3. Calcular cargas y clasificar en grupos
+        self.node_seismic_loads = {}
+        for nid, area_val in self.node_seismic_areas.items():
+            area = round(area_val, 4)
+            self.node_seismic_areas[nid] = area
+            load = round(area * w_total * self.seismic_v, 1)
+            self.node_seismic_loads[nid] = load
+            cat = node_categories.get(nid, 'PERIMETRALES')
+
+            key = (round(area, 2), load)
+            if key not in grouped_data[cat]:
+                grouped_data[cat][key] = {
+                    'category': cat,
+                    'area': area,
+                    'load': load,
+                    'nodes': []
+                }
+            if nid not in grouped_data[cat][key]['nodes']:
+                grouped_data[cat][key]['nodes'].append(nid)
+
+        # Crear lista ordenada: ESQUINAS -> PERIMETRALES -> CENTRALES
+        self.seismic_nodal_groups = []
+        for cat in ['ESQUINAS', 'PERIMETRALES', 'CENTRALES']:
+            for key in sorted(grouped_data[cat].keys(), key=lambda k: k[1]):
+                grp = grouped_data[cat][key]
+                grp['nodes'] = sorted(grp['nodes'])
+                self.seismic_nodal_groups.append(grp)
+
+        # Mapeo retrocompatible
+        self.seismic_load_groups = {}
+        for grp in self.seismic_nodal_groups:
+            load = grp['load']
+            if load not in self.seismic_load_groups:
+                self.seismic_load_groups[load] = []
+            self.seismic_load_groups[load].extend(grp['nodes'])
         
     def _generate_extensions(self):
         if not getattr(self, 'ext_bays_active', False) or self.wall_type != "Tilt-Up":
@@ -1168,6 +1270,8 @@ class StaadModel:
         if getattr(self, 'ext_tl', False): corners.append(('tl', 0, range(self.nBay - ext_depth, self.nBay + 1)))
         if getattr(self, 'ext_br', False): corners.append(('br', self.nSpan, range(0, ext_depth + 1)))
         if getattr(self, 'ext_tr', False): corners.append(('tr', self.nSpan, range(self.nBay - ext_depth, self.nBay + 1)))
+        self.ext_corners = corners
+        self.ext_outer_roof_nodes = {}
 
         L0_ext = ext_larm / ext_subdiv
         
@@ -1196,6 +1300,8 @@ class StaadModel:
                     nodes_cs[k] = nid_cs
                     ext_nodes_cs[(i_val, k)] = nid_cs
                     
+                self.ext_outer_roof_nodes[(corner_name, i_val)] = nodes_cs[0]
+                    
                 # Cuerda Inferior (Solo en K impares + extremos)
                 for k in [0] + list(range(1, ext_subdiv, 2)) + [ext_subdiv]:
                     x_node = ext_x + k * L0_ext if is_left else ext_x - k * L0_ext
@@ -1206,18 +1312,6 @@ class StaadModel:
                     else:
                         nid_ci = self.get_or_create_node(x_node, y_bot, z)
                     nodes_ci[k] = nid_ci
-                    
-                # Asignar áreas tributarias a la extensión para Sismo
-                trib_z_coord = self.Ljoist_m / 2.0 if (i_val == 0 or i_val == self.nBay) else self.Ljoist_m
-                
-                main_node = nodes_cs[ext_subdiv]
-                if main_node in self.node_seismic_areas:
-                    self.node_seismic_areas[main_node] += (ext_larm / 2.0) * trib_z_coord
-                else:
-                    self.node_seismic_areas[main_node] = (ext_larm / 2.0) * trib_z_coord
-                    
-                outer_node = nodes_cs[0]
-                self.node_seismic_areas[outer_node] = (ext_larm / 2.0) * trib_z_coord
 
                 # Generar Truss (solo en pórticos interiores, ya que en Z perimetral el Tilt-Up soporta todo)
                 if not is_z_perimeter:
@@ -1280,8 +1374,10 @@ class StaadModel:
                 for k in range(ext_subdiv):
                     nid_start = ext_nodes_cs[(i_val1, k)]
                     nid_end = ext_nodes_cs[(i_val2, k)]
-                    j_target = 0 if is_left else self.nSpan - 1
-                    mem = self.add_member(nid_start, nid_end, f'_LARGUEROS_{j_target}')
+                    grp_name = self.ext_larguero_group
+                    mem = self.add_member(nid_start, nid_end, grp_name)
+                    if grp_name != '_LARGUEROS':
+                        self.groups['_LARGUEROS'].append(mem)
                 
                 # Contravientos
                 for c in range(len(k_points) - 1):

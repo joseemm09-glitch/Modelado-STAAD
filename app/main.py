@@ -1197,7 +1197,7 @@ if st.session_state.current_panel == "Diseño":
                         export_path = st.session_state.get("export_path", ".")
                         import os
                         full_path = os.path.join(export_path, clean_name)
-                        with open(full_path, "w", encoding="utf-8") as f:
+                        with open(full_path, "w", encoding="windows-1252", errors="replace") as f:
                             f.write(staad_text)
                             
                     st.rerun()
@@ -1271,7 +1271,7 @@ if st.session_state.current_panel == "Diseño":
                                     export_path = st.session_state.get("export_path", ".")
                                     import os
                                     full_path = os.path.join(export_path, clean_name)
-                                    with open(full_path, "w", encoding="utf-8") as f:
+                                    with open(full_path, "w", encoding="windows-1252", errors="replace") as f:
                                         f.write(staad_text)
                                         
                                 st.rerun()
@@ -1446,7 +1446,7 @@ else:
                     clean_name += ".std"
 
                 import base64 as _b64
-                staad_b64 = _b64.b64encode(staad_text.encode("utf-8")).decode("utf-8")
+                staad_b64 = _b64.b64encode(staad_text.encode("windows-1252", errors="replace")).decode("ascii")
 
                 web_ui = f"""
                 <style>
@@ -1552,7 +1552,7 @@ else:
                     
                     full_path = os.path.join(st.session_state.export_path, clean_name)
                     try:
-                        with open(full_path, "w", encoding="utf-8") as f:
+                        with open(full_path, "w", encoding="windows-1252", errors="replace") as f:
                             f.write(staad_text)
                         st.success(f"Guardado exitosamente en:\n{full_path}")
                     

@@ -1,56 +1,56 @@
 ****************************CASOS DE CARGA***********************************
 *****************************************************************************
 LOAD 1 LOADTYPE None  TITLE CARGA MUERTA (CM)
-**** CM CUBIERTA: 39.50 KG/M² *****
+**** CM CUBIERTA: 39.50 Kg/m² *****
 *******************************************************************************
 LOAD 2 LOADTYPE None  TITLE CARGA MUERTA PROPIA (CMP)
 REPEAT LOAD
 1 0.6 
 *******************************************************************************
 LOAD 3 LOADTYPE None  TITLE CARGA VIVA (CV)
-**** CV ENTREPISO: 200 KG/M2 *****
+**** CV ENTREPISO: 200 Kg/m² *****
 *******************************************************************************
 LOAD 4 LOADTYPE None  TITLE CARGA VIVA (CVR)
 *******************************************************************************
 LOAD 5 LOADTYPE None  TITLE CARGA VIVA DE TECHO (CVT)
-**** CV CUBIERTA: 100 KG/M2 *****
+**** CV CUBIERTA: 100 Kg/m² *****
 MEMBER LOAD
 *******************************************************************************
-LOAD 6 LOADTYPE None  TITLE CARGA VIVA REDUDUCIDA DE TECHO (CVRT)
+LOAD 6 LOADTYPE None  TITLE CARGA VIVA REDUCIDA DE TECHO (CVRT)
 REPEAT LOAD
 5 0.7 
 *******************************************************************************
 LOAD 7 LOADTYPE None  TITLE VIENTO X+
 MEMBER LOAD
-******BARLOVENTO: 86 KG/M2******
-******SOTAVENTO: 50 KG/M2******
-******LATERALES 1: 78 KG/M2******
-******LATERALES 2: 78 KG/M2******
-**** SUCCIÓN : 95 KG/M2 *****
+******BARLOVENTO: 86 Kg/m²******
+******SOTAVENTO: 50 Kg/m²******
+******LATERALES 1: 78 Kg/m²******
+******LATERALES 2: 78 Kg/m²******
+**** SUCCIÓN: 95 Kg/m² *****
 *******************************************************************************
 LOAD 8 LOADTYPE None  TITLE VIENTO X-
 MEMBER LOAD
-******BARLOVENTO: 86 KG/M2******
-******SOTAVENTO: 50 KG/M2******
-******LATERALES 1: 78 KG/M2******
-******LATERALES 2: 78 KG/M2******
-**** SUCCIÓN : 95 KG/M2 *****
+******BARLOVENTO: 86 Kg/m²******
+******SOTAVENTO: 50 Kg/m²******
+******LATERALES 1: 78 Kg/m²******
+******LATERALES 2: 78 Kg/m²******
+**** SUCCIÓN: 95 Kg/m² *****
 *******************************************************************************
 LOAD 9 LOADTYPE None  TITLE VIENTO Z+
 MEMBER LOAD
-******BARLOVENTO: 86 KG/M2******
-******SOTAVENTO: 50 KG/M2******
-******LATERALES 1: 78 KG/M2******
-******LATERALES 2: 78 KG/M2******
-**** SUCCIÓN : 95 KG/M2 *****
+******BARLOVENTO: 86 Kg/m²******
+******SOTAVENTO: 50 Kg/m²******
+******LATERALES 1: 78 Kg/m²******
+******LATERALES 2: 78 Kg/m²******
+**** SUCCIÓN: 95 Kg/m² *****
 *******************************************************************************
 LOAD 10 LOADTYPE None  TITLE VIENTO Z-
 MEMBER LOAD
-******BARLOVENTO: 86 KG/M2******
-******SOTAVENTO: 50 KG/M2******
-******LATERALES 1: 78 KG/M2******
-******LATERALES 2: 78 KG/M2******
-**** SUCCIÓN : 95 KG/M2 *****
+******BARLOVENTO: 86 Kg/m²******
+******SOTAVENTO: 50 Kg/m²******
+******LATERALES 1: 78 Kg/m²******
+******LATERALES 2: 78 Kg/m²******
+**** SUCCIÓN: 95 Kg/m² *****
 *******************************************************************************
 LOAD 11 LOADTYPE None  TITLE SISMO X+
 *******************************************************************************
@@ -63,8 +63,8 @@ LOAD 13 LOADTYPE None  TITLE SISMO Z+
 *******************************************************************************
 LOAD 14 LOADTYPE None  TITLE SISMO Z-
 *******************************************************************************
-LOAD 15 LOADTYPE None  TITLE CARGA DE GRANIZO(N)
-**** CARGA DE GRANIZO: 60 KG/M2 *****
+LOAD 15 LOADTYPE None  TITLE CARGA DE GRANIZO (N)
+**** CARGA DE GRANIZO: 60 Kg/m² *****
 *******************************************************************************
 LOAD 16 LOADTYPE None  TITLE MASA DE SISMO
 REPEAT LOAD
@@ -73,7 +73,7 @@ REPEAT LOAD
 **************************************COMBINACIONES DE CARGAS****************************
 *****************************************************************************************
 *****COMBINACIONES REGLAMENTO DE CHIHUAHUA*****
-*****COMBINACIONES PARA CARGAS GRAVITACINALES*****
+*****COMBINACIONES PARA CARGAS GRAVITACIONALES*****
 LOAD COMB 17 CM
 1 1.0 
 ************************************************************************************
@@ -191,7 +191,7 @@ LOAD COMB 53 0.60CM+0.70SZ+
 LOAD COMB 54 0.60CM+0.70SZ-
 1 0.6 14 0.7 
 *
-**********************************CARGAS ULTIMAS*********************************
+**********************************CARGAS ÚLTIMAS*********************************
 *LOAD COMB 55 1.4CM
 *1 1.4
 **
@@ -296,7 +296,7 @@ LOAD COMB 54 0.60CM+0.70SZ-
 *1 0.9 14 1.0
 **
 *************************************************************************
-*********************PRIMER ANALYIS Y DISEÑO*****************************
+*********************PRIMER ANÁLISIS Y DISEÑO*****************************
 *************************************************************************
 PERFORM ANALYSIS
 LOAD LIST 17 TO 54

@@ -34,8 +34,11 @@ def plot_model(model, show_supports=False, highlight_ids=None, highlight_colors=
     fig = go.Figure()
 
     # Create a mapping from member to its group
+    skip_groups = {'_JOISTGRAL', '_JPUNTAL', '_CELOSIA', '_ARMADURA_CENTRAL', '_ARMADURA_PERIM', '_CELOSIA_SEC', '_ARMADURA_SEC'}
     member_to_group = {}
     for grp_name, mem_list in model.groups.items():
+        if grp_name in skip_groups:
+            continue
         for m in mem_list:
             member_to_group[m] = grp_name
 
@@ -99,25 +102,53 @@ def plot_model(model, show_supports=False, highlight_ids=None, highlight_colors=
                     opacity=0.45 if grp_name == 'faded' else 1.0
                 ))
     else:
-        largueros_added = False
+        categories_map = {
+            '_CS': 'CS Armaduras',
+            '_CS_PERIM': 'CS Armaduras',
+            '_CS_SEC': 'CS Armaduras',
+            '_CI': 'CI Armaduras',
+            '_CI_PERIM': 'CI Armaduras',
+            '_CI_SEC': 'CI Armaduras',
+            '_MONTANTES': 'Montantes',
+            '_MONTANTES_PERIM': 'Montantes',
+            '_MONTANTES_SEC': 'Montantes',
+            '_DIAG': 'Diagonales',
+            '_DIAG_PERIM': 'Diagonales',
+            '_DIAG_SEC': 'Diagonales',
+        }
+        
+        shown_legend_categories = set()
+        
         for grp in group_order:
             data = lines_by_group[grp]
             if data['x']:
                 lw = 3 if (grp.startswith('_LARGUEROS') or grp in ['_JOISTGRAL', '_JPUNTAL']) else 4
-                hidden_legend_groups = ['_CS', '_CI', '_CS_PERIM', '_CI_PERIM', '_MONTANTES', '_DIAG', '_MONTANTES_PERIM', '_DIAG_PERIM', '_CS_SEC', '_CI_SEC', '_MONTANTES_SEC', '_DIAG_SEC']
                 
                 is_larguero = grp.startswith('_LARGUEROS')
-                show_leg = (grp not in hidden_legend_groups)
-                trace_name = grp
-                leg_group = None
+                cat = categories_map.get(grp)
                 
                 if is_larguero:
                     trace_name = '_LARGUEROS'
                     leg_group = '_LARGUEROS'
-                    if largueros_added:
+                    if '_LARGUEROS' in shown_legend_categories:
                         show_leg = False
                     else:
-                        largueros_added = True
+                        shown_legend_categories.add('_LARGUEROS')
+                        show_leg = True
+                elif cat:
+                    trace_name = cat
+                    leg_group = cat
+                    if cat in shown_legend_categories:
+                        show_leg = False
+                    else:
+                        shown_legend_categories.add(cat)
+                        show_leg = True
+                else:
+                    trace_name = grp
+                    leg_group = grp
+                    if grp in ['_JOISTGRAL', '_JPUNTAL']:
+                        show_leg = False
+                    else:
                         show_leg = True
                         
                 fig.add_trace(go.Scatter3d(
@@ -371,13 +402,17 @@ def plot_model(model, show_supports=False, highlight_ids=None, highlight_colors=
             )
         ],
         legend=dict(
-            bgcolor='rgba(255, 255, 255, 0.65)',
+            bgcolor='rgba(255, 255, 255, 0.75)',
             bordercolor='rgba(255, 255, 255, 0.9)',
             borderwidth=1,
             yanchor="top",
             y=0.95,
             xanchor="right",
-            x=0.95
+            x=0.95,
+            tracegroupgap=0,
+            itemsizing='constant',
+            font=dict(size=11),
+            valign='middle'
         ),
         height=700
     )
