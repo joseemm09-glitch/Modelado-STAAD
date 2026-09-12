@@ -224,8 +224,9 @@ class StaadModel:
         
         total_length_m = self.nBay * self.Ljoist_m
         self.has_marco_doble = (self.junta_constructiva_tipo == "Marco doble") and (total_length_m > self.junta_max_dist_m)
+        self.has_junta_cubierta = (self.junta_constructiva_tipo == "En Cubierta") and (total_length_m > self.junta_max_dist_m)
         self.joint_axes = []
-        if self.has_marco_doble and self.nBay >= 2:
+        if (self.has_marco_doble or self.has_junta_cubierta) and self.nBay >= 2:
             num_segments = math.ceil((total_length_m - 0.05) / self.junta_max_dist_m)
             num_joints = num_segments - 1
             for k in range(1, num_joints + 1):
@@ -235,11 +236,24 @@ class StaadModel:
                     self.joint_axes.append(target_i)
             self.joint_axes.sort()
 
+        self.roof_joint_bays = {} # bay_idx -> 'START' or 'END' (extremo que conecta al marco divisor)
+        if self.has_junta_cubierta:
+            for j_ax in self.joint_axes:
+                if j_ax <= self.nBay / 2.0:
+                    self.roof_joint_bays[j_ax] = 'START'
+                else:
+                    self.roof_joint_bays[j_ax - 1] = 'END'
+
+        self.rel_roof_joint_start = []
+        self.rel_roof_joint_end = []
+        self.roof_joint_purlins_start = set()
+        self.roof_joint_purlins_end = set()
+
         # Construir marcos a lo largo de Z
         self.frames = []
         f_idx = 0
         for i in range(self.nBay + 1):
-            if i in self.joint_axes:
+            if self.has_marco_doble and i in self.joint_axes:
                 zA = i * self.Lz - 10.0
                 self.frames.append({
                     'idx': f_idx,
@@ -416,7 +430,7 @@ class StaadModel:
 
         return self.add_node(x, y, z)
         
-    def _add_sec_truss_segment(self, j_span, top_start, top_end, bot_start, bot_end, base_z, L_segment, start_release, end_release):
+    def _add_sec_truss_segment(self, j_span, top_start, top_end, bot_start, bot_end, base_z, L_segment, start_release, end_release, roof_joint_rel=None):
         min_n = L_segment / (1.60 * self.scale)
         n = math.ceil(min_n)
         if n % 2 != 0: n += 1
@@ -446,10 +460,16 @@ class StaadModel:
             nid = sec_upper[k]
             mid = self.add_member(prev, nid, '_CS_SEC')
             self.groups[f'_CS_SEC_{j_span}'].append(mid)
-            if k == 1 and start_release:
-                self.rel_cs_sec_start.append(mid)
-            if k == num_subdiv and end_release:
-                self.rel_cs_sec_end.append(mid)
+            if k == 1:
+                if roof_joint_rel == 'START':
+                    self.rel_roof_joint_start.append(mid)
+                elif start_release:
+                    self.rel_cs_sec_start.append(mid)
+            if k == num_subdiv:
+                if roof_joint_rel == 'END':
+                    self.rel_roof_joint_end.append(mid)
+                elif end_release:
+                    self.rel_cs_sec_end.append(mid)
             prev = nid
             
         # _CI_SEC
@@ -457,11 +477,16 @@ class StaadModel:
         for t in range(1, halfSub + 1):
             nid = sec_lower[t]
             mid = self.add_member(leftN, nid, '_CI_SEC')
-            if t == 1 and start_release:
-                self.rel_ci_sec_start.append(mid)
+            if t == 1:
+                if roof_joint_rel == 'START':
+                    self.rel_roof_joint_start.append(mid)
+                elif start_release:
+                    self.rel_ci_sec_start.append(mid)
             leftN = nid
         mid2 = self.add_member(leftN, bot_end, '_CI_SEC')
-        if end_release:
+        if roof_joint_rel == 'END':
+            self.rel_roof_joint_end.append(mid2)
+        elif end_release:
             self.rel_ci_sec_end.append(mid2)
             
         # _MONTANTES_SEC
@@ -767,7 +792,13 @@ class StaadModel:
                                 bot_end = nL2[(i+1, j)] if p == N - 1 else self.get_or_create_node(xn, yn_bot, baseZ + (p + 1) * segment_length)
                                 start_rel = True
                                 end_rel = True
-                                self._add_sec_truss_segment(j, A[p], A[p+1], bot_start, bot_end, baseZ + p * segment_length, segment_length, start_rel, end_rel)
+                                rj_rel = None
+                                if self.has_junta_cubierta and i in self.roof_joint_bays:
+                                    if self.roof_joint_bays[i] == 'START' and p == 0:
+                                        rj_rel = 'START'
+                                    elif self.roof_joint_bays[i] == 'END' and p == N - 1:
+                                        rj_rel = 'END'
+                                self._add_sec_truss_segment(j, A[p], A[p+1], bot_start, bot_end, baseZ + p * segment_length, segment_length, start_rel, end_rel, rj_rel)
                             else:
                                 grp_name = self.span_to_larguero_group[j]
                                 mem_id = self.add_member(A[p], A[p+1], grp_name)
@@ -775,20 +806,30 @@ class StaadModel:
                                     self.groups['_LARGUEROS'].append(mem_id)
                                 if p == 0:
                                     self.split_purlin_first.append(mem_id)
+                                    if self.has_junta_cubierta and self.roof_joint_bays.get(i) == 'START':
+                                        self.roof_joint_purlins_start.add(mem_id)
                                 elif p == N - 1:
                                     self.split_purlin_last.append(mem_id)
+                                    if self.has_junta_cubierta and self.roof_joint_bays.get(i) == 'END':
+                                        self.roof_joint_purlins_end.add(mem_id)
                                 else:
                                     self.split_purlin_middle.append(mem_id)
                     elif has_sec_truss:
                         baseZ = frame_curr['z']
                         start_rel = True
                         end_rel = True
-                        self._add_sec_truss_segment(j, nL3[(i, j)], nL3[(i + 1, j)], nL2[(i, j)], nL2[(i + 1, j)], baseZ, Lz_bay, start_rel, end_rel)
+                        rj_rel = self.roof_joint_bays.get(i, None) if self.has_junta_cubierta else None
+                        self._add_sec_truss_segment(j, nL3[(i, j)], nL3[(i + 1, j)], nL2[(i, j)], nL2[(i + 1, j)], baseZ, Lz_bay, start_rel, end_rel, rj_rel)
                     else:
                         grp_name = self.span_to_larguero_group[j]
                         mid_lg = self.add_member(nL3[(i, j)], nL3[(i + 1, j)], grp_name)
                         if grp_name != '_LARGUEROS':
                             self.groups['_LARGUEROS'].append(mid_lg)
+                        if self.has_junta_cubierta and i in self.roof_joint_bays:
+                            if self.roof_joint_bays[i] == 'START':
+                                self.roof_joint_purlins_start.add(mid_lg)
+                            elif self.roof_joint_bays[i] == 'END':
+                                self.roof_joint_purlins_end.add(mid_lg)
             
             for j in range(self.nSpan):
                 for k in range(1, self.subdiv_list[j]):
@@ -822,10 +863,20 @@ class StaadModel:
                                 if not hasattr(self, 'wind_strut_members'):
                                     self.wind_strut_members = []
                                 self.wind_strut_members.append(mid)
+                                if self.has_junta_cubierta and i in self.roof_joint_bays:
+                                    if self.roof_joint_bays[i] == 'START' and p == 0:
+                                        self.roof_joint_purlins_start.add(mid)
+                                    elif self.roof_joint_bays[i] == 'END' and p == N - 1:
+                                        self.roof_joint_purlins_end.add(mid)
                         else:
                             mid_sub = self.add_member(upperSub[(i, j, k)], upperSub[(i + 1, j, k)], grp_name)
                             if grp_name != '_LARGUEROS':
                                 self.groups['_LARGUEROS'].append(mid_sub)
+                            if self.has_junta_cubierta and i in self.roof_joint_bays:
+                                if self.roof_joint_bays[i] == 'START':
+                                    self.roof_joint_purlins_start.add(mid_sub)
+                                elif self.roof_joint_bays[i] == 'END':
+                                    self.roof_joint_purlins_end.add(mid_sub)
 
         # --- Contravientos Horizontales (_CV) ---
         if self.num_frames > 1 and self.nSpan >= 1:
@@ -833,6 +884,9 @@ class StaadModel:
                 frame_curr = self.frames[i]
                 frame_next = self.frames[i + 1]
                 if not frame_curr['connect_to_next']:
+                    continue
+                # En Junta en Cubierta, eliminar contravientos en la franja más cercana al centro
+                if self.has_junta_cubierta and i in self.roof_joint_bays:
                     continue
                 for j in range(self.nSpan):
                     is_perimeter = (i == 0) or (i == self.num_frames - 2) or (j == 0) or (j == self.nSpan - 1)
@@ -1228,7 +1282,18 @@ class StaadModel:
                 self.groups.setdefault('_JOISTGRAL', []).append(mem_id)
                 
             # Releases logic
-            if is_puntal:
+            is_rj_start = (mem_id in self.roof_joint_purlins_start)
+            is_rj_end = (mem_id in self.roof_joint_purlins_end)
+
+            if is_rj_start:
+                self.rel_roof_joint_start.append(mem_id)
+                if mem_id not in self.split_purlin_first:
+                    self.rel_larg_end.append(mem_id)
+            elif is_rj_end:
+                self.rel_roof_joint_end.append(mem_id)
+                if mem_id not in self.split_purlin_last:
+                    self.rel_larg_start.append(mem_id)
+            elif is_puntal:
                 # No release for JPUNTAL
                 pass
             elif mem_id in self.split_purlin_first:

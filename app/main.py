@@ -1617,8 +1617,11 @@ else:
             wind_cols_line = f"&emsp;<span style='font-weight:700; color:#1e293b;'>• Columnas (Viento):</span> <span style='font-weight:700; color:#1e3a8a;'>{num_wind_cols}</span><br>" if num_wind_cols > 0 else ""
             sec_trusses_line = f"&emsp;<span style='font-weight:700; color:#1e293b;'>• Armaduras (Secundarias):</span> <span style='font-weight:700; color:#1e3a8a;'>{num_sec_trusses_total}</span><br>" if num_sec_trusses_total > 0 else ""
             
-            num_md_juntas = len(getattr(model, 'joint_axes', []))
+            num_md_juntas = len(getattr(model, 'joint_axes', [])) if getattr(model, 'has_marco_doble', False) else 0
             md_line = f"<span style='font-weight:700; color:#1e293b;'>• Marcos Dobles:</span> <span style='font-weight:700; color:#1e3a8a;'>{num_md_juntas}</span><br>" if num_md_juntas > 0 else ""
+
+            num_jc_juntas = len(getattr(model, 'joint_axes', [])) if getattr(model, 'has_junta_cubierta', False) else 0
+            jc_line = f"<span style='font-weight:700; color:#1e293b;'>• Juntas en Cubierta:</span> <span style='font-weight:700; color:#1e3a8a;'>{num_jc_juntas}</span><br>" if num_jc_juntas > 0 else ""
 
             total_armaduras = model.nSpan * getattr(model, 'num_frames', model.nBay + 1)
             if getattr(model, 'ext_bays_active', False):
@@ -1635,7 +1638,7 @@ else:
             <div style="font-family: 'Aptos Display', 'Segoe UI', sans-serif; font-size: 1rem; font-weight: 700; color: #1e293b; margin-bottom: 0px; margin-top: -5px;">Elementos</div>
             <hr style="border: 0; border-top: 1px solid #e2e8f0; margin-top: 0px; margin-bottom: 0px;">
             <div style="font-family: 'Aptos Display', 'Segoe UI', sans-serif; line-height: 1.8; color: #334155; font-size: 13px; padding-bottom: 15px; padding-left: 15px;">
-                {md_line}<span style='font-weight:700; color:#1e293b;'>• Columnas Principales:</span> <span style='font-weight:700; color:#1e3a8a;'>{len(model.groups.get('_COL', [])) // 2}</span><br>
+                {md_line}{jc_line}<span style='font-weight:700; color:#1e293b;'>• Columnas Principales:</span> <span style='font-weight:700; color:#1e3a8a;'>{len(model.groups.get('_COL', [])) // 2}</span><br>
                 {wind_cols_line}<span style='font-weight:700; color:#1e293b;'>• Armaduras:</span> <span style='font-weight:700; color:#1e3a8a;'>{total_armaduras}</span><br>
                 {sec_trusses_line}<span style='font-weight:700; color:#1e293b;'>• Contravientos:</span> <span style='font-weight:700; color:#1e3a8a;'>{len(model.groups.get('_CVH', []))}</span><br>
                 <span style='font-weight:700; color:#1e293b;'>• Largueros:</span> <span style='font-weight:700; color:#1e3a8a;'>{num_purlins}</span>

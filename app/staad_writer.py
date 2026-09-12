@@ -201,8 +201,10 @@ def write_staad(model, selected_profiles=None):
         '_REL_CSCI_END': model.rel_csci_end,
         '_REL_HORIZ_START': model.rel_horiz_start,
         '_REL_HORIZ_END': model.rel_horiz_end,
-        '_REL_LARG_START': model.rel_larg_start,
-        '_REL_LARG_END': model.rel_larg_end,
+        '_REL_LARG_START': [m for m in model.rel_larg_start if m not in set(getattr(model, 'rel_roof_joint_start', []))],
+        '_REL_LARG_END': [m for m in model.rel_larg_end if m not in set(getattr(model, 'rel_roof_joint_end', []))],
+        '_REL_ROOF_JOINT_START': getattr(model, 'rel_roof_joint_start', []),
+        '_REL_ROOF_JOINT_END': getattr(model, 'rel_roof_joint_end', []),
         '_REL_TILTUP_START': getattr(model, 'rel_tiltup_start', []),
         '_REL_TILTUP_END': getattr(model, 'rel_tiltup_end', []),
         '_REL_END_FX': model.release_end_fx,
@@ -211,8 +213,8 @@ def write_staad(model, selected_profiles=None):
         '_CI_SEC': model.groups.get('_CI_SEC', []),
         '_MONTANTES_SEC': model.groups.get('_MONTANTES_SEC', []),
         '_DIAG_SEC': model.groups.get('_DIAG_SEC', []),
-        '_REL_SEC_START': sorted(list(set(model.rel_cs_sec_start + model.rel_ci_sec_start))),
-        '_REL_SEC_END': sorted(list(set(model.rel_cs_sec_end + model.rel_ci_sec_end))),
+        '_REL_SEC_START': sorted(list(set([m for m in (model.rel_cs_sec_start + model.rel_ci_sec_start) if m not in set(getattr(model, 'rel_roof_joint_start', []))]))),
+        '_REL_SEC_END': sorted(list(set([m for m in (model.rel_cs_sec_end + model.rel_ci_sec_end) if m not in set(getattr(model, 'rel_roof_joint_end', []))]))),
         '_CELOSIA_SEC': sorted(list(set(
             model.groups.get('_MONTANTES_SEC', []) + 
             model.groups.get('_DIAG_SEC', [])
@@ -391,12 +393,15 @@ def write_staad(model, selected_profiles=None):
     
     # ------------------
     # Specifications
-    # ------------------
+    rel_roof_start = set(getattr(model, 'rel_roof_joint_start', []))
+    rel_roof_end = set(getattr(model, 'rel_roof_joint_end', []))
+
     if (model.rel_csci_start or model.rel_csci_end or 
         model.rel_cs_sec_start or model.rel_cs_sec_end or
         model.rel_ci_sec_start or model.rel_ci_sec_end or
         model.rel_horiz_start or model.rel_horiz_end or 
         model.rel_larg_start or model.rel_larg_end or 
+        rel_roof_start or rel_roof_end or
         getattr(model, 'rel_tiltup_start', []) or getattr(model, 'rel_tiltup_end', []) or
         model.release_end_fx):
         out.append("MEMBER RELEASE")
@@ -404,18 +409,22 @@ def write_staad(model, selected_profiles=None):
             out.append("_REL_CSCI_START START MY MZ")
         if model.rel_csci_end:
             out.append("_REL_CSCI_END END MY MZ")
-        if model.rel_cs_sec_start or model.rel_ci_sec_start:
+        if any(m not in rel_roof_start for m in (model.rel_cs_sec_start + model.rel_ci_sec_start)):
             out.append("_REL_SEC_START START MY MZ")
-        if model.rel_cs_sec_end or model.rel_ci_sec_end:
+        if any(m not in rel_roof_end for m in (model.rel_cs_sec_end + model.rel_ci_sec_end)):
             out.append("_REL_SEC_END END MY MZ")
         if model.rel_horiz_start:
             out.append("_REL_HORIZ_START START MY MZ")
         if model.rel_horiz_end:
             out.append("_REL_HORIZ_END END MY MZ")
-        if model.rel_larg_start:
+        if any(m not in rel_roof_start for m in model.rel_larg_start):
             out.append("_REL_LARG_START START MY MZ")
-        if model.rel_larg_end:
+        if any(m not in rel_roof_end for m in model.rel_larg_end):
             out.append("_REL_LARG_END END MY MZ")
+        if rel_roof_start:
+            out.append("_REL_ROOF_JOINT_START START FX MY MZ")
+        if rel_roof_end:
+            out.append("_REL_ROOF_JOINT_END END FX MY MZ")
         if getattr(model, 'rel_tiltup_start', []):
             out.append("_REL_TILTUP_START START FX MY MZ")
         if getattr(model, 'rel_tiltup_end', []):
