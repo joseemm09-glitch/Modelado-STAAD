@@ -127,7 +127,8 @@ class StaadModel:
             '_CS_SEC': [],
             '_CI_SEC': [],
             '_MONTANTES_SEC': [],
-            '_DIAG_SEC': []
+            '_DIAG_SEC': [],
+            '_ARMADURA_MD': []
         }
         # Agrupación de largueros según su separación transversal (s = Larm / subdiv)
         self.span_larguero_spacing = [
@@ -216,6 +217,62 @@ class StaadModel:
         self.split_purlin_last = []
         self.split_purlin_middle = []
         
+        # Marco Doble / Juntas Constructivas
+        self.junta_constructiva_tipo = kwargs.get('junta_constructiva_tipo', 'Ninguna')
+        self.junta_max_dist_ft = float(kwargs.get('junta_max_dist_ft', 600.0))
+        self.junta_max_dist_m = self.junta_max_dist_ft * 0.3048
+        
+        total_length_m = self.nBay * self.Ljoist_m
+        self.has_marco_doble = (self.junta_constructiva_tipo == "Marco doble") and (total_length_m > self.junta_max_dist_m)
+        self.joint_axes = []
+        if self.has_marco_doble and self.nBay >= 2:
+            num_segments = math.ceil((total_length_m - 0.05) / self.junta_max_dist_m)
+            num_joints = num_segments - 1
+            for k in range(1, num_joints + 1):
+                target_i = int(round(k * self.nBay / (num_joints + 1)))
+                target_i = max(1, min(self.nBay - 1, target_i))
+                if target_i not in self.joint_axes:
+                    self.joint_axes.append(target_i)
+            self.joint_axes.sort()
+
+        # Construir marcos a lo largo de Z
+        self.frames = []
+        f_idx = 0
+        for i in range(self.nBay + 1):
+            if i in self.joint_axes:
+                zA = i * self.Lz - 10.0
+                self.frames.append({
+                    'idx': f_idx,
+                    'z': zA,
+                    'orig_i': i,
+                    'is_md': True,
+                    'md_side': 'A',
+                    'connect_to_next': False
+                })
+                f_idx += 1
+                zB = i * self.Lz + 10.0
+                self.frames.append({
+                    'idx': f_idx,
+                    'z': zB,
+                    'orig_i': i,
+                    'is_md': True,
+                    'md_side': 'B',
+                    'connect_to_next': True
+                })
+                f_idx += 1
+            else:
+                self.frames.append({
+                    'idx': f_idx,
+                    'z': i * self.Lz,
+                    'orig_i': i,
+                    'is_md': False,
+                    'md_side': None,
+                    'connect_to_next': True
+                })
+                f_idx += 1
+        self.num_frames = len(self.frames)
+        self.dummy_md_members = []
+
         self.col_heights = {}
         self.ci_int = []
         self.ci_ly_groups = {}
@@ -431,32 +488,33 @@ class StaadModel:
 
         # --- Nivel 1 (Base) ---
         for j in range(self.nSpan + 1):
-            for i in range(self.nBay + 1):
+            for i in range(self.num_frames):
                 x = self.get_x(j)
                 y = 0.0
-                z = i * self.Lz
+                z = self.frames[i]['z']
                 nL1[(i, j)] = self.add_node(x, y, z)
 
         # --- Nivel 2 (Eaves) ---
         for j in range(self.nSpan + 1):
-            for i in range(self.nBay + 1):
+            for i in range(self.num_frames):
                 x = self.get_x(j)
                 y = self.HtLibre + self.get_y_offset(x)
-                z = i * self.Lz
+                z = self.frames[i]['z']
                 nL2[(i, j)] = self.add_node(x, y, z)
 
         # --- Nivel 3 (Ridge / Top) ---
         for j in range(self.nSpan + 1):
-            for i in range(self.nBay + 1):
+            for i in range(self.num_frames):
                 x = self.get_x(j)
                 y = self.HtLibre + self.HtArmad + self.get_y_offset(x)
-                z = i * self.Lz
+                z = self.frames[i]['z']
                 nL3[(i, j)] = self.add_node(x, y, z)
 
         # --- Columnas (Niveles 1 -> 2 y 2 -> 3) ---
         for j in range(self.nSpan + 1):
-            for i in range(self.nBay + 1):
-                is_perimeter = (j == 0 or j == self.nSpan or i == 0 or i == self.nBay)
+            for i in range(self.num_frames):
+                is_z_edge = (i == 0 or i == self.num_frames - 1)
+                is_perimeter = (j == 0 or j == self.nSpan or is_z_edge)
                 trib_x = self.Ljoist_m / self.wind_col_N
                 if j == 0:
                     trib_z = self.Larm_list[0] / self.wind_col_Z_M_list[0] / 2.0
@@ -472,7 +530,7 @@ class StaadModel:
                     col2 = self.add_member(nL2[(i, j)], nL3[(i, j)], '_COL')
 
                     if is_perimeter:
-                        if i == 0 or i == self.nBay:
+                        if is_z_edge:
                             self.col_trib_z[col1] = trib_z
                             self.col_trib_z[col2] = trib_z
                             self.col_trib_x[col1] = trib_x / 2.0
@@ -493,14 +551,14 @@ class StaadModel:
                     
                     # Face X0
                     if j == 0:
-                        if i == 0 or i == self.nBay:
+                        if is_z_edge:
                             self.wind_cols['X0_CORNER'].extend([col1, col2])
                         else:
                             self.wind_cols['X0_INNER'].extend([col1, col2])
                     
                     # Face XMAX
                     if j == self.nSpan:
-                        if i == 0 or i == self.nBay:
+                        if is_z_edge:
                             self.wind_cols['XMAX_CORNER'].extend([col1, col2])
                         else:
                             self.wind_cols['XMAX_INNER'].extend([col1, col2])
@@ -513,45 +571,58 @@ class StaadModel:
                             self.wind_cols['Z0_INNER'].extend([col1, col2])
                             
                     # Face ZMAX
-                    if i == self.nBay:
+                    if i == self.num_frames - 1:
                         if j == 0 or j == self.nSpan:
                             self.wind_cols['ZMAX_CORNER'].extend([col1, col2])
                         else:
                             self.wind_cols['ZMAX_INNER'].extend([col1, col2])
                 
-                
         self.nL3 = nL3
 
         # --- Cuerda Superior (Nivel 3) e intermedios ---
-        for i in range(self.nBay + 1):
+        for i in range(self.num_frames):
+            frame = self.frames[i]
+            is_end_frame = (i == 0 or i == self.num_frames - 1)
+            is_tiltup_end = (self.wall_type == "Tilt-Up" and is_end_frame)
+            is_md = frame['is_md']
+
             for j in range(self.nSpan):
                 prev = nL3[(i, j)]
                 is_first = True
                 for k in range(1, self.subdiv_list[j]):
                     xn = self.get_x(j) + k * ((self.Lx_list[j] / self.subdiv_list[j]))
                     yn = self.HtLibre + self.HtArmad + self.get_y_offset(xn)
-                    zn = i * self.Lz
+                    zn = frame['z']
                     nid = self.add_node(xn, yn, zn)
                     upperSub[(i, j, k)] = nid
                     
-                    if not (self.wall_type == "Tilt-Up" and (i == 0 or i == self.nBay)):
+                    if not is_tiltup_end:
                         grp = '_CS_PERIM' if (j == 0 or j == self.nSpan - 1) else '_CS'
                         mid = self.add_member(prev, nid, grp)
+                        if is_md:
+                            self.groups['_ARMADURA_MD'].append(mid)
                         if is_first:
                             self.rel_csci_start.append(mid)
                             is_first = False
                     prev = nid
-                if not (self.wall_type == "Tilt-Up" and (i == 0 or i == self.nBay)):
+                if not is_tiltup_end:
                     grp = '_CS_PERIM' if (j == 0 or j == self.nSpan - 1) else '_CS'
                     mid2 = self.add_member(prev, nL3[(i, j + 1)], grp)
+                    if is_md:
+                        self.groups['_ARMADURA_MD'].append(mid2)
                     self.rel_csci_end.append(mid2)
 
         # --- Cuerda Inferior (Nivel 2) ---
-        for i in range(self.nBay + 1):
+        for i in range(self.num_frames):
+            frame = self.frames[i]
+            is_end_frame = (i == 0 or i == self.num_frames - 1)
+            is_tiltup_end = (self.wall_type == "Tilt-Up" and is_end_frame)
+            is_md = frame['is_md']
+
             for j in range(self.nSpan):
                 L0_local = (self.Lx_list[j] / self.subdiv_list[j])
                 baseX = self.get_x(j)
-                z2 = i * self.Lz
+                z2 = frame['z']
                 leftN = nL2[(i, j)]
 
                 for t in range(1, (self.subdiv_list[j] // 2) + 1):
@@ -561,9 +632,11 @@ class StaadModel:
                     nid = self.add_node(x, yn, z2)
                     lowerInter[(i, j, t)] = nid
                     
-                    if not (self.wall_type == "Tilt-Up" and (i == 0 or i == self.nBay)):
+                    if not is_tiltup_end:
                         grp = '_CI_PERIM' if (j == 0 or j == self.nSpan - 1) else '_CI'
                         mid = self.add_member(leftN, nid, grp)
+                        if is_md:
+                            self.groups['_ARMADURA_MD'].append(mid)
                         if t == 1:
                             self.rel_csci_start.append(mid)
                         else:
@@ -571,64 +644,85 @@ class StaadModel:
                             self.add_ci_ly(mid, L0_local)
                     leftN = nid
 
-                if not (self.wall_type == "Tilt-Up" and (i == 0 or i == self.nBay)):
+                if not is_tiltup_end:
                     grp = '_CI_PERIM' if (j == 0 or j == self.nSpan - 1) else '_CI'
                     mid2 = self.add_member(leftN, nL2[(i, j + 1)], grp)
+                    if is_md:
+                        self.groups['_ARMADURA_MD'].append(mid2)
                     self.rel_csci_end.append(mid2)
 
         # --- Montantes ---
-        for i in range(self.nBay + 1):
-            if self.wall_type == "Tilt-Up" and (i == 0 or i == self.nBay):
+        for i in range(self.num_frames):
+            frame = self.frames[i]
+            if self.wall_type == "Tilt-Up" and (i == 0 or i == self.num_frames - 1):
                 continue
+            is_md = frame['is_md']
             for j in range(self.nSpan):
                 grp = '_MONTANTES_PERIM' if (j == 0 or j == self.nSpan - 1) else '_MONTANTES'
                 for t in range(1, (self.subdiv_list[j] // 2) + 1):
                     oddK = 2 * t - 1
-                    self.add_member(lowerInter[(i, j, t)], upperSub[(i, j, oddK)], grp)
+                    mid = self.add_member(lowerInter[(i, j, t)], upperSub[(i, j, oddK)], grp)
+                    if is_md:
+                        self.groups['_ARMADURA_MD'].append(mid)
 
         # --- Diagonales (V) ---
-        for i in range(self.nBay + 1):
-            if self.wall_type == "Tilt-Up" and (i == 0 or i == self.nBay):
+        for i in range(self.num_frames):
+            frame = self.frames[i]
+            if self.wall_type == "Tilt-Up" and (i == 0 or i == self.num_frames - 1):
                 continue
+            is_md = frame['is_md']
             for j in range(self.nSpan):
                 grp = '_DIAG_PERIM' if (j == 0 or j == self.nSpan - 1) else '_DIAG'
                 for t in range(1, (self.subdiv_list[j] // 2) + 1):
                     # izquierda
                     u_left = self.get_upper_node(nL3, upperSub, i, j, 2 * (t - 1))
-                    self.add_member(u_left, lowerInter[(i, j, t)], grp)
+                    mid1 = self.add_member(u_left, lowerInter[(i, j, t)], grp)
+                    if is_md:
+                        self.groups['_ARMADURA_MD'].append(mid1)
                     # derecha
                     u_right = self.get_upper_node(nL3, upperSub, i, j, 2 * t)
-                    self.add_member(u_right, lowerInter[(i, j, t)], grp)
+                    mid2 = self.add_member(u_right, lowerInter[(i, j, t)], grp)
+                    if is_md:
+                        self.groups['_ARMADURA_MD'].append(mid2)
 
         # --- Largueros ---
-        if self.nBay >= 1:
+        if self.num_frames > 1:
             for j in range(self.nSpan + 1):
                 has_sec_truss = (j in self.sec_trusses_j)
                 is_wind_col_axis = (self.add_wind_cols and self.wind_col_N > 1 and (j == 0 or j == self.nSpan) and self.wall_type != "Tilt-Up")
-                for i in range(self.nBay):
+                for i in range(self.num_frames - 1):
+                    frame_curr = self.frames[i]
+                    frame_next = self.frames[i + 1]
+                    
+                    if not frame_curr['connect_to_next']:
+                        # Vano de 20cm entre Marco A y Marco B
+                        if self.wall_type != "Tilt-Up":
+                            if j in [0, self.nSpan]:
+                                mem_dummy = self.add_member(nL1[(i, j)], nL1[(i + 1, j)], None)
+                                self.dummy_md_members.append(mem_dummy)
+                        continue
+                    
+                    Lz_bay = frame_next['z'] - frame_curr['z']
+                    
                     if is_wind_col_axis:
-                        # Split larguero and create wind columns and horizontal wind trusses
                         N = self.wind_col_N
-                        
-                        # Initialize nodes arrays for this bay segment
                         A = [None] * (N + 1)
                         B = [None] * (N + 1)
                         
                         A[0] = nL3[(i, j)]
                         A[N] = nL3[(i + 1, j)]
                         
-                        # Generate intermediate wind columns and horizontal truss nodes/struts
                         for k in range(1, N):
                             x = self.get_x(j)
                             y = self.HtLibre + self.HtArmad + self.get_y_offset(x)
-                            z = (i + k / N) * self.Lz
+                            z = frame_curr['z'] + (k / N) * Lz_bay
                             
                             nid_roof = self.add_node(x, y, z)
                             nid_base = self.add_node(x, 0.0, z, is_wind_base=True)
                             
                             col_wind = self.add_member(nid_base, nid_roof, '_COLVIENTO')
                             
-                            trib_x = self.Ljoist_m / self.wind_col_N
+                            trib_x = (Lz_bay / 100.0) / self.wind_col_N
                             self.col_trib_x[col_wind] = trib_x
                             
                             if j == 0:
@@ -638,7 +732,6 @@ class StaadModel:
                                 
                             A[k] = nid_roof
                             
-                            # Generate horizontal truss node
                             span_idx = 0 if j == 0 else self.nSpan - 1
                             L0_local = self.Lx_list[span_idx] / self.subdiv_list[span_idx]
                             x_next = L0_local if j == 0 else (self.total_width - L0_local)
@@ -647,13 +740,11 @@ class StaadModel:
                             nid_new = self.get_or_create_node(x_next, y_next, z)
                             B[k] = nid_new
                             
-                            # Strut (Puntal horizontal)
                             mem_strut = self.add_member(nid_roof, nid_new, None)
                             self.horizontal_truss_members.append(mem_strut)
                             self.rel_horiz_start.append(mem_strut)
                             self.rel_horiz_end.append(mem_strut)
                             
-                        # Connect horizontal truss diagonals
                         for p in range(N):
                             if p + 1 < N:
                                 diag1 = self.add_member(A[p], B[p+1], None)
@@ -665,21 +756,17 @@ class StaadModel:
                                 self.horizontal_truss_members.append(diag2)
                                 self.rel_horiz_start.append(diag2)
                                 self.rel_horiz_end.append(diag2)
-                            
-                        # Add the perimetric purlin (larguero) segments OR secondary truss segments
-                        baseZ = i * self.Lz
-                        segment_length = self.Lz / N
+                                
+                        baseZ = frame_curr['z']
+                        segment_length = Lz_bay / N
                         for p in range(N):
                             if has_sec_truss:
                                 xn = self.get_x(j)
                                 yn_bot = self.HtLibre + self.get_y_offset(xn)
-                                
                                 bot_start = nL2[(i, j)] if p == 0 else self.get_or_create_node(xn, yn_bot, baseZ + p * segment_length)
                                 bot_end = nL2[(i+1, j)] if p == N - 1 else self.get_or_create_node(xn, yn_bot, baseZ + (p + 1) * segment_length)
-                                
                                 start_rel = True
                                 end_rel = True
-                                
                                 self._add_sec_truss_segment(j, A[p], A[p+1], bot_start, bot_end, baseZ + p * segment_length, segment_length, start_rel, end_rel)
                             else:
                                 grp_name = self.span_to_larguero_group[j]
@@ -693,13 +780,11 @@ class StaadModel:
                                 else:
                                     self.split_purlin_middle.append(mem_id)
                     elif has_sec_truss:
-                        # Secondary truss on interior axis without wind columns
-                        baseZ = i * self.Lz
+                        baseZ = frame_curr['z']
                         start_rel = True
                         end_rel = True
-                        self._add_sec_truss_segment(j, nL3[(i, j)], nL3[(i + 1, j)], nL2[(i, j)], nL2[(i + 1, j)], baseZ, self.Lz, start_rel, end_rel)
+                        self._add_sec_truss_segment(j, nL3[(i, j)], nL3[(i + 1, j)], nL2[(i, j)], nL2[(i + 1, j)], baseZ, Lz_bay, start_rel, end_rel)
                     else:
-                        # Standard larguero
                         grp_name = self.span_to_larguero_group[j]
                         mid_lg = self.add_member(nL3[(i, j)], nL3[(i + 1, j)], grp_name)
                         if grp_name != '_LARGUEROS':
@@ -710,7 +795,12 @@ class StaadModel:
                     is_segundo = (j == 0 and k == 1)
                     is_penultimo = (j == self.nSpan - 1 and k == self.subdiv_list[j] - 1)
                     is_wind_strut = self.add_wind_cols and self.wind_col_N > 1 and (is_segundo or is_penultimo) and self.wall_type != "Tilt-Up"
-                    for i in range(self.nBay):
+                    for i in range(self.num_frames - 1):
+                        frame_curr = self.frames[i]
+                        frame_next = self.frames[i + 1]
+                        if not frame_curr['connect_to_next']:
+                            continue
+                        Lz_bay = frame_next['z'] - frame_curr['z']
                         grp_name = self.span_to_larguero_group[j]
                         if is_wind_strut:
                             N = self.wind_col_N
@@ -722,7 +812,7 @@ class StaadModel:
                             A[0] = upperSub[(i, j, k)]
                             A[N] = upperSub[(i + 1, j, k)]
                             for p in range(1, N):
-                                z = (i + p / N) * self.Lz
+                                z = frame_curr['z'] + (p / N) * Lz_bay
                                 A[p] = self.get_or_create_node(x, y, z)
                                 
                             for p in range(N):
@@ -738,40 +828,43 @@ class StaadModel:
                                 self.groups['_LARGUEROS'].append(mid_sub)
 
         # --- Contravientos Horizontales (_CV) ---
-        if self.nBay >= 1 and self.nSpan >= 1:
-            for i in range(self.nBay):
+        if self.num_frames > 1 and self.nSpan >= 1:
+            for i in range(self.num_frames - 1):
+                frame_curr = self.frames[i]
+                frame_next = self.frames[i + 1]
+                if not frame_curr['connect_to_next']:
+                    continue
                 for j in range(self.nSpan):
-                    is_perimeter = (i == 0) or (i == self.nBay - 1) or (j == 0) or (j == self.nSpan - 1)
+                    is_perimeter = (i == 0) or (i == self.num_frames - 2) or (j == 0) or (j == self.nSpan - 1)
                     
                     if not is_perimeter:
                         # Patrón interior: alternar desde el centro hacia afuera
+                        orig_i = frame_curr['orig_i']
                         if self.nBay % 2 != 0:
-                            if i % 2 != 0:
+                            if orig_i % 2 != 0:
                                 continue
                         else:
-                            # Si es par, empezar con 2 cruces al centro y alternar hacia los extremos
                             c1 = self.nBay // 2 - 1
                             c2 = self.nBay // 2
-                            if i <= c1:
-                                d = c1 - i
+                            if orig_i <= c1:
+                                d = c1 - orig_i
                             else:
-                                d = i - c2
-                                
+                                d = orig_i - c2
                             if d % 2 != 0:
                                 continue
                             
-                    # Subdivisión de cruces (buscando ~45° y obligando paso por cumbrera si aplica)
+                    Lz_bay = frame_next['z'] - frame_curr['z']
                     if self.roof_type == "2 Aguas":
                         half_sub = (self.subdiv_list[j] // 2)
                         half_lx = (self.Lx_list[j] / 2.0)
-                        chunks_half = max(1, round(half_lx / self.Lz))
+                        chunks_half = max(1, round(half_lx / Lz_bay))
                         
                         left_pts = [int(round(c * half_sub / chunks_half)) for c in range(chunks_half)]
                         right_pts = [half_sub + int(round(c * half_sub / chunks_half)) for c in range(chunks_half + 1)]
                         k_points = left_pts + right_pts
                     else:
-                        if self.Lx_list[j] > self.Lz:
-                            chunks = max(2, round(self.Lx_list[j] / self.Lz))
+                        if self.Lx_list[j] > Lz_bay:
+                            chunks = max(2, round(self.Lx_list[j] / Lz_bay))
                         else:
                             chunks = 1
                         k_points = [int(round(c * self.subdiv_list[j] / chunks)) for c in range(chunks + 1)]
@@ -791,47 +884,33 @@ class StaadModel:
 
         # --- Columnas de Viento en Cabeceras (Eje Z primero y último) ---
         if self.add_wind_cols and any(w > 1 for w in self.wind_col_Z_M_list):
-            for i in [0, self.nBay]:
+            for i in [0, self.num_frames - 1]:
                 if self.wall_type == "Tilt-Up":
                     continue
+                frame_z = self.frames[i]['z']
                 for j in range(self.nSpan):
                     if self.wind_col_Z_M_list[j] <= 1:
                         continue
-                    # Existing nodes on Cuerda Inferior in this span j and bay i
                     ci_nodes_in_span = []
-                    # 1. Start node
                     ci_nodes_in_span.append((nL2[(i, j)], self.get_x(j)))
-                    # 2. Intermediate lowerInter nodes
                     L0 = self.Lx_list[j] / self.subdiv_list[j]
                     for t in range(1, (self.subdiv_list[j] // 2) + 1):
                         oddK = 2 * t - 1
                         x_coord = self.get_x(j) + oddK * L0
                         if (i, j, t) in lowerInter:
                             ci_nodes_in_span.append((lowerInter[(i, j, t)], x_coord))
-                    # 3. End node
                     ci_nodes_in_span.append((nL2[(i, j+1)], self.get_x(j+1)))
                     
-                    # For each wind column position
                     for k in range(1, self.wind_col_Z_M_list[j]):
                         x_wind = self.get_x(j) + k * ((self.Lx_list[j] / self.wind_col_Z_M_list[j]))
-                        
-                        # Find the closest existing node on the Cuerda Inferior
                         closest_node, x_node = min(ci_nodes_in_span, key=lambda node_info: abs(node_info[1] - x_wind))
                         
-                        # Only add wind column if the closest node is not a main column (i.e. not at j*Lx or (j+1)*Lx)
                         if closest_node not in [nL2[(i, j)], nL2[(i, j+1)]]:
-                            # Create base node at ground level (y=0) at x_node
-                            nid_base = self.add_node(x_node, 0.0, i * self.Lz, is_wind_base=True)
-                            
+                            nid_base = self.add_node(x_node, 0.0, frame_z, is_wind_base=True)
                             col_wind = self.add_member(nid_base, closest_node, '_COLVIENTO')
-                            
                             trib_z = self.Lx_list[j] / self.wind_col_Z_M_list[j]
                             self.col_trib_z[col_wind] = trib_z
-                            
-                            # Release at the top: MY, MZ, FX
                             self.release_end_fx.append(col_wind)
-                            
-                            # Classify for wind loading
                             if i == 0:
                                 self.wind_cols['Z0_WINDCOL'].append(col_wind)
                             else:
@@ -843,13 +922,13 @@ class StaadModel:
         # --- Generación de Placas para Tilt-Up ---
         if self.wall_type == "Tilt-Up":
             # 1. Caras Z=0 y Z=ZMAX (A lo largo de X)
-            for i in [0, self.nBay]:
+            for i in [0, self.num_frames - 1]:
                 is_front = (i == 0)
                 ext_left = self.ext_bl if is_front else self.ext_tl
                 ext_right = self.ext_br if is_front else self.ext_tr
+                baseZ = self.frames[i]['z']
                 
                 if getattr(self, 'ext_bays_active', False) and ext_left:
-                    baseZ = i * self.Lz
                     W_ext = getattr(self, 'ext_larm', 1524.0)
                     Nx = getattr(self, 'ext_subdiv', 10)
                     step_x = W_ext / Nx
@@ -875,8 +954,6 @@ class StaadModel:
                         self.plate_groups[group_key].extend([p1, p2])
                 
                 for j in range(self.nSpan):
-                    baseZ = i * self.Lz
-                    # En estas caras, generamos 2 placas por cada separación de la armadura
                     for k in range(self.subdiv_list[j]):
                         xn1 = self.get_x(j) + k * ((self.Lx_list[j] / self.subdiv_list[j]))
                         xn2 = self.get_x(j) + (k + 1) * ((self.Lx_list[j] / self.subdiv_list[j]))
@@ -887,35 +964,27 @@ class StaadModel:
                         yn_bot2 = self.HtLibre + self.get_y_offset(xn2)
                         yn_top2 = self.HtLibre + self.HtArmad + self.get_y_offset(xn2)
                         
-                        # Nodos inferiores en y=0
                         n_b1 = self.get_or_create_node(xn1, 0.0, baseZ)
                         n_b2 = self.get_or_create_node(xn2, 0.0, baseZ)
                         
-                        # Nodos en CI
                         n_ci1 = self.get_or_create_node(xn1, yn_bot1, baseZ)
                         n_ci2 = self.get_or_create_node(xn2, yn_bot2, baseZ)
                         
-                        # Nodos en CS
                         n_cs1 = self.get_or_create_node(xn1, yn_top1, baseZ)
                         n_cs2 = self.get_or_create_node(xn2, yn_top2, baseZ)
                         
-                        # Placa Inferior (y=0 a CI)
                         p1 = self.add_plate(n_b1, n_b2, n_ci2, n_ci1)
-                        
-                        # Placa Superior (CI a CS)
                         p2 = self.add_plate(n_ci1, n_ci2, n_cs2, n_cs1)
                         
-                        group_key = 'Z0' if i == 0 else 'ZMAX'
+                        group_key = 'Z0' if is_front else 'ZMAX'
                         self.plate_groups[group_key].extend([p1, p2])
                         
-                        # Nodos base requieren soporte PINNED
                         if n_b1 not in self.wind_base_nodes:
                             self.wind_base_nodes.append(n_b1)
                         if n_b2 not in self.wind_base_nodes:
                             self.wind_base_nodes.append(n_b2)
 
                 if getattr(self, 'ext_bays_active', False) and ext_right:
-                    baseZ = i * self.Lz
                     W_ext = getattr(self, 'ext_larm', 1524.0)
                     Nx = getattr(self, 'ext_subdiv', 10)
                     step_x = W_ext / Nx
@@ -939,24 +1008,57 @@ class StaadModel:
                         p2 = self.add_plate(n_ci1, n_ci2, n_cs2, n_cs1)
                         group_key = 'Z0' if is_front else 'ZMAX'
                         self.plate_groups[group_key].extend([p1, p2])
+                        
+                        if n_b1 not in self.wind_base_nodes:
+                            self.wind_base_nodes.append(n_b1)
+                        if n_b2 not in self.wind_base_nodes:
+                            self.wind_base_nodes.append(n_b2)
 
             # 2. Caras X=0 y X=XMAX (A lo largo de Z)
             for j in [0, self.nSpan]:
+                is_left = (j == 0)
                 baseX = self.get_x(j)
                 yn_bot = self.HtLibre + self.get_y_offset(baseX)
                 yn_top = self.HtLibre + self.HtArmad + self.get_y_offset(baseX)
                 
-                is_left = (j == 0)
-                
-                for i in range(self.nBay):
+                for i in range(self.num_frames - 1):
+                    frame_curr = self.frames[i]
+                    frame_next = self.frames[i + 1]
+                    
+                    if not frame_curr['connect_to_next']:
+                        # Vano de 20cm de Marco Doble: Generar 2 plates (Y=0 a CI, y CI a CS)
+                        n_b1 = self.get_or_create_node(baseX, 0.0, frame_curr['z'])
+                        n_b2 = self.get_or_create_node(baseX, 0.0, frame_next['z'])
+                        n_ci1 = self.get_or_create_node(baseX, yn_bot, frame_curr['z'])
+                        n_ci2 = self.get_or_create_node(baseX, yn_bot, frame_next['z'])
+                        n_cs1 = self.get_or_create_node(baseX, yn_top, frame_curr['z'])
+                        n_cs2 = self.get_or_create_node(baseX, yn_top, frame_next['z'])
+                        
+                        p1 = self.add_plate(n_b1, n_b2, n_ci2, n_ci1)
+                        p2 = self.add_plate(n_ci1, n_ci2, n_cs2, n_cs1)
+                        group_key = 'X0' if is_left else 'XMAX'
+                        self.plate_groups[group_key].extend([p1, p2])
+                        
+                        if n_b1 not in self.wind_base_nodes:
+                            self.wind_base_nodes.append(n_b1)
+                        if n_b2 not in self.wind_base_nodes:
+                            self.wind_base_nodes.append(n_b2)
+                        continue
+
+                    # Bahías de extensión si aplican
                     is_ext = False
                     if getattr(self, 'ext_bays_active', False):
                         depth = getattr(self, 'ext_depth', 1)
-                        if is_left and i < depth and self.ext_bl: is_ext = True
-                        elif is_left and i >= self.nBay - depth and self.ext_tl: is_ext = True
-                        elif not is_left and i < depth and self.ext_br: is_ext = True
-                        elif not is_left and i >= self.nBay - depth and self.ext_tr: is_ext = True
+                        orig_i = frame_curr['orig_i']
+                        if is_left and orig_i < depth and self.ext_bl: is_ext = True
+                        elif is_left and orig_i >= self.nBay - depth and self.ext_tl: is_ext = True
+                        elif not is_left and orig_i < depth and self.ext_br: is_ext = True
+                        elif not is_left and orig_i >= self.nBay - depth and self.ext_tr: is_ext = True
                     
+                    Lz_bay = frame_next['z'] - frame_curr['z']
+                    Nz = math.ceil((Lz_bay / 100.0) / 4.0)
+                    step_z = Lz_bay / Nz
+
                     if is_ext:
                         depth = getattr(self, 'ext_depth', 1)
                         W_ext = getattr(self, 'ext_larm', 1524.0)
@@ -966,12 +1068,9 @@ class StaadModel:
                         yn_ext_bot = self.HtLibre + self.get_y_offset(ext_x)
                         yn_ext_top = self.HtLibre + self.HtArmad + self.get_y_offset(ext_x)
                         
-                        Nz = math.ceil(self.Ljoist_m / 4.0)
-                        step_z = self.Lz / Nz
-                        
                         for nz in range(Nz):
-                            zn1 = i * self.Lz + nz * step_z
-                            zn2 = i * self.Lz + (nz + 1) * step_z
+                            zn1 = frame_curr['z'] + nz * step_z
+                            zn2 = frame_curr['z'] + (nz + 1) * step_z
                             
                             n_b1 = self.get_or_create_node(ext_x, 0.0, zn1)
                             n_b2 = self.get_or_create_node(ext_x, 0.0, zn2)
@@ -985,10 +1084,11 @@ class StaadModel:
                             group_key = 'X0' if is_left else 'XMAX'
                             self.plate_groups[group_key].extend([p1, p2])
                             
-                        # Return wall (Inner Z face): only if this is the innermost bay of the extension
-                        is_front = (i < depth)
-                        if (is_front and i == depth - 1) or (not is_front and i == self.nBay - depth):
-                            inner_z = depth * self.Lz if is_front else (self.nBay - depth) * self.Lz
+                        # Return wall (Inner Z face)
+                        orig_i = frame_curr['orig_i']
+                        is_front = (orig_i < depth)
+                        if (is_front and orig_i == depth - 1) or (not is_front and orig_i == self.nBay - depth):
+                            inner_z = frame_next['z'] if is_front else frame_curr['z']
                             step_x = W_ext / Nx
                             for nx in range(Nx):
                                 x1 = ext_x + nx * step_x if is_left else ext_x - nx * step_x
@@ -1015,13 +1115,11 @@ class StaadModel:
                                 
                                 g_key = 'Z0' if is_front else 'ZMAX'
                                 self.plate_groups[g_key].extend([p1, p2])
-                        
                         continue
-                    Nz = math.ceil(self.Ljoist_m / 4.0)
-                    step_z = self.Lz / Nz
+
                     for nz in range(Nz):
-                        zn1 = i * self.Lz + nz * step_z
-                        zn2 = i * self.Lz + (nz + 1) * step_z
+                        zn1 = frame_curr['z'] + nz * step_z
+                        zn2 = frame_curr['z'] + (nz + 1) * step_z
                         
                         n_b1 = self.get_or_create_node(baseX, 0.0, zn1)
                         n_b2 = self.get_or_create_node(baseX, 0.0, zn2)
@@ -1040,7 +1138,7 @@ class StaadModel:
                         
                         if i == 0 and nz == 0:
                             self.plate_releases_j1_j4.extend([p1, p2])
-                        elif i == self.nBay - 1 and nz == Nz - 1:
+                        elif i == self.num_frames - 2 and nz == Nz - 1:
                             self.plate_releases_j2_j3.extend([p1, p2])
                         
                         if n_b1 not in self.wind_base_nodes:
@@ -1165,11 +1263,12 @@ class StaadModel:
 
         # 1. Áreas tributarias del edificio principal
         for j in range(self.nSpan + 1):
-            for i in range(self.nBay + 1):
+            for i in range(self.num_frames):
+                frame = self.frames[i]
                 top_node = nL3[(i, j)]
                 
                 # Clasificación de categoría base
-                is_z_edge = (i == 0 or i == self.nBay)
+                is_z_edge = (i == 0 or i == self.num_frames - 1 or frame['is_md'])
                 is_x_edge = (j == 0 or j == self.nSpan)
                 
                 if is_z_edge and is_x_edge:
@@ -1179,7 +1278,7 @@ class StaadModel:
                 else:
                     cat = 'CENTRALES'
 
-                # Dimensión tributaria en Z
+                # Dimensión tributaria en Z (cubierta completa)
                 trib_z = (self.Ljoist_m / 2.0) if is_z_edge else self.Ljoist_m
 
                 # Dimensión tributaria en X

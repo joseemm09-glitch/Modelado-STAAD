@@ -34,7 +34,7 @@ def plot_model(model, show_supports=False, highlight_ids=None, highlight_colors=
     fig = go.Figure()
 
     # Create a mapping from member to its group
-    skip_groups = {'_JOISTGRAL', '_JPUNTAL', '_CELOSIA', '_ARMADURA_CENTRAL', '_ARMADURA_PERIM', '_CELOSIA_SEC', '_ARMADURA_SEC'}
+    skip_groups = {'_JOISTGRAL', '_JPUNTAL', '_CELOSIA', '_ARMADURA_CENTRAL', '_ARMADURA_PERIM', '_CELOSIA_SEC', '_ARMADURA_SEC', '_ARMADURA_MD'}
     member_to_group = {}
     for grp_name, mem_list in model.groups.items():
         if grp_name in skip_groups:

@@ -222,7 +222,8 @@ def write_staad(model, selected_profiles=None):
             model.groups.get('_CI_SEC', []) + 
             model.groups.get('_MONTANTES_SEC', []) + 
             model.groups.get('_DIAG_SEC', [])
-        )))
+        ))),
+        '_ARMADURA_MD': getattr(model, 'groups', {}).get('_ARMADURA_MD', [])
     })
     
     for name, members in group_map.items():
@@ -269,10 +270,12 @@ def write_staad(model, selected_profiles=None):
     celosia_str = group_ranges(group_map.get('_CELOSIA', []))
     armadura_central_str = group_ranges(group_map.get('_ARMADURA_CENTRAL', []))
     armadura_perim_str = group_ranges(group_map.get('_ARMADURA_PERIM', []))
+    armadura_md_str = group_ranges(group_map.get('_ARMADURA_MD', []))
     armaduras_all = sorted(list(set(
         group_map.get('_ARMADURA_CENTRAL', []) + 
         group_map.get('_ARMADURA_PERIM', []) + 
-        group_map.get('_ARMADURA_SEC', [])
+        group_map.get('_ARMADURA_SEC', []) +
+        group_map.get('_ARMADURA_MD', [])
     )))
     armaduras_all_str = group_ranges(armaduras_all)
     cv_str = group_ranges(group_map.get('_CVH', []))
@@ -328,6 +331,12 @@ def write_staad(model, selected_profiles=None):
     if cv_str:
         out.append("MEMBER PROPERTY AMERICAN")
         out.append(build_lines(cv_str.split(" ") + ["TABLE ST PIPE OD 1.905 ID 0"], 72))
+        
+    if getattr(model, 'dummy_md_members', []):
+        dummy_str = group_ranges(model.dummy_md_members)
+        if dummy_str:
+            out.append("MEMBER PROPERTY AMERICAN")
+            out.append(build_lines(dummy_str.split(" ") + ["PRIS YD 1.0"], 72))
         
     if getattr(model, 'plates', None):
         out.append("ELEMENT PROPERTY")
@@ -428,6 +437,11 @@ def write_staad(model, selected_profiles=None):
     if model.groups.get('_CVH', []):
         out.append("MEMBER TENSION")
         out.append("_CVH")
+
+    if getattr(model, 'dummy_md_members', []):
+        dummy_str = group_ranges(model.dummy_md_members)
+        if dummy_str:
+            out.append(build_lines(["INACTIVE", "MEMBER"] + dummy_str.split(" "), 72))
 
         
     # ------------------
@@ -891,6 +905,8 @@ def write_staad(model, selected_profiles=None):
         out.append(build_lines(["CHECK", "CODE", "MEMB"] + armadura_perim_str.split(" "), 72))
     if cv_str:
         out.append(build_lines(["CHECK", "CODE", "MEMB"] + cv_str.split(" "), 72))
+    if armadura_md_str:
+        out.append(build_lines(["CHECK", "CODE", "MEMB"] + armadura_md_str.split(" "), 72))
     out.append("STEEL TAKE OFF ALL")
     if col_str:
         out.append(build_lines(["STEEL", "TAKE", "OFF", "LIST"] + col_str.split(" "), 72))
@@ -900,6 +916,8 @@ def write_staad(model, selected_profiles=None):
         out.append(build_lines(["STEEL", "TAKE", "OFF", "LIST"] + armadura_central_str.split(" "), 72))
     if armadura_perim_str:
         out.append(build_lines(["STEEL", "TAKE", "OFF", "LIST"] + armadura_perim_str.split(" "), 72))
+    if armadura_md_str:
+        out.append(build_lines(["STEEL", "TAKE", "OFF", "LIST"] + armadura_md_str.split(" "), 72))
     if cv_str:
         out.append(build_lines(["STEEL", "TAKE", "OFF", "LIST"] + cv_str.split(" "), 72))
 

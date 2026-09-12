@@ -708,7 +708,7 @@ def get_cached_model(
     coef_sismico, ductilidad, cm_sismo, cv_sismo, add_wind_cols, max_wind_dist, 
     wall_type, sec_trusses_j, resorte_val, dif_lengths, larm_ext1, larm_ext2, 
     subdiv_ext1, subdiv_ext2, ext_bays_active, ext_bl, ext_br, ext_tl, ext_tr, 
-    ext_height_mode, ext_larm, ext_subdiv, ext_depth
+    ext_height_mode, ext_larm, ext_subdiv, ext_depth, junta_constructiva_tipo, junta_max_dist_ft
 ):
     return StaadModel(
         larm, ljoist, nbay, nspan, harm, hlib, subdiv, roof_type, slope_pct,
@@ -719,7 +719,8 @@ def get_cached_model(
         subdiv_ext1=subdiv_ext1, subdiv_ext2=subdiv_ext2,
         ext_bays_active=ext_bays_active, ext_bl=ext_bl, ext_br=ext_br,
         ext_tl=ext_tl, ext_tr=ext_tr, ext_height_mode=ext_height_mode,
-        ext_larm=ext_larm, ext_subdiv=ext_subdiv, ext_depth=ext_depth
+        ext_larm=ext_larm, ext_subdiv=ext_subdiv, ext_depth=ext_depth,
+        junta_constructiva_tipo=junta_constructiva_tipo, junta_max_dist_ft=junta_max_dist_ft
     )
 
 try:
@@ -736,7 +737,7 @@ try:
         st.session_state.subdiv_ext1, st.session_state.subdiv_ext2, st.session_state.ext_bays_active, 
         st.session_state.ext_bl, st.session_state.ext_br, st.session_state.ext_tl, st.session_state.ext_tr, 
         st.session_state.ext_height_mode, st.session_state.ext_larm, st.session_state.ext_subdiv, 
-        st.session_state.ext_depth
+        st.session_state.ext_depth, st.session_state.junta_constructiva_tipo, st.session_state.junta_max_dist_ft
     )
 except Exception as e:
     st.error(f"Error generando la geometría: {e}")
@@ -1616,7 +1617,10 @@ else:
             wind_cols_line = f"&emsp;<span style='font-weight:700; color:#1e293b;'>• Columnas (Viento):</span> <span style='font-weight:700; color:#1e3a8a;'>{num_wind_cols}</span><br>" if num_wind_cols > 0 else ""
             sec_trusses_line = f"&emsp;<span style='font-weight:700; color:#1e293b;'>• Armaduras (Secundarias):</span> <span style='font-weight:700; color:#1e3a8a;'>{num_sec_trusses_total}</span><br>" if num_sec_trusses_total > 0 else ""
             
-            total_armaduras = model.nSpan * (model.nBay + 1)
+            num_md_juntas = len(getattr(model, 'joint_axes', []))
+            md_line = f"<span style='font-weight:700; color:#1e293b;'>• Marcos Dobles:</span> <span style='font-weight:700; color:#1e3a8a;'>{num_md_juntas}</span><br>" if num_md_juntas > 0 else ""
+
+            total_armaduras = model.nSpan * getattr(model, 'num_frames', model.nBay + 1)
             if getattr(model, 'ext_bays_active', False):
                 ext_depth = getattr(model, 'ext_depth', 1)
                 extra_per_corner = max(0, ext_depth - 1)
@@ -1625,11 +1629,13 @@ else:
                 if getattr(model, 'ext_br', False): total_armaduras += extra_per_corner
                 if getattr(model, 'ext_tr', False): total_armaduras += extra_per_corner
             
+            num_purlins = len(model.groups.get('_LARGUEROS', []))
+            
             elementos_html = f"""
             <div style="font-family: 'Aptos Display', 'Segoe UI', sans-serif; font-size: 1rem; font-weight: 700; color: #1e293b; margin-bottom: 0px; margin-top: -5px;">Elementos</div>
             <hr style="border: 0; border-top: 1px solid #e2e8f0; margin-top: 0px; margin-bottom: 0px;">
             <div style="font-family: 'Aptos Display', 'Segoe UI', sans-serif; line-height: 1.8; color: #334155; font-size: 13px; padding-bottom: 15px; padding-left: 15px;">
-                <span style='font-weight:700; color:#1e293b;'>• Columnas Principales:</span> <span style='font-weight:700; color:#1e3a8a;'>{len(model.groups.get('_COL', [])) // 2}</span><br>
+                {md_line}<span style='font-weight:700; color:#1e293b;'>• Columnas Principales:</span> <span style='font-weight:700; color:#1e3a8a;'>{len(model.groups.get('_COL', [])) // 2}</span><br>
                 {wind_cols_line}<span style='font-weight:700; color:#1e293b;'>• Armaduras:</span> <span style='font-weight:700; color:#1e3a8a;'>{total_armaduras}</span><br>
                 {sec_trusses_line}<span style='font-weight:700; color:#1e293b;'>• Contravientos:</span> <span style='font-weight:700; color:#1e3a8a;'>{len(model.groups.get('_CVH', []))}</span><br>
                 <span style='font-weight:700; color:#1e293b;'>• Largueros:</span> <span style='font-weight:700; color:#1e3a8a;'>{num_purlins}</span>
