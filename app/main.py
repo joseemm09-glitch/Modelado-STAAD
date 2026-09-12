@@ -528,7 +528,9 @@ defaults = {
     "ext_height_mode": "Primer Entre-Eje completo",
     "ext_larm": 15.24,
     "ext_subdiv": 10,
-    "ext_depth": 2
+    "ext_depth": 2,
+    "junta_constructiva_tipo": "Ninguna",
+    "junta_max_dist_ft": 600
 }
 
 for k, v in defaults.items():
@@ -887,6 +889,33 @@ with st.sidebar:
                 selected_ejes = st.session_state.get('sec_truss_custom_ejes', [])
                 for j in interior_j:
                     st.checkbox(f"Eje {j + 1 + shift_eje} (X = {model.get_x(j) / 100.0:.2f} m)", value=(j in selected_ejes), key=f"sec_eje_{j}")
+
+        with st.expander("Juntas Constructivas", expanded=False):
+            junta_opts = ["Ninguna", "Marco doble", "En Cubierta"]
+            curr_junta = st.session_state.get("junta_constructiva_tipo", "Ninguna")
+            junta_idx = junta_opts.index(curr_junta) if curr_junta in junta_opts else 0
+            st.radio(
+                "Tipo de Junta",
+                junta_opts,
+                index=junta_idx,
+                key="_junta_constructiva_tipo",
+                on_change=update_val,
+                args=("junta_constructiva_tipo",),
+                label_visibility="collapsed"
+            )
+            
+            if st.session_state.junta_constructiva_tipo != "Ninguna":
+                st.number_input(
+                    "Separación máxima (ft)",
+                    min_value=50,
+                    step=50,
+                    value=int(st.session_state.junta_max_dist_ft),
+                    key="_junta_max_dist_ft",
+                    on_change=update_val,
+                    args=("junta_max_dist_ft",)
+                )
+                junta_m = st.session_state.junta_max_dist_ft * 0.3048
+                st.markdown(f"<div style='font-size: 11px; color: #64748b; margin-top: -6px; margin-bottom: 8px;'>({junta_m:.2f} m)</div>", unsafe_allow_html=True)
 
         st.markdown("<hr style='border-top: 1px solid #cce5ff;'>", unsafe_allow_html=True)
         
