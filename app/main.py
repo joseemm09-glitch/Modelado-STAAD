@@ -50,7 +50,18 @@ except Exception:
     pass
 
 
-icono_path = os.path.join(os.path.dirname(__file__), "..", "staad_blue.ico")
+# Configuración de icono: "black", "dark_slate" o "blue" (cambiar aquí para alternar color)
+ICONO_COLOR = "blue"
+icono_filename = {
+    "black": "staad_black.ico",
+    "dark_slate": "staad_darkslate.ico",
+    "blue": "staad_blue.ico"
+}.get(ICONO_COLOR, "staad_blue.ico")
+
+icono_path = os.path.join(os.path.dirname(__file__), "..", icono_filename)
+if not os.path.exists(icono_path):
+    icono_path = os.path.join(os.path.dirname(__file__), "..", "staad_blue.ico")
+
 page_icon = icono_path if os.path.exists(icono_path) else "🏢"
 st.set_page_config(page_title="Naves Industriales STAAD.Pro", page_icon=page_icon, layout="wide")
 

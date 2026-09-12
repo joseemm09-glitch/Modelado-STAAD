@@ -18,6 +18,8 @@ FILES_TO_INCLUDE = [
     ("Archivos/JOISTGRAL.UPT", "text"),
     ("Archivos/JPUNTAL.UPT", "text"),
     ("staad_blue.ico", "binary"),
+    ("staad_darkslate.ico", "binary"),
+    ("staad_black.ico", "binary"),
 ]
 
 def build():
