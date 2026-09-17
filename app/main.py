@@ -13,10 +13,13 @@ except Exception:
     pass
 
 
-# Ensure app directory is in sys.path for both local and web environments
+# Ensure app directory and root directory are in sys.path for both local and web environments
 app_dir = os.path.dirname(os.path.abspath(__file__))
+root_dir = os.path.dirname(app_dir)
 if app_dir not in sys.path:
     sys.path.insert(0, app_dir)
+if root_dir not in sys.path:
+    sys.path.insert(0, root_dir)
 
 import streamlit.components.v1 as components
 
@@ -30,11 +33,20 @@ if os.environ.get("LOCAL_DEV") == "1":
     importlib.reload(staad_writer)
     importlib.reload(visualizer)
     importlib.reload(prediseno)
-else:
-    import model
-    import staad_writer
-    import visualizer
-    import prediseno
+import model
+import staad_writer
+import visualizer
+import prediseno
+try:
+    import Catalogo
+    import Catalogo.catalogo_ui
+    import Catalogo.catalogo_state
+    importlib.reload(Catalogo)
+    importlib.reload(Catalogo.catalogo_ui)
+    importlib.reload(Catalogo.catalogo_state)
+except Exception:
+    pass
+
 
 from model import StaadModel
 from staad_writer import write_staad
@@ -760,7 +772,7 @@ def render_siblings_top(group, current):
         if name == current: break
         c1, c2, c3 = st.columns([1, 6, 1])
         is_dis = False
-        if name in ["Diseño", "Catálogo"] and not st.session_state.get("file_generated", False):
+        if name == "Diseño" and not st.session_state.get("file_generated", False):
             is_dis = True
         with c2:
             if name in ["Diseño", "Catálogo"]:
@@ -778,7 +790,7 @@ def render_siblings_bottom(group, current):
                 first_bot = False
             c1, c2, c3 = st.columns([1, 6, 1])
             is_dis = False
-            if name in ["Diseño", "Catálogo"] and not st.session_state.get("file_generated", False):
+            if name == "Diseño" and not st.session_state.get("file_generated", False):
                 is_dis = True
             with c2:
                 if name in ["Diseño", "Catálogo"]:
@@ -807,7 +819,7 @@ with st.sidebar:
         st.markdown("<div class='grey-btn-marker'></div>", unsafe_allow_html=True)
         st.button("Diseño", type="primary", use_container_width=True, on_click=go_panel, args=("Diseño",), disabled=is_disabled)
         st.markdown("<div class='grey-btn-marker'></div>", unsafe_allow_html=True)
-        st.button("Catálogo", type="primary", use_container_width=True, on_click=go_panel, args=("Catálogo",), disabled=is_disabled)
+        st.button("Catálogo", type="primary", use_container_width=True, on_click=go_panel, args=("Catálogo",))
         
     elif panel == "Geometría":
         c1, c2 = st.columns([5, 3])
@@ -1099,15 +1111,37 @@ with st.sidebar:
     elif panel == "Catálogo":
         c1, c2 = st.columns([5, 3])
         with c1:
-            st.button("⬅ Volver", type="secondary", use_container_width=True, on_click=go_panel, args=("Main",))
+            st.button("⬅ Menú Principal", type="secondary", use_container_width=True, on_click=go_panel, args=("Main",))
         with c2:
             try:
                 st.image(icono_path, use_container_width=True)
             except:
                 pass
-        render_siblings_top(nav_group2, "Catálogo")
-        st.header("Catálogo")
-        render_siblings_bottom(nav_group2, "Catálogo")
+        
+        st.markdown("<h3 style='margin-top: 10px; margin-bottom: 30px;'>Catálogo de Conceptos</h3>", unsafe_allow_html=True)
+        
+        import sys, os
+        if os.path.join(os.path.dirname(__file__), 'staad_link') not in sys.path:
+            sys.path.append(os.path.join(os.path.dirname(__file__), 'staad_link'))
+        from link import check_staad_status
+        staad_info = check_staad_status()
+        
+        target_file = st.session_state.get("active_staad_file", "")
+        if staad_info["status"] in ["connected", "connected_no_results"] and target_file and target_file.lower() == str(staad_info["filename"]).lower():
+            color = "#005cb2" if staad_info["status"] == "connected" else "#d4b106"
+            text = f"Sincronizado a modelo:<br><span style='color: {color}; font-weight: normal;'>{staad_info['filename']}</span>"
+        else:
+            # Override if disconnected or mismatched
+            staad_info["status"] = "disconnected"
+            color = "#ba281b" # Red
+            text = "No sincronizado al modelo exportado"
+            
+        st.markdown(f"<div style='margin-bottom: 20px; font-size: 14px; font-weight: 600;'><span style='color: {color}; font-size: 10px;'>●</span> {text}</div>", unsafe_allow_html=True)
+        
+        st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+        st.markdown("<div class='grey-btn-marker'></div>", unsafe_allow_html=True)
+        is_dis = not st.session_state.get("file_generated", False)
+        st.button("Diseño", type="primary", use_container_width=True, on_click=go_panel, args=("Diseño",), key="cat_sidebar_diseno", disabled=is_dis)
 
 if st.session_state.current_panel == "Diseño":
     
@@ -1363,8 +1397,8 @@ if st.session_state.current_panel == "Diseño":
         st.plotly_chart(fig, use_container_width=True, config={'displaylogo': False})
 
 elif st.session_state.current_panel == "Catálogo":
-    st.title("Catálogo de Conceptos")
-    st.write("En desarrollo...")
+    from Catalogo import render_catalogo
+    render_catalogo(model)
 
 else:
     col1, col2 = st.columns([3, 1])
