@@ -529,7 +529,7 @@ st.markdown("""
 
 st.markdown("<div style='color: gray; margin-bottom: -30px; margin-left: 10px; padding-top: 5px; position: relative; z-index: 10;'>Tensor Systems</div>", unsafe_allow_html=True)
 st.title("FrameOne")
-st.markdown("<div style='color: gray; margin-top: -15px; margin-bottom: 20px; margin-left: 10px;'>Modelado de Naves Industriales STAAD.Pro</div>", unsafe_allow_html=True)
+st.markdown("<div style='color: gray; margin-top: -15px; margin-bottom: 20px; margin-left: 10px;'>Modelado de Naves Industriales para STAAD.Pro</div>", unsafe_allow_html=True)
 
 # Inicializar estado para variables por defecto
 defaults = {
