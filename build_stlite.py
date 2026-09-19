@@ -182,8 +182,8 @@ def build():
     <div id="splash-screen">
         <div class="splash-card">
             <img src="data:image/svg+xml;base64,{splash_logo_base64}" class="splash-logo" alt="Logo" />
-            <h1 class="splash-title">Naves Industriales STAAD.Pro</h1>
-            <p class="splash-subtitle">Tensor Systems</p>
+            <h1 class="splash-title">FrameOne</h1>
+            <p class="splash-subtitle">Modelado Naves Industriales STAAD.Pro</p>
             <div class="splash-spinner"></div>
             <p class="splash-status">Iniciando aplicación...</p>
         </div>
