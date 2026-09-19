@@ -1561,7 +1561,6 @@ else:
                   }}
                   .folder-btn:hover {{ background: rgba(0,0,0,0.05); }}
                   .save-btn {{
-                    margin-top: 15px;
                     padding: 0.5rem 1rem; background: #ba281b; color: white;
                     border: none; border-radius: 4px; font-size: 14px; font-weight: 600;
                     cursor: pointer; box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.1);
@@ -1569,9 +1568,10 @@ else:
                   }}
                   .save-btn:hover {{ background: #9d2116; }}
                   .save-btn:disabled {{ opacity: 0.8; cursor: not-allowed; }}
-                  .status {{ font-size: 0.85rem; margin-top: 5px; display: none; }}
+                  .status {{ font-size: 0.85rem; display: none; }}
                   .status.ok {{ color: #16a34a; display: block; }}
                   .status.err {{ color: #dc2626; display: block; }}
+                  .action-row {{ display: flex; align-items: center; gap: 12px; margin-top: 15px; }}
                 </style>
 
                 <span class="label">Ubicación:</span>
@@ -1581,8 +1581,10 @@ else:
                     <button class="folder-btn" id="folderBtn" title="Examinar...">📁</button>
                   </div>
                 </div>
-                <button class="save-btn" id="saveBtn" disabled>Guardar Archivo .std</button>
-                <div id="status" class="status"></div>
+                <div class="action-row">
+                  <button class="save-btn" id="saveBtn" disabled>Guardar Archivo .std</button>
+                  <div id="status" class="status"></div>
+                </div>
 
                 <script>
                   const FILE_NAME = "{clean_name}";
