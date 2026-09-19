@@ -67,14 +67,16 @@ ICONO_COLOR = "blue"
 icono_filename = {
     "black": "staad_black.ico",
     "dark_slate": "staad_darkslate.ico",
-    "blue": "Azul.svg"
-}.get(ICONO_COLOR, "Azul.svg")
+    "blue": "FrameOne2.jpg"
+}.get(ICONO_COLOR, "FrameOne2.jpg")
 
 icono_path = os.path.join(os.path.dirname(__file__), "..", icono_filename)
 if not os.path.exists(icono_path):
-    icono_path = os.path.join(os.path.dirname(__file__), "..", "Azul.svg")
+    icono_path = os.path.join(os.path.dirname(__file__), "..", "FrameOne2.jpg")
 
-page_icon = icono_path if os.path.exists(icono_path) else "🏢"
+icono_small_path = os.path.join(os.path.dirname(__file__), "..", "FrameOne3.png")
+
+page_icon = icono_small_path if os.path.exists(icono_small_path) else "🏢"
 st.set_page_config(page_title="Naves Industriales STAAD.Pro", page_icon=page_icon, layout="wide")
 
 st.markdown("""
@@ -131,9 +133,12 @@ div.element-container:has(div.path-marker) {
 [data-testid="stSidebar"] img {
     border-radius: 18px !important;
     box-shadow: 0 12px 24px rgba(0, 0, 0, 0.25) !important;
-    width: 66% !important;
+    width: 79% !important;
     margin: 0 auto 15px auto !important;
     display: block !important;
+}
+[data-testid="stSidebar"] [data-testid="stImage"] button {
+    display: none !important;
 }
 /* Make the divider faint grey */
 hr {
@@ -824,16 +829,21 @@ with st.sidebar:
         is_disabled = not st.session_state.get("file_generated", False)
         st.markdown("<div class='grey-btn-marker'></div>", unsafe_allow_html=True)
         st.button("Diseño", type="primary", use_container_width=True, on_click=go_panel, args=("Diseño",), disabled=is_disabled)
-        # st.markdown("<div class='grey-btn-marker'></div>", unsafe_allow_html=True)
         # st.button("Catálogo", type="primary", use_container_width=True, on_click=go_panel, args=("Catálogo",))
         
+        st.markdown(
+            "<div style='text-align: center; color: #888; font-size: 11px; margin-top: 24vh; padding-top: 15px; border-top: 1px solid #ddd;'>"
+            "&reg; 2026 Tensor Systems<br>Todos los derechos reservados.<br>v1.0.0"
+            "</div>",
+            unsafe_allow_html=True
+        )
     elif panel == "Geometría":
         c1, c2 = st.columns([5, 3])
         with c1:
             st.button("⬅ Volver", type="secondary", use_container_width=True, on_click=go_panel, args=("Main",))
         with c2:
             try:
-                st.image(icono_path, use_container_width=True)
+                st.image(icono_small_path, use_container_width=True)
             except:
                 pass
         render_siblings_top(nav_group1, "Geometría")
@@ -1006,7 +1016,7 @@ with st.sidebar:
             st.button("⬅ Volver", type="secondary", use_container_width=True, on_click=go_panel, args=("Main",))
         with c2:
             try:
-                st.image(icono_path, use_container_width=True)
+                st.image(icono_small_path, use_container_width=True)
             except:
                 pass
         render_siblings_top(nav_group1, "Cargas")
@@ -1041,7 +1051,7 @@ with st.sidebar:
             st.button("⬅ Volver", type="secondary", use_container_width=True, on_click=go_panel, args=("Main",))
         with c2:
             try:
-                st.image(icono_path, use_container_width=True)
+                st.image(icono_small_path, use_container_width=True)
             except:
                 pass
         render_siblings_top(nav_group1, "Prediseño")
@@ -1087,7 +1097,7 @@ with st.sidebar:
             st.button("⬅ Menú Principal", type="secondary", use_container_width=True, on_click=go_panel, args=("Main",))
         with c2:
             try:
-                st.image(icono_path, use_container_width=True)
+                st.image(icono_small_path, use_container_width=True)
             except:
                 pass
         
@@ -1120,7 +1130,7 @@ with st.sidebar:
             st.button("⬅ Menú Principal", type="secondary", use_container_width=True, on_click=go_panel, args=("Main",))
         with c2:
             try:
-                st.image(icono_path, use_container_width=True)
+                st.image(icono_small_path, use_container_width=True)
             except:
                 pass
         

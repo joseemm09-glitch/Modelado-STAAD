@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="_0" data-name="0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000">
+  <defs>
+    <style>
+      .cls-1 {
+        font-size: 43.13px;
+      }
+
+      .cls-1, .cls-2, .cls-3, .cls-4 {
+        stroke: #fff;
+        stroke-miterlimit: 10;
+        stroke-width: .75px;
+      }
+
+      .cls-1, .cls-4 {
+        fill: #fff;
+        font-family: CenturyGothic, 'Century Gothic';
+      }
+
+      .cls-5 {
+        fill: #212830;
+      }
+
+      .cls-2 {
+        fill: none;
+      }
+
+      .cls-3 {
+        fill: #636466;
+        fill-rule: evenodd;
+      }
+
+      .cls-4 {
+        font-size: 107.83px;
+      }
+    </style>
+  </defs>
+  <rect class="cls-5" width="1000" height="1000" rx="100.23" ry="100.23"/>
+  <g>
+    <g id="HATCH">
+      <path class="cls-3" d="M638.42,251.63h223.13L510.16,82.96v205.47l128.26,420.4V251.63M140.45,251.63h223.13v457.21l128.26-420.4V82.96L140.45,251.63M119.28,241.46V68.4h360.55L119.28,241.46M522.17,68.4h360.55v173.06l-360.55-173.06M501,321.19l-127.84,419.04h255.68s-127.84-419.04-127.84-419.04Z"/>
+    </g>
+    <g>
+      <g id="LWPOLYLINE">
+        <polygon class="cls-2" points="522.17 68.4 882.72 68.4 882.72 241.46 522.17 68.4"/>
+      </g>
+      <g id="LWPOLYLINE-2" data-name="LWPOLYLINE">
+        <polygon class="cls-2" points="119.28 241.46 119.28 68.4 479.83 68.4 119.28 241.46"/>
+      </g>
+      <g id="LWPOLYLINE-3" data-name="LWPOLYLINE">
+        <polygon class="cls-2" points="140.45 251.63 363.58 251.63 363.58 708.83 491.84 288.43 491.84 251.63 491.84 82.96 140.45 251.63"/>
+      </g>
+      <g id="LWPOLYLINE-4" data-name="LWPOLYLINE">
+        <polygon class="cls-2" points="501 321.19 373.16 740.23 628.84 740.23 501 321.19"/>
+      </g>
+      <g id="LWPOLYLINE-5" data-name="LWPOLYLINE">
+        <polygon class="cls-2" points="638.42 251.63 861.55 251.63 510.16 82.96 510.16 251.63 510.16 288.43 638.42 708.83 638.42 251.63"/>
+      </g>
+    </g>
+    <g>
+      <g id="MTEXT">
+        <text class="cls-4" transform="translate(307.78 885.07)"><tspan x="0" y="0">TENSOR</tspan></text>
+      </g>
+      <g id="MTEXT-2" data-name="MTEXT">
+        <text class="cls-1" transform="translate(317.05 932.77)"><tspan x="0" y="0">S</tspan></text>
+        <text class="cls-1" transform="translate(373.25 932.77)"><tspan x="0" y="0">Y</tspan></text>
+        <text class="cls-1" transform="translate(433.44 932.77)"><tspan x="0" y="0">S</tspan></text>
+        <text class="cls-1" transform="translate(489.64 932.77)"><tspan x="0" y="0">T</tspan></text>
+        <text class="cls-1" transform="translate(542.77 932.77)"><tspan x="0" y="0">E</tspan></text>
+        <text class="cls-1" transform="translate(600.59 932.77)"><tspan x="0" y="0">M</tspan></text>
+        <text class="cls-1" transform="translate(674.68 932.77)"><tspan x="0" y="0">S</tspan></text>
+      </g>
+    </g>
+  </g>
+</svg>

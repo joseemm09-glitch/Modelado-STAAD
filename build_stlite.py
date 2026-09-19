@@ -17,7 +17,8 @@ FILES_TO_INCLUDE = [
     ("app/staad_link/link.py", "text"),
     ("Archivos/JOISTGRAL.UPT", "text"),
     ("Archivos/JPUNTAL.UPT", "text"),
-    ("Azul.svg", "binary"),
+    ("FrameOne2.jpg", "binary"),
+    ("FrameOne3.png", "binary"),
     ("staad_darkslate.ico", "binary"),
     ("staad_black.ico", "binary"),
 ]
@@ -45,9 +46,9 @@ def build():
     files_json = json.dumps(files_dict, ensure_ascii=False)
     files_json = files_json.replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
     
-    logo_base64 = files_dict.get('Azul.svg', {}).get('base64', '')
-    with open(os.path.join(ROOT_DIR, 'Azul - Letras.svg'), 'rb') as f:
-        splash_logo_base64 = base64.b64encode(f.read()).decode("utf-8")
+    logo_base64 = files_dict.get('FrameOne2.jpg', {}).get('base64', '')
+    logo_small_base64 = files_dict.get('FrameOne3.png', {}).get('base64', '')
+    splash_logo_base64 = logo_base64
     
     html_template = f"""<!DOCTYPE html>
 <html lang="es">
@@ -56,8 +57,8 @@ def build():
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
     <title>Naves Industriales STAAD.Pro</title>
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,{logo_base64}" />
-    <link rel="apple-touch-icon" href="data:image/svg+xml;base64,{logo_base64}" />
+    <link rel="icon" type="image/png" href="data:image/png;base64,{logo_small_base64}" />
+    <link rel="apple-touch-icon" href="data:image/png;base64,{logo_small_base64}" />
     <meta name="theme-color" content="#005cb2" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -126,7 +127,7 @@ def build():
             object-fit: contain;
             border-radius: 22px;
             box-shadow: 0 10px 22px rgba(0, 92, 178, 0.22);
-            margin: 0 auto 12px auto;
+            margin: 0 auto 20px auto;
         }}
 
         .splash-title {{
@@ -183,7 +184,7 @@ def build():
 <body>
     <div id="splash-screen">
         <div class="splash-card">
-            <img src="data:image/svg+xml;base64,{splash_logo_base64}" class="splash-logo" alt="Logo" />
+            <img src="data:image/jpeg;base64,{splash_logo_base64}" class="splash-logo" alt="Logo" />
             <h1 class="splash-title">FrameOne</h1>
             <p class="splash-subtitle">Modelado de Naves Industriales para STAAD.Pro</p>
             <div class="splash-spinner"></div>
