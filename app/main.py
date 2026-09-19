@@ -519,12 +519,17 @@ st.markdown("""
         pointer-events: none;
     }
     .widget-title { font-size: 12px; font-weight: 600; margin-bottom: 5px; color: #0F172A; }
+    
+    /* Ocultar el icono de hipervinculo que aparece junto a los titulos */
+    .stHeadingContainer a {
+        display: none !important;
+    }
     </style>
 """, unsafe_allow_html=True)
 
 st.markdown("<div style='color: gray; margin-bottom: -15px; margin-left: 10px; padding-top: 5px;'>Tensor Systems</div>", unsafe_allow_html=True)
 st.title("FrameOne")
-st.markdown("<div style='color: gray; margin-top: -15px; margin-bottom: 20px; margin-left: 10px;'>Modelado Naves Industriales STAAD.Pro</div>", unsafe_allow_html=True)
+st.markdown("<div style='color: gray; margin-top: -15px; margin-bottom: 20px; margin-left: 10px;'>Modelado de Naves Industriales STAAD.Pro</div>", unsafe_allow_html=True)
 
 # Inicializar estado para variables por defecto
 defaults = {
