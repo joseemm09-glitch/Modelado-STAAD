@@ -48,7 +48,8 @@ def build():
     
     logo_base64 = files_dict.get('FrameOne2.jpg', {}).get('base64', '')
     logo_small_base64 = files_dict.get('FrameOne3.png', {}).get('base64', '')
-    splash_logo_base64 = logo_base64
+    with open(os.path.join(ROOT_DIR, 'Gris - Letras.svg'), 'rb') as f:
+        splash_logo_base64 = base64.b64encode(f.read()).decode("utf-8")
     
     html_template = f"""<!DOCTYPE html>
 <html lang="es">
@@ -184,7 +185,7 @@ def build():
 <body>
     <div id="splash-screen">
         <div class="splash-card">
-            <img src="data:image/jpeg;base64,{splash_logo_base64}" class="splash-logo" alt="Logo" />
+            <img src="data:image/svg+xml;base64,{splash_logo_base64}" class="splash-logo" alt="Logo" />
             <h1 class="splash-title">FrameOne</h1>
             <p class="splash-subtitle">Modelado de Naves Industriales para STAAD.Pro</p>
             <div class="splash-spinner"></div>
