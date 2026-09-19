@@ -1632,7 +1632,7 @@ else:
                   }}
                 </script>
                 """
-                components.html(web_ui, height=170)
+                components.html(web_ui, height=135)
             else:
                 # ─── Modo Escritorio: guardar al disco y abrir ───
                 if st.button("Guardar Archivo .std", type="primary"):
