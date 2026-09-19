@@ -1379,7 +1379,7 @@ if st.session_state.current_panel == "Diseño":
             render_group_results("Contravientos", grupos_v)
 
     with col_der:
-        st.markdown("<b>Visualizador 3D</b>", unsafe_allow_html=True)
+        st.markdown("<b style='font-size: 14px;'>Visualizador 3D</b>", unsafe_allow_html=True)
         
         st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
         # Using the last active group for highlighting if any
@@ -1411,7 +1411,7 @@ else:
     
     with col1:
         st.markdown("<div style='margin-top: -15px;'></div>", unsafe_allow_html=True)
-        st.subheader("Visualizador 3D")
+        st.markdown("<h3 style='font-size: 20px; font-weight: 600; margin-bottom: 0.5rem;'>Visualizador 3D</h3>", unsafe_allow_html=True)
         show_sup = (st.session_state.current_panel == "Geometría")
         highlight_col = st.session_state.get("highlight_grupo_col", "C-1") if st.session_state.current_panel == "Prediseño" else "Ninguno"
         highlight_ids = None
