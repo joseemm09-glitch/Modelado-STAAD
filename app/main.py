@@ -1443,7 +1443,7 @@ else:
         with st.container():
             st.markdown("<div class='ios-glass-marker'></div>", unsafe_allow_html=True)
         
-            st.markdown("<div style=\"font-family: 'Aptos Display', 'Segoe UI', sans-serif; font-size: 1rem; font-weight: 700; color: #1e293b; margin-bottom: 5px;\">Nombre Proyecto:</div>", unsafe_allow_html=True)
+            st.markdown("<div style=\"font-family: 'Aptos Display', 'Segoe UI', sans-serif; font-size: 1.1rem; font-weight: 700; color: #0f172a; margin-bottom: 0px; margin-top: -5px;\">Nombre Proyecto:</div>", unsafe_allow_html=True)
             
             # Contenedor para simular el sufijo
             col_in1, col_in2 = st.columns([4, 1])
@@ -1452,8 +1452,6 @@ else:
             with col_in2:
                 st.markdown("<div style='color: #aaa; margin-top: 8px; font-weight: 500; font-family: \"Aptos Display\", sans-serif;'>.std</div>", unsafe_allow_html=True)
                 
-            st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
-        
             # Detectar si estamos en entorno web (stlite/Pyodide) o escritorio
             _is_web = False
             try:
@@ -1544,7 +1542,7 @@ else:
                   * {{ box-sizing: border-box; margin: 0; padding: 0; }}
                   body {{ font-family: 'Aptos Display', 'Segoe UI', sans-serif;
                          background: transparent; }}
-                  .label {{ font-family: 'Aptos Display', 'Segoe UI', sans-serif; font-size: 1rem; font-weight: 700; color: #1e293b; margin-bottom: 5px; display: block; }}
+                  .label {{ font-family: 'Aptos Display', 'Segoe UI', sans-serif; font-size: 1.1rem; font-weight: 700; color: #0f172a; margin-bottom: 10px; margin-top: -5px; display: block; }}
                   .row {{ display: flex; position: relative; margin-bottom: 10px; width: 78%; align-items: center; }}
                   .path-input {{
                     width: 100%; padding: 8px 32px 8px 12px; font-size: 0.85rem; color: #374151;
@@ -1696,8 +1694,8 @@ else:
             num_purlins = len(model.groups.get('_LARGUEROS', []))
             
             elementos_html = f"""
-            <div style="font-family: 'Aptos Display', 'Segoe UI', sans-serif; font-size: 1rem; font-weight: 700; color: #1e293b; margin-bottom: 0px; margin-top: -5px;">Elementos</div>
-            <hr style="border: 0; border-top: 1px solid #e2e8f0; margin-top: 0px; margin-bottom: 0px;">
+            <div style="font-family: 'Aptos Display', 'Segoe UI', sans-serif; font-size: 1.1rem; font-weight: 700; color: #0f172a; margin-bottom: 10px; margin-top: -5px;">Elementos</div>
+            <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 0 0 12px 0 !important;">
             <div style="font-family: 'Aptos Display', 'Segoe UI', sans-serif; line-height: 1.8; color: #334155; font-size: 13px; padding-bottom: 15px; padding-left: 15px;">
                 {md_line}{jc_line}<span style='font-weight:700; color:#1e293b;'>• Columnas Principales:</span> <span style='font-weight:700; color:#1e3a8a;'>{len(model.groups.get('_COL', [])) // 2}</span><br>
                 {wind_cols_line}<span style='font-weight:700; color:#1e293b;'>• Armaduras:</span> <span style='font-weight:700; color:#1e3a8a;'>{total_armaduras}</span><br>
@@ -1734,8 +1732,8 @@ else:
                 h_max = hlib + harm + ancho_total * (slope_pct / 100.0) + y_shift_ext
                 
             geometria_html = f"""
-            <div style="font-family: 'Aptos Display', 'Segoe UI', sans-serif; font-size: 1rem; font-weight: 700; color: #1e293b; margin-bottom: 0px; margin-top: -5px;">Geometría</div>
-            <hr style="border: 0; border-top: 1px solid #e2e8f0; margin-top: 0px; margin-bottom: 0px;">
+            <div style="font-family: 'Aptos Display', 'Segoe UI', sans-serif; font-size: 1.1rem; font-weight: 700; color: #0f172a; margin-bottom: 10px; margin-top: -5px;">Geometría</div>
+            <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 0 0 12px 0 !important;">
             <div style="font-family: 'Aptos Display', 'Segoe UI', sans-serif; line-height: 1.8; color: #334155; font-size: 13px; padding-bottom: 15px; padding-left: 15px;">
                 <span style='font-weight:700; color:#1e293b;'>• Largo:</span> <span style='font-weight:700; color:#1e3a8a;'>{largo_total:.2f} m</span><br>
                 <span style='font-weight:700; color:#1e293b;'>• Ancho:</span> <span style='font-weight:700; color:#1e3a8a;'>{ancho_total:.2f} m</span><br>
