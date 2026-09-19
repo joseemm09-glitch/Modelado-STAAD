@@ -67,12 +67,12 @@ ICONO_COLOR = "blue"
 icono_filename = {
     "black": "staad_black.ico",
     "dark_slate": "staad_darkslate.ico",
-    "blue": "staad_blue.ico"
-}.get(ICONO_COLOR, "staad_blue.ico")
+    "blue": "Azul.svg"
+}.get(ICONO_COLOR, "Azul.svg")
 
 icono_path = os.path.join(os.path.dirname(__file__), "..", icono_filename)
 if not os.path.exists(icono_path):
-    icono_path = os.path.join(os.path.dirname(__file__), "..", "staad_blue.ico")
+    icono_path = os.path.join(os.path.dirname(__file__), "..", "Azul.svg")
 
 page_icon = icono_path if os.path.exists(icono_path) else "🏢"
 st.set_page_config(page_title="Naves Industriales STAAD.Pro", page_icon=page_icon, layout="wide")
@@ -523,7 +523,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("Naves Industriales STAAD.Pro")
-st.markdown("<div style='color: gray; margin-top: -15px; margin-bottom: 20px; margin-left: 10px;'>M.I. José Ramón Márquez Montes</div>", unsafe_allow_html=True)
+st.markdown("<div style='color: gray; margin-top: -15px; margin-bottom: 20px; margin-left: 10px;'>Tensor Systems</div>", unsafe_allow_html=True)
 
 # Inicializar estado para variables por defecto
 defaults = {
@@ -818,8 +818,8 @@ with st.sidebar:
         is_disabled = not st.session_state.get("file_generated", False)
         st.markdown("<div class='grey-btn-marker'></div>", unsafe_allow_html=True)
         st.button("Diseño", type="primary", use_container_width=True, on_click=go_panel, args=("Diseño",), disabled=is_disabled)
-        st.markdown("<div class='grey-btn-marker'></div>", unsafe_allow_html=True)
-        st.button("Catálogo", type="primary", use_container_width=True, on_click=go_panel, args=("Catálogo",))
+        # st.markdown("<div class='grey-btn-marker'></div>", unsafe_allow_html=True)
+        # st.button("Catálogo", type="primary", use_container_width=True, on_click=go_panel, args=("Catálogo",))
         
     elif panel == "Geometría":
         c1, c2 = st.columns([5, 3])

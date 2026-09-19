@@ -17,7 +17,7 @@ FILES_TO_INCLUDE = [
     ("app/staad_link/link.py", "text"),
     ("Archivos/JOISTGRAL.UPT", "text"),
     ("Archivos/JPUNTAL.UPT", "text"),
-    ("staad_blue.ico", "binary"),
+    ("Azul.svg", "binary"),
     ("staad_darkslate.ico", "binary"),
     ("staad_black.ico", "binary"),
 ]
@@ -45,7 +45,9 @@ def build():
     files_json = json.dumps(files_dict, ensure_ascii=False)
     files_json = files_json.replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
     
-    logo_base64 = files_dict.get('staad_blue.ico', {}).get('base64', '')
+    logo_base64 = files_dict.get('Azul.svg', {}).get('base64', '')
+    with open(os.path.join(ROOT_DIR, 'Azul - Letras.svg'), 'rb') as f:
+        splash_logo_base64 = base64.b64encode(f.read()).decode("utf-8")
     
     html_template = f"""<!DOCTYPE html>
 <html lang="es">
@@ -54,8 +56,8 @@ def build():
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
     <title>Naves Industriales STAAD.Pro</title>
-    <link rel="icon" type="image/x-icon" href="data:image/x-icon;base64,{logo_base64}" />
-    <link rel="apple-touch-icon" href="data:image/x-icon;base64,{logo_base64}" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,{logo_base64}" />
+    <link rel="apple-touch-icon" href="data:image/svg+xml;base64,{logo_base64}" />
     <meta name="theme-color" content="#005cb2" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -97,7 +99,7 @@ def build():
             left: 0;
             width: 100vw;
             height: 100vh;
-            background: #f8fafc;
+            background: #ffffff;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -177,9 +179,9 @@ def build():
 <body>
     <div id="splash-screen">
         <div class="splash-card">
-            <img src="data:image/x-icon;base64,{logo_base64}" class="splash-logo" alt="Logo" />
+            <img src="data:image/svg+xml;base64,{splash_logo_base64}" class="splash-logo" alt="Logo" />
             <h1 class="splash-title">Naves Industriales STAAD.Pro</h1>
-            <p class="splash-subtitle">M.I. José Ramón Márquez Montes</p>
+            <p class="splash-subtitle">Tensor Systems</p>
             <div class="splash-spinner"></div>
             <p class="splash-status">Iniciando aplicación...</p>
         </div>

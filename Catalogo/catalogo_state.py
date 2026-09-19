@@ -99,6 +99,7 @@ def init_column_group_state(c_name, mids, model, staad_profile=None):
         {"no": 0, "longitud": 0.0, "npt": 0.10}
     ]
 
+    l_plan_def, b_plan_def, _, _ = calculate_plantilla(perfil_data.get("largo_cm", 35.0), perfil_data.get("ancho_cm", 35.0))
     anclas_num, anclas_peso = calculate_anclas_default(perfil_data.get("largo_cm", 35.0), perfil_data.get("ancho_cm", 35.0))
 
     data = {
@@ -108,6 +109,8 @@ def init_column_group_state(c_name, mids, model, staad_profile=None):
         "peso_kg_m": float(perfil_data["peso_kg_m"]),
         "largo_cm": float(perfil_data.get("largo_cm", 35.0)),
         "ancho_cm": float(perfil_data.get("ancho_cm", 35.0)),
+        "largo_plan_cm": l_plan_def,
+        "ancho_plan_cm": b_plan_def,
         "cant": cant,
         "altura_modelo_m": h_init,
         "desplante_m": 0.10,
@@ -152,9 +155,15 @@ def calculate_column_group_totals(col_state):
     peso_total_grupo = round(peso_por_columna * total_no, 2)
 
     # Cálculo de plantillas (+30cm por sentido, redondeado a 5cm, 37.5 kg/m2)
-    l_cm = col_state.get("largo_cm", 35.0)
-    b_cm = col_state.get("ancho_cm", 35.0)
-    l_plan, b_plan, area_plan, p_unit_plan = calculate_plantilla(l_cm, b_cm)
+    if "largo_plan_cm" in col_state and "ancho_plan_cm" in col_state and float(col_state.get("largo_plan_cm", 0)) > 0 and float(col_state.get("ancho_plan_cm", 0)) > 0:
+        l_plan = float(col_state["largo_plan_cm"])
+        b_plan = float(col_state["ancho_plan_cm"])
+        area_plan = round((l_plan / 100.0) * (b_plan / 100.0), 4)
+        p_unit_plan = round(area_plan * 37.5, 2)
+    else:
+        l_cm = col_state.get("largo_cm", 35.0)
+        b_cm = col_state.get("ancho_cm", 35.0)
+        l_plan, b_plan, area_plan, p_unit_plan = calculate_plantilla(l_cm, b_cm)
     peso_plantillas_grupo = round(total_no * p_unit_plan, 2)
 
     # Cálculo de anclas

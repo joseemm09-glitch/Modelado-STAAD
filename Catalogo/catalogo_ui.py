@@ -195,20 +195,17 @@ def render_compact_column_calculator(c_name, col_state):
     perf_val = col_state.get("perfil", "WD14X90")
     perf_lbl = format_profile_mexican_label(perf_val)
     
-    # 1. Caja con el nombre exactamente como saldría en el catálogo
+    # 1. Cabecera compacta
     h_prom_actual = float(col_state.get("altura_promedio_m", col_state.get("altura_modelo_m", 10.51) + col_state.get("desplante_m", 0.10)))
     hp_cm_actual = round(h_prom_actual * 100.0, 1)
     titulo_catalogo = f"Columna {c_name} a base de {perf_lbl} Hp={hp_cm_actual:.1f}"
 
     st.markdown(
-        f"<div style=\"background: #f8fafc; border-left: 4px solid #005cb2; border-radius: 4px; padding: 7px 12px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; border-top: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0;\">"
-        f"<div>"
-        f"<span style=\"font-size: 10.5px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;\">CONCEPTO EN CATÁLOGO:</span><br>"
-        f"<span style=\"font-family: 'Aptos', 'Segoe UI', sans-serif; font-size: 14px; font-weight: 800; color: #005cb2;\">{titulo_catalogo}</span>"
-        f"</div>"
-        f"<div style=\"background: #e0f2fe; color: #0369a1; font-weight: 700; font-size: 11.5px; padding: 3px 10px; border-radius: 4px;\">"
-        f"{col_state.get('total_no', col_state.get('cant', 1))} piezas"
-        f"</div>"
+        f"<div style=\"background: #f8fafc; border-left: 3px solid #005cb2; border-radius: 4px; padding: 5px 10px; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; border-top: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0;\">"
+        f"<span style=\"font-size: 13px; font-weight: 700; color: #005cb2;\">{titulo_catalogo}</span>"
+        f"<span style=\"background: #e0f2fe; color: #0369a1; font-weight: 700; font-size: 11px; padding: 2px 8px; border-radius: 4px;\">"
+        f"{col_state.get('total_no', col_state.get('cant', 1))} pzas"
+        f"</span>"
         f"</div>",
         unsafe_allow_html=True
     )
@@ -254,6 +251,9 @@ def render_compact_column_calculator(c_name, col_state):
                 col_state["peso_kg_m"] = float(p_info["peso_kg_m"])
                 col_state["largo_cm"] = float(p_info.get("largo_cm", 35.0))
                 col_state["ancho_cm"] = float(p_info.get("ancho_cm", 35.0))
+                lp, bp, _, _ = calculate_plantilla(col_state["largo_cm"], col_state["ancho_cm"])
+                col_state["largo_plan_cm"] = lp
+                col_state["ancho_plan_cm"] = bp
                 a_num, a_peso = calculate_anclas_default(col_state["largo_cm"], col_state["ancho_cm"])
                 col_state["anclas_num"] = a_num
                 col_state["anclas_peso_kg"] = a_peso
@@ -330,48 +330,22 @@ def render_compact_column_calculator(c_name, col_state):
     # 4. Cálculo dinámico de totales
     res = calculate_column_group_totals(col_state)
     
-    # 5. Métricas compactas y botón
-    st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
-    m1, m2, m3, m4 = st.columns([1.1, 1.2, 1.3, 1.4])
-    with m1:
-        st.markdown(
-            f"<div style='background: #f8fafc; border: 1px solid #e2e8f0; padding: 6px 8px; border-radius: 6px; text-align: center;'>"
-            f"<span style='font-size: 10.5px; color: #64748b; font-weight: 600;'>ALTURA HP</span><br>"
-            f"<span style='font-size: 13.5px; font-weight: 800; color: #005cb2;'>{res['altura_total_col']:.2f} m</span>"
-            f"</div>",
-            unsafe_allow_html=True
-        )
-    with m2:
-        st.markdown(
-            f"<div style='background: #eff6ff; border: 1px solid #bfdbfe; padding: 6px 8px; border-radius: 6px; text-align: center;'>"
-            f"<span style='font-size: 10.5px; color: #1e3a8a; font-weight: 700;'>PESO COLUMNA</span><br>"
-            f"<span style='font-size: 13px; font-weight: 800; color: #1e3a8a;'>{res['peso_columna_base']:,.1f} KG</span>"
-            f"</div>",
-            unsafe_allow_html=True
-        )
-    with m3:
-        st.markdown(
-            f"<div style='background: #fefce8; border: 1px solid #fde047; padding: 6px 8px; border-radius: 6px; text-align: center;'>"
-            f"<span style='font-size: 10.5px; color: #854d0e; font-weight: 700;'>PESO POR COLUMNA</span><br>"
-            f"<span style='font-size: 13px; font-weight: 800; color: #854d0e;'>{res['peso_por_columna']:,.1f} KG</span>"
-            f"</div>",
-            unsafe_allow_html=True
-        )
-    with m4:
-        st.markdown(
-            f"<div style='background: #fff7ed; border: 1px solid #fed7aa; padding: 6px 8px; border-radius: 6px; text-align: center;'>"
-            f"<span style='font-size: 10.5px; color: #9a3412; font-weight: 800;'>PESO TOTAL ({res['total_no']} PZS)</span><br>"
-            f"<span style='font-size: 13.5px; font-weight: 800; color: #9a3412;'>{res['peso_total_grupo']:,.1f} KG</span>"
-            f"</div>",
-            unsafe_allow_html=True
-        )
+    # 5. Métricas compactas en una sola franja horizontal
+    st.markdown(
+        f"<div style='display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 6px 10px; margin: 8px 0; text-align: center;'>"
+        f"<div><span style='font-size: 10px; color: #64748b; font-weight: 600;'>ALTURA HP</span><br><b style='font-size: 13px; color: #005cb2;'>{res['altura_total_col']:.2f} m</b></div>"
+        f"<div><span style='font-size: 10px; color: #1e3a8a; font-weight: 600;'>PESO BASE</span><br><b style='font-size: 13px; color: #1e3a8a;'>{res['peso_columna_base']:,.1f} kg</b></div>"
+        f"<div><span style='font-size: 10px; color: #854d0e; font-weight: 600;'>POR COLUMNA</span><br><b style='font-size: 13px; color: #854d0e;'>{res['peso_por_columna']:,.1f} kg</b></div>"
+        f"<div><span style='font-size: 10px; color: #9a3412; font-weight: 700;'>TOTAL ({res['total_no']} PZS)</span><br><b style='font-size: 13.5px; color: #9a3412;'>{res['peso_total_grupo']:,.1f} kg</b></div>"
+        f"</div>",
+        unsafe_allow_html=True
+    )
 
-    st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
-    c_btn, _ = st.columns([1.4, 3.6])
+    c_btn, _ = st.columns([1.2, 3.8])
     with c_btn:
-        if st.button(f"Guardar Cambios {c_name}", key=f"btn_save_{c_name}", type="primary", use_container_width=True):
+        if st.button(f"Guardar {c_name}", key=f"btn_save_{c_name}", type="primary", use_container_width=True):
             st.session_state[f"col_quant_{c_name}"] = col_state
-            st.success(f"Configuración de {c_name} actualizada exitosamente.")
+            st.success(f"{c_name} guardado.")
             st.rerun()
 
 def render_catalogo(model):
@@ -442,7 +416,6 @@ def render_catalogo(model):
             cols_keys = list(sorted(cols_dict.keys()))
 
             # ── Submenú 1: Columnas ──
-            # ── Submenú 1: Columnas ──
             with st.expander("Columnas", expanded=True):
                 # 1. Selector horizontal compacto de grupo de columna idéntico al screenshot del usuario
                 sel_col_name = st.radio(
@@ -461,93 +434,98 @@ def render_catalogo(model):
 
             # ── Submenú 2: Plantillas ──
             with st.expander("Plantillas", expanded=False):
+                plantillas_data = []
+                peso_tot_plantillas = 0.0
+
+                for k in cols_keys:
+                    col_s = cat_data["columnas_detalle"].get(k, {})
+                    cant = col_s.get("total_no", 0)
+                    l_p = float(col_s.get("largo_plan_cm", 65.0))
+                    b_p = float(col_s.get("ancho_plan_cm", 65.0))
+                    p_u = float(col_s.get("peso_unit_plan", 15.84))
+                    p_tot = float(col_s.get("peso_plantillas_grupo", round(cant * p_u, 2)))
+                    peso_tot_plantillas += p_tot
+                    
+                    perf_k = col_s.get("perfil", "")
+                    perf_lbl = format_profile_mexican_label(perf_k)
+                    plantillas_data.append({
+                        "Grupo": k,
+                        "Perfil": perf_lbl,
+                        "Plantilla (cm)": f"{l_p:.0f} × {b_p:.0f}",
+                        "Espesor": "3/16\"",
+                        "Cant.": cant,
+                        "P. Unit. (kg)": f"{p_u:.2f}",
+                        "Peso Total (kg)": f"{p_tot:,.1f}"
+                    })
+
+                st.dataframe(pd.DataFrame(plantillas_data), use_container_width=True, hide_index=True)
+                
+                # Ajuste rápido de dimensiones de plantilla
+                c_pcol, c_pl, c_pb, c_pbtn = st.columns([1.1, 1.2, 1.2, 1.1])
+                with c_pcol:
+                    sel_edit_p = st.selectbox("Grupo", cols_keys, key="sel_edit_plan_grp", label_visibility="collapsed")
+                curr_col_p = cat_data["columnas_detalle"].get(sel_edit_p, {})
+                with c_pl:
+                    new_l = st.number_input(
+                        "Largo (cm)",
+                        min_value=20.0,
+                        max_value=200.0,
+                        value=float(curr_col_p.get("largo_plan_cm", 65.0)),
+                        step=5.0,
+                        key=f"inp_lplan_{sel_edit_p}",
+                        label_visibility="collapsed"
+                    )
+                with c_pb:
+                    new_b = st.number_input(
+                        "Ancho (cm)",
+                        min_value=20.0,
+                        max_value=200.0,
+                        value=float(curr_col_p.get("ancho_plan_cm", 65.0)),
+                        step=5.0,
+                        key=f"inp_bplan_{sel_edit_p}",
+                        label_visibility="collapsed"
+                    )
+                with c_pbtn:
+                    if st.button("Ajustar", key=f"btn_upd_plan_{sel_edit_p}", use_container_width=True):
+                        state_k = f"col_quant_{sel_edit_p}"
+                        if state_k in st.session_state:
+                            st.session_state[state_k]["largo_plan_cm"] = new_l
+                            st.session_state[state_k]["ancho_plan_cm"] = new_b
+                        else:
+                            curr_col_p["largo_plan_cm"] = new_l
+                            curr_col_p["ancho_plan_cm"] = new_b
+                            st.session_state[state_k] = curr_col_p
+                        st.rerun()
+
                 st.markdown(
-                    "<div style='font-size: 13px; color: #475569; margin-bottom: 12px; line-height: 1.5;'>"
-                    "<b>Criterio de cálculo:</b> Ancho y largo de columna <b>+30 cm por sentido</b> y redondeado al múltiplo más cercano de <b>5 cm</b>. "
-                    "Área en m² &times; <b>37.5 kg/m²</b> (peso para placa de 3/16\")."
-                    "</div>",
-                    unsafe_allow_html=True
-                )
-                
-                # Selector de grupo de columnas
-                sel_plan_col = st.radio(
-                    "Seleccionar Grupo de Columna:", 
-                    cols_keys, 
-                    horizontal=True, 
-                    key="radio_sel_plan_col",
-                    format_func=lambda c: f"{c} ({cat_data['columnas_detalle'].get(c, {}).get('total_no', 0)} pzas)"
-                )
-                
-                col_state_plan = cat_data["columnas_detalle"].get(sel_plan_col, {})
-                c_cant = col_state_plan.get("total_no", 0)
-                c_largo = float(col_state_plan.get("largo_cm", 35.0))
-                c_ancho = float(col_state_plan.get("ancho_cm", 35.0))
-                c_perf = col_state_plan.get("perfil", "WD14X90")
-                c_sec_type = col_state_plan.get("sec_type", "IPR Doble (WD)")
-                
-                l_plan = float(col_state_plan.get("largo_plan_cm", 65.0))
-                b_plan = float(col_state_plan.get("ancho_plan_cm", 65.0))
-                area_plan = float(col_state_plan.get("area_plan_m2", 0.4225))
-                p_unit_plan = float(col_state_plan.get("peso_unit_plan", 15.84))
-                p_tot_grp_plan = float(col_state_plan.get("peso_plantillas_grupo", 0.0))
-                
-                # Diagrama de la Placa Base / Plantilla
-                diagram_html = generate_plantilla_diagram(sel_plan_col, c_perf, c_largo, c_ancho, l_plan, b_plan, c_sec_type)
-                st.markdown(diagram_html, unsafe_allow_html=True)
-                
-                # Indicadores de dimensiones y peso de la plantilla abajo del diagrama
-                st.markdown(
-                    f"<div style='display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 10px; margin-bottom: 15px;'>"
-                    f"<div style='background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 8px; padding: 10px 18px; text-align: center; min-width: 170px;'>"
-                    f"<span style='font-size: 11.5px; font-weight: 700; color: #166534;'>PESO DE LA PLANTILLA:</span><br>"
-                    f"<span style='font-size: 20px; font-weight: 800; color: #15803d;'>{p_unit_plan:,.2f} KG</span><br>"
-                    f"<span style='font-size: 10.5px; color: #166534;'>(Placa de 3/16\" &bull; Unitario)</span>"
-                    f"</div>"
-                    f"<div style='background: #eff6ff; border: 1.5px solid #93c5fd; border-radius: 8px; padding: 10px 18px; text-align: center; min-width: 170px;'>"
-                    f"<span style='font-size: 11.5px; font-weight: 700; color: #1e40af;'>DIMENSIONES:</span><br>"
-                    f"<span style='font-size: 20px; font-weight: 800; color: #1d4ed8;'>{l_plan:.0f} &times; {b_plan:.0f} cm</span><br>"
-                    f"<span style='font-size: 10.5px; color: #1e40af;'>Área: {area_plan:.4f} m²</span>"
-                    f"</div>"
-                    f"<div style='background: #fefce8; border: 1.5px solid #fde047; border-radius: 8px; padding: 10px 18px; text-align: center; min-width: 170px;'>"
-                    f"<span style='font-size: 11.5px; font-weight: 700; color: #854d0e;'>PESO TOTAL GRUPO {sel_plan_col}:</span><br>"
-                    f"<span style='font-size: 20px; font-weight: 800; color: #a16207;'>{p_tot_grp_plan:,.1f} KG</span><br>"
-                    f"<span style='font-size: 10.5px; color: #854d0e;'>({c_cant} piezas &times; {p_unit_plan:.2f} kg)</span>"
-                    f"</div>"
-                    f"</div>",
-                    unsafe_allow_html=True
-                )
-                
-                # Suma general de plantillas de toda la nave
-                peso_tot_plantillas = sum(cat_data["columnas_detalle"].get(k, {}).get("peso_plantillas_grupo", 0.0) for k in cols_keys)
-                st.markdown(
-                    f"<div style='text-align: right; font-weight: 800; font-size: 13.5px; color: #005cb2; padding: 8px 12px; background: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0;'>"
-                    f"TOTAL PESO PLANTILLAS GENERAL (TODA LA NAVE): {peso_tot_plantillas:,.1f} kg"
+                    f"<div style='display: flex; justify-content: space-between; font-weight: 700; font-size: 12.5px; color: #005cb2; margin-top: 4px; padding: 5px 10px; background: #f8fafc; border-radius: 4px; border: 1px solid #e2e8f0;'>"
+                    f"<span>Criterio: +30 cm / Placa 3/16\" (37.5 kg/m²)</span>"
+                    f"<span>TOTAL PLANTILLAS: {peso_tot_plantillas:,.1f} kg</span>"
                     f"</div>",
                     unsafe_allow_html=True
                 )
 
             # ── Submenú 3: Anclas ──
             with st.expander("Anclas", expanded=False):
-                st.markdown(
-                    "<div style='font-size: 13px; color: #475569; margin-bottom: 12px; line-height: 1.5;'>"
-                    "<b>Lógica de cálculo:</b> Cajones de <b>4, 6, 8 y 12 anclas</b> de acuerdo a la sección y esfuerzo de la columna, "
-                    "con pesos de <b>18 kg a 95 kg</b> por cajón de anclas (redondos lisos con rosca y placas de anclaje)."
-                    "</div>",
-                    unsafe_allow_html=True
-                )
-                
-                # Configuración interactiva por grupo de anclas
-                st.markdown("<div style='font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 6px;'>AJUSTE DE CAJONES DE ANCLAS:</div>", unsafe_allow_html=True)
-                anclas_rows = []
+                c_h1, c_h2, c_h3, c_h4 = st.columns([1.1, 1.4, 1.3, 1.2])
+                with c_h1:
+                    st.markdown("<span style='font-size: 11px; font-weight: 700; color: #64748b;'>GRUPO</span>", unsafe_allow_html=True)
+                with c_h2:
+                    st.markdown("<span style='font-size: 11px; font-weight: 700; color: #64748b;'>CAJÓN</span>", unsafe_allow_html=True)
+                with c_h3:
+                    st.markdown("<span style='font-size: 11px; font-weight: 700; color: #64748b;'>PESO CAJÓN (KG)</span>", unsafe_allow_html=True)
+                with c_h4:
+                    st.markdown("<span style='font-size: 11px; font-weight: 700; color: #64748b;'>SUBTOTAL</span>", unsafe_allow_html=True)
+
                 peso_tot_anclas = 0.0
 
                 for c_name in cols_keys:
                     col_state = cat_data["columnas_detalle"].get(c_name, {})
                     cant = col_state.get("total_no", 0)
                     
-                    ca1, ca2, ca3, ca4 = st.columns([1.0, 1.4, 1.4, 1.4])
+                    ca1, ca2, ca3, ca4 = st.columns([1.1, 1.4, 1.3, 1.2])
                     with ca1:
-                        st.markdown(f"<div style='padding-top: 6px; font-weight: 700; color: #0369a1;'>{c_name} ({cant} cols)</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div style='padding-top: 5px; font-weight: 700; font-size: 13px; color: #0369a1;'>{c_name} <span style='font-size: 11px; color: #64748b;'>({cant} cols)</span></div>", unsafe_allow_html=True)
                     with ca2:
                         opt_anclas = [4, 6, 8, 12]
                         curr_a = col_state.get("anclas_num", 8)
@@ -557,7 +535,7 @@ def render_catalogo(model):
                             opt_anclas, 
                             index=idx_a, 
                             key=f"sel_anc_num_{c_name}",
-                            format_func=lambda x: f"Cajón {x} anclas",
+                            format_func=lambda x: f"{x} anclas",
                             label_visibility="collapsed"
                         )
                     with ca3:
@@ -574,19 +552,10 @@ def render_catalogo(model):
                     with ca4:
                         sub_anc = round(cant * col_state["anclas_peso_kg"], 1)
                         peso_tot_anclas += sub_anc
-                        st.markdown(f"<div style='padding-top: 6px; font-weight: 600; color: #0f172a;'>{sub_anc:,.1f} kg</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div style='padding-top: 5px; font-weight: 700; font-size: 13px; color: #0f172a;'>{sub_anc:,.1f} kg</div>", unsafe_allow_html=True)
 
-                    anclas_rows.append({
-                        "Columna": c_name,
-                        "Cantidad Columnas": cant,
-                        "Tipo de Cajón": f"Cajón con {col_state['anclas_num']} anclas",
-                        "Peso Unitario (kg)": f"{col_state['anclas_peso_kg']:.1f}",
-                        "Peso Total Anclas (kg)": f"{sub_anc:,.1f}"
-                    })
-
-                st.markdown("<hr style='margin: 8px 0; border-top: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
                 st.markdown(
-                    f"<div style='text-align: right; font-weight: 800; font-size: 14px; color: #005cb2; margin-top: 8px;'>"
+                    f"<div style='text-align: right; font-weight: 700; font-size: 13px; color: #005cb2; margin-top: 4px; padding: 5px 10px; background: #f8fafc; border-radius: 4px; border: 1px solid #e2e8f0;'>"
                     f"TOTAL PESO ANCLAS: {peso_tot_anclas:,.1f} kg"
                     f"</div>",
                     unsafe_allow_html=True
