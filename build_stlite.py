@@ -120,15 +120,17 @@ def build():
         }}
 
         .splash-logo {{
-            width: 108px;
-            height: 108px;
+            width: 135px;
+            height: auto;
+            max-height: 135px;
+            object-fit: contain;
             border-radius: 22px;
             box-shadow: 0 10px 22px rgba(0, 92, 178, 0.22);
             margin-bottom: 16px;
         }}
 
         .splash-title {{
-            font-size: 19px;
+            font-size: 20px;
             font-weight: 600;
             color: #0f172a;
             margin: 0 0 2px 0;
@@ -137,7 +139,7 @@ def build():
         }}
 
         .splash-subtitle {{
-            font-size: 13px;
+            font-size: 14px;
             color: #64748b;
             margin: 0 0 22px 0;
             line-height: 1.2;
