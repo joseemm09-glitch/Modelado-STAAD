@@ -639,8 +639,8 @@ class StaadModel:
                             nid_base = self.add_node(x_node, 0.0, i * self.Lz, is_wind_base=True)
                             
                             col_wind = self.add_member(nid_base, closest_node, '_COLVIENTO')
-                            
-                            # Release at the top: MY, MZ, FX
+                            trib_z = self.Larm_list[j] / self.wind_col_Z_M_list[j]
+                            self.col_trib_z[col_wind] = trib_z
                             self.release_end_fx.append(col_wind)
                             
                             # Classify for wind loading
