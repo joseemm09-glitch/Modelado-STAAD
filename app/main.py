@@ -77,7 +77,7 @@ if not os.path.exists(icono_path):
 icono_small_path = os.path.join(os.path.dirname(__file__), "..", "FrameOne3.png")
 
 page_icon = icono_small_path if os.path.exists(icono_small_path) else "🏢"
-st.set_page_config(page_title="Naves Industriales STAAD.Pro", page_icon=page_icon, layout="wide")
+st.set_page_config(page_title="FrameOne", page_icon=page_icon, layout="wide")
 
 st.markdown("""
 <style>
@@ -833,7 +833,7 @@ with st.sidebar:
         
         st.markdown(
             "<div style='text-align: center; color: #888; font-size: 11px; margin-top: 24vh; padding-top: 15px; border-top: 1px solid #ddd;'>"
-            "&reg; 2026 Tensor Systems<br>Todos los derechos reservados.<br>v1.0.0"
+            "&reg; 2026 Tensor Systems<br>Todos los derechos reservados.<br>v1.0.0 | <a href='mailto:admintensorsystems@gmail.com' style='color: inherit; text-decoration: none;'>Contáctanos</a>"
             "</div>",
             unsafe_allow_html=True
         )
