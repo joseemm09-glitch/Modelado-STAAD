@@ -126,14 +126,14 @@ def build():
             object-fit: contain;
             border-radius: 22px;
             box-shadow: 0 10px 22px rgba(0, 92, 178, 0.22);
-            margin: 0 auto 0 auto;
+            margin: 0 auto 12px auto;
         }}
 
         .splash-title {{
             font-size: 20px;
             font-weight: 600;
             color: #0f172a;
-            margin: -6px 0 0 0;
+            margin: 0 0 0 0;
             padding: 0;
             letter-spacing: -0.3px;
             line-height: 1.25;
