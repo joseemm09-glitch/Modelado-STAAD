@@ -527,7 +527,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.markdown("<div style='color: gray; margin-bottom: -15px; margin-left: 10px; padding-top: 5px;'>Tensor Systems</div>", unsafe_allow_html=True)
+st.markdown("<div style='color: gray; margin-bottom: -30px; margin-left: 10px; padding-top: 5px; position: relative; z-index: 10;'>Tensor Systems</div>", unsafe_allow_html=True)
 st.title("FrameOne")
 st.markdown("<div style='color: gray; margin-top: -15px; margin-bottom: 20px; margin-left: 10px;'>Modelado de Naves Industriales STAAD.Pro</div>", unsafe_allow_html=True)
 
