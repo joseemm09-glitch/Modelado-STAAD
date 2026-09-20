@@ -533,7 +533,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.markdown("<div style='color: gray; margin-bottom: -30px; margin-left: 10px; padding-top: 5px; position: relative; z-index: 10;'>Tensor Systems</div>", unsafe_allow_html=True)
-st.title("FrameOne")
+st.title("FrameOne", anchor=False)
 st.markdown("<div style='color: gray; margin-top: -15px; margin-bottom: 20px; margin-left: 10px;'>Modelado de Naves Industriales para STAAD.Pro</div>", unsafe_allow_html=True)
 
 # Inicializar estado para variables por defecto
@@ -642,7 +642,7 @@ def update_larm():
     
     # Auto-actualizar Peralte de Armadura
     avg_harm = (length / 10.0 + length / 15.0) / 2.0
-    st.session_state.harm = round(avg_harm, 1)
+    st.session_state.harm = max(0.5, round(avg_harm, 1))
     st.session_state['_harm'] = st.session_state.harm
 
 def update_larm_ext1():
@@ -663,7 +663,7 @@ def update_larm_ext2():
     st.session_state.subdiv_ext2 = max(2, int(needed))
     st.session_state['_subdiv_ext2'] = st.session_state.subdiv_ext2
     
-    st.session_state.harm = math.ceil((length / 12.5) * 10) / 10.0
+    st.session_state.harm = max(0.5, math.ceil((length / 12.5) * 10) / 10.0)
     st.session_state['_harm'] = st.session_state.harm
 
 def update_larm_ext_bays():
@@ -1421,7 +1421,7 @@ else:
     
     with col1:
         st.markdown("<div style='margin-top: -15px;'></div>", unsafe_allow_html=True)
-        st.markdown("<h3 style='font-size: 20px; font-weight: 600; margin-bottom: 0.5rem;'>Visualizador 3D</h3>", unsafe_allow_html=True)
+        st.markdown("<div style='font-size: 20px; font-weight: 600; margin-bottom: 0.5rem;'>Visualizador 3D</div>", unsafe_allow_html=True)
         show_sup = (st.session_state.current_panel == "Geometría")
         highlight_col = st.session_state.get("highlight_grupo_col", "C-1") if st.session_state.current_panel == "Prediseño" else "Ninguno"
         highlight_ids = None
@@ -1431,7 +1431,7 @@ else:
         
         if is_mobile_client:
             fig.update_layout(
-                scene_camera=dict(eye=dict(x=-3.0, y=-3.0, z=3.0))
+                scene_camera=dict(eye=dict(x=-5.0, y=-5.0, z=4.0))
             )
             
         st.plotly_chart(fig, use_container_width=True, config={

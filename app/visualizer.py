@@ -367,8 +367,8 @@ def plot_model(model, show_supports=False, highlight_ids=None, highlight_colors=
         zaxis=dict(title='Y (m)'),
         aspectmode='data', # Keeps scale proportional
         camera=dict(
-            eye=dict(x=-1.5, y=-1.5, z=1.2),
-            center=dict(x=-0.2, y=0, z=-0.5),
+            eye=dict(x=-1.9, y=-1.9, z=1.5),
+            center=dict(x=0.25, y=0.15, z=-0.8),
             up=dict(x=0, y=0, z=1)
         )
     )
@@ -394,7 +394,7 @@ def plot_model(model, show_supports=False, highlight_ids=None, highlight_colors=
                 bordercolor="rgba(0, 0, 0, 0.2)",
                 showactive=True,
                 buttons=[
-                    dict(label="Iso", method="relayout", args=["scene.camera", dict(eye=dict(x=-1.5, y=-1.5, z=1.2), center=dict(x=0, y=0, z=-0.5), up=dict(x=0, y=0, z=1))]),
+                    dict(label="Iso", method="relayout", args=["scene.camera", dict(eye=dict(x=-1.9, y=-1.9, z=1.5), center=dict(x=0.25, y=0.15, z=-0.8), up=dict(x=0, y=0, z=1))]),
                     dict(label="Planta", method="relayout", args=["scene.camera", dict(eye=dict(x=0, y=0, z=2.5), center=dict(x=0, y=0, z=-0.5), up=dict(x=0, y=1, z=0))]),
                     dict(label="Lat. X", method="relayout", args=["scene.camera", dict(eye=dict(x=0, y=-2.5, z=0), center=dict(x=0, y=0, z=-0.5), up=dict(x=0, y=0, z=1))]),
                     dict(label="Lat. Z", method="relayout", args=["scene.camera", dict(eye=dict(x=-2.5, y=0, z=0), center=dict(x=0, y=0, z=-0.5), up=dict(x=0, y=0, z=1))])
