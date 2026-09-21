@@ -79,8 +79,104 @@ icono_small_path = os.path.join(os.path.dirname(__file__), "..", "FrameOne3.png"
 page_icon = icono_small_path if os.path.exists(icono_small_path) else "🏢"
 st.set_page_config(page_title="FrameOne", page_icon=page_icon, layout="wide")
 
+# Forzar Tema Light por defecto y Puente de Mensajes (ESC, Minimizar)
+components.html("""
+<script>
+try {
+    const themeVal = JSON.stringify('Light');
+    const pathKey = 'stActiveTheme-' + window.parent.location.pathname + '-v2';
+    const rootKey = 'stActiveTheme-/-v2';
+    const currentTheme = window.parent.localStorage.getItem(pathKey) || window.parent.localStorage.getItem(rootKey);
+    if (currentTheme !== themeVal) {
+        window.parent.localStorage.setItem(pathKey, themeVal);
+        window.parent.localStorage.setItem(rootKey, themeVal);
+        window.parent.localStorage.setItem('stActiveTheme', themeVal);
+        window.parent.location.reload();
+    }
+} catch (e) {}
+
+// Escuchar tecla ESC dentro de Streamlit y notificar a la ventana superior
+window.parent.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        window.top.postMessage('pywebview:restore', '*');
+        try {
+            if (window.top.pywebview && window.top.pywebview.api) {
+                window.top.pywebview.api.restore();
+            }
+        } catch(err) {}
+    }
+});
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        window.top.postMessage('pywebview:restore', '*');
+        try {
+            if (window.top.pywebview && window.top.pywebview.api) {
+                window.top.pywebview.api.restore();
+            }
+        } catch(err) {}
+    }
+});
+</script>
+""", height=0, width=0)
+
+if st.session_state.get("minimize_next"):
+    st.session_state.minimize_next = False
+    components.html("""
+    <script>
+    try {
+        window.top.postMessage('pywebview:minimize', '*');
+        const api = (window.top && window.top.pywebview && window.top.pywebview.api) || 
+                    (window.parent && window.parent.pywebview && window.parent.pywebview.api);
+        if (api && api.minimize) {
+            api.minimize();
+        }
+    } catch(e) {}
+    </script>
+    """, height=0, width=0)
+
 st.markdown("""
 <style>
+/* Forzar Colores de Tema Claro en todo el contenedor de la App */
+:root, [data-testid="stAppViewContainer"], .stApp {
+    background-color: #ffffff !important;
+    color: #1e293b !important;
+}
+
+[data-testid="stSidebar"] {
+    background-color: #f8fafc !important;
+    border-right: 1px solid #e2e8f0 !important;
+}
+
+/* Ocultar barra superior completa de Streamlit (Deploy y menú de 3 puntos) */
+header[data-testid="stHeader"] {
+    display: none !important;
+}
+#MainMenu {
+    visibility: hidden !important;
+    display: none !important;
+}
+footer {
+    visibility: hidden !important;
+    display: none !important;
+}
+[data-testid="stToolbar"] {
+    display: none !important;
+}
+[data-testid="stDecoration"] {
+    display: none !important;
+}
+[data-testid="stStatusWidget"] {
+    display: none !important;
+}
+.stDeployButton,
+[data-testid="stDeployButton"],
+div[data-testid="stToolbarActions"],
+button[title="Deploy this app"],
+button[title="View app in Streamlit Community Cloud"] {
+    display: none !important;
+}
+
 /* Mobile layout adjustments for Plotly 3D Viewer */
 @media screen and (max-width: 768px) {
     div[data-testid="stPlotlyChart"],
@@ -200,29 +296,83 @@ st.markdown("""
         color: #0f172a !important;
     }
 
-    /* Tema Azul para Controles: Radio, Toggles, Checkboxes */
-    div[role="radiogroup"] label div[role="radio"][aria-checked="true"],
-    div[role="radiogroup"] label div:has(input:checked),
-    div[data-testid="stRadio"] label [aria-checked="true"] > div,
-    div[data-testid="stRadio"] [aria-checked="true"] div {
-        border-color: #005cb2 !important;
-    }
-    div[role="radiogroup"] label div[role="radio"][aria-checked="true"]::after,
-    div[data-testid="stRadio"] [aria-checked="true"] span,
-    div[data-testid="stRadio"] [aria-checked="true"] svg circle {
-        background-color: #005cb2 !important;
-        fill: #005cb2 !important;
+    /* Forzar accent-color nativo azul */
+    input[type="checkbox"], input[type="radio"] {
+        accent-color: #005cb2 !important;
     }
 
-    div[data-testid="stToggle"] label div[aria-checked="true"],
-    div[data-testid="stToggle"] [aria-checked="true"] {
-        background-color: #005cb2 !important;
+    /* ======================================================== */
+    /* Tema Azul (#005cb2) SOLO para Iconos de Checkboxes y Radios */
+    /* ======================================================== */
+
+    /* Reset estricto: Nunca aplicar fondo a textos, etiquetas o contenedores de opciones */
+    div[data-testid="stCheckbox"] label,
+    div[data-testid="stCheckbox"] label p,
+    div[data-testid="stCheckbox"] label span,
+    div[data-testid="stCheckbox"] [data-testid="stWidgetLabel"],
+    div[data-testid="stRadio"] label,
+    div[data-testid="stRadio"] label p,
+    div[data-testid="stRadio"] label span,
+    div[data-testid="stRadio"] [data-testid="stWidgetLabel"],
+    div[data-testid="stRadioOption"],
+    div[data-testid="stRadioOption"] p,
+    div[data-testid="stRadioOption"] span,
+    div[data-testid="stRadioOption"] > div,
+    div[data-testid="stRadioOption"] > div > div {
+        background: transparent !important;
+        background-color: transparent !important;
     }
 
-    div[data-testid="stCheckbox"] label div[aria-checked="true"],
-    div[data-testid="stCheckbox"] [aria-checked="true"] {
+    /* 1. Checkbox: SOLO la cajita con la palomita */
+    div[data-testid="stCheckbox"] label > div:first-child:has(svg),
+    div[data-testid="stCheckbox"] label > span:first-child:has(svg),
+    div[data-testid="stCheckbox"] label > div:first-child > div:has(svg),
+    div[data-testid="stCheckbox"] div:has(> svg[viewBox="0 0 10 8"]) {
         background-color: #005cb2 !important;
         border-color: #005cb2 !important;
+    }
+
+    div[data-testid="stCheckbox"] svg {
+        fill: #ffffff !important;
+        stroke: #ffffff !important;
+    }
+    div[data-testid="stCheckbox"] svg polyline {
+        stroke: #ffffff !important;
+        fill: none !important;
+    }
+
+    /* 2. Radio Button: SOLO el círculo indicador de selección */
+    div[data-testid="stRadioOption"][data-selected="true"] > div > div > div:first-child,
+    div[data-testid="stRadio"] label[data-selected="true"] > div > div > div:first-child,
+    div[data-testid="stRadio"] div[role="radiogroup"] label[data-selected="true"] > div > div > div:first-child {
+        background-color: #005cb2 !important;
+        border-color: #005cb2 !important;
+    }
+
+    /* Punto interior blanco del radio seleccionado */
+    div[data-testid="stRadioOption"][data-selected="true"] > div > div > div:first-child > div,
+    div[data-testid="stRadio"] label[data-selected="true"] > div > div > div:first-child > div,
+    div[data-testid="stRadio"] div[role="radiogroup"] label[data-selected="true"] > div > div > div:first-child > div {
+        background-color: #ffffff !important;
+    }
+
+    /* 3. Toggles activos */
+    div[data-testid="stToggle"] label > div[aria-checked="true"],
+    div[data-testid="stToggle"] [aria-checked="true"]:not(label):not(p):not(span) {
+        background-color: #005cb2 !important;
+        border-color: #005cb2 !important;
+    }
+
+    /* 4. Sliders */
+    div[data-testid="stSlider"] [role="slider"] {
+        background-color: #005cb2 !important;
+        border-color: #005cb2 !important;
+    }
+
+    /* 5. Pestañas activas */
+    div[data-testid="stTabs"] button[aria-selected="true"] {
+        color: #005cb2 !important;
+        border-bottom-color: #005cb2 !important;
     }
 
     div[data-testid="stNumberInputStepDown"],
@@ -1160,6 +1310,15 @@ with st.sidebar:
         st.button("Diseño", type="primary", use_container_width=True, on_click=go_panel, args=("Diseño",), key="cat_sidebar_diseno", disabled=is_dis)
 
 if st.session_state.current_panel == "Diseño":
+    if st.session_state.pop("minimize_next", False):
+        import streamlit.components.v1 as components
+        components.html("""
+            <script>
+                if (window.parent && window.parent.pywebview && window.parent.pywebview.api) {
+                    window.parent.pywebview.api.minimize();
+                }
+            </script>
+        """, height=0)
     
     col_izq, col_der = st.columns([2, 1])
     
@@ -1170,8 +1329,25 @@ if st.session_state.current_panel == "Diseño":
         from link import check_staad_status, run_analysis
         
         staad_info = check_staad_status()
-        is_disabled = (staad_info["status"] == "disconnected")
         
+        expected_filename = st.session_state.get("active_staad_file", "Modelo.std")
+        actual_filename = staad_info.get("filename") or ""
+        
+        is_connected_to_target = False
+        if staad_info["status"] != "disconnected" and actual_filename.lower() == expected_filename.lower():
+            is_connected_to_target = True
+            
+        is_disabled = not is_connected_to_target
+        
+        if not is_connected_to_target:
+            from streamlit_autorefresh import st_autorefresh
+            st_autorefresh(interval=2000, key="staad_poll")
+            st.info(f"⏳ Esperando conexión con **{expected_filename}** en STAAD.Pro...")
+            if actual_filename:
+                st.warning(f"STAAD.Pro está abierto con otro archivo: {actual_filename}")
+        else:
+            st.success(f"✅ Conectado a STAAD.Pro ({expected_filename})")
+            
         col_btn, col_spin = st.columns([1, 2])
         with col_btn:
             if st.button("Correr Análisis ▶", type="primary", disabled=is_disabled):
@@ -1659,6 +1835,7 @@ else:
                         st.session_state.file_generated = True
                         st.session_state.active_staad_file = clean_name
                         st.session_state.current_panel = "Diseño"
+                        st.session_state.minimize_next = True
                         st.rerun()
                         
                     except Exception as e:
