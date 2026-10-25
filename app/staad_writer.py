@@ -485,7 +485,39 @@ def write_staad(model, selected_profiles=None):
         else:
             return (model.Larm_list[j_idx-1] / model.subdiv_list[j_idx-1] + model.Larm_list[j_idx] / model.subdiv_list[j_idx]) / 2.0
 
-    cm_load_lines = [f"**** CM CUBIERTA: {model.c_muerta} Kg/m² *****\nMEMBER LOAD"]
+    # Selfweight con factor 1 (Y -1) solo para columnas y armaduras (sin joists ni contravientos)
+    sw_members = set()
+    sw_members.update(model.groups.get('_COL', []))
+    sw_members.update(model.groups.get('_COLVIENTO', []))
+    armadura_groups = [
+        '_CS', '_CI', '_CS_PERIM', '_CI_PERIM',
+        '_MONTANTES', '_DIAG', '_MONTANTES_PERIM', '_DIAG_PERIM',
+        '_CS_SEC', '_CI_SEC', '_MONTANTES_SEC', '_DIAG_SEC',
+        '_ARMADURA_MD'
+    ]
+    for grp in armadura_groups:
+        sw_members.update(model.groups.get(grp, []))
+    for j in range(model.nSpan + 1):
+        sw_members.update(model.groups.get(f'_CS_SEC_{j}', []))
+
+    # Exclusión explícita de joists/largueros y contravientos
+    exclude_members = set(model.groups.get('_CVH', []))
+    exclude_members.update(model.groups.get('_JOISTGRAL', []))
+    exclude_members.update(model.groups.get('_JPUNTAL', []))
+    exclude_members.update(model.groups.get('_LARGUEROS', []))
+    for grp in getattr(model, 'largueros_group_info', {}).keys():
+        exclude_members.update(model.groups.get(grp, []))
+    for j in range(model.nSpan):
+        exclude_members.update(model.groups.get(f'_LARGUEROS_{j}', []))
+
+    sw_members = sorted(list(sw_members - exclude_members))
+    sw_load_lines = []
+    if sw_members:
+        sw_ranges = group_ranges(sw_members)
+        tokens = ["SELFWEIGHT Y -1 LIST"] + sw_ranges.split(" ")
+        sw_load_lines.append(build_lines(tokens))
+
+    cm_load_lines = sw_load_lines + [f"**** CM CUBIERTA: {model.c_muerta} Kg/m² *****\nMEMBER LOAD"]
     if getattr(model, 'largueros_group_info', None):
         for grp_name, info in model.largueros_group_info.items():
             if model.groups.get(grp_name):

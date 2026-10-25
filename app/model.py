@@ -911,16 +911,17 @@ class StaadModel:
                     if self.roof_type == "2 Aguas":
                         half_sub = (self.subdiv_list[j] // 2)
                         half_lx = (self.Lx_list[j] / 2.0)
-                        chunks_half = max(1, round(half_lx / Lz_bay))
+                        # Procurar ángulo máximo de 45°: ancho de cruceta en X <= longitud de joist en Z
+                        chunks_half = max(1, math.ceil(half_lx / Lz_bay))
+                        chunks_half = min(chunks_half, half_sub)
                         
                         left_pts = [int(round(c * half_sub / chunks_half)) for c in range(chunks_half)]
                         right_pts = [half_sub + int(round(c * half_sub / chunks_half)) for c in range(chunks_half + 1)]
                         k_points = left_pts + right_pts
                     else:
-                        if self.Lx_list[j] > Lz_bay:
-                            chunks = max(2, round(self.Lx_list[j] / Lz_bay))
-                        else:
-                            chunks = 1
+                        # Procurar ángulo máximo de 45°: ancho de cruceta en X <= longitud de joist en Z
+                        chunks = max(1, math.ceil(self.Lx_list[j] / Lz_bay))
+                        chunks = min(chunks, self.subdiv_list[j])
                         k_points = [int(round(c * self.subdiv_list[j] / chunks)) for c in range(chunks + 1)]
                     
                     for c in range(len(k_points) - 1):
@@ -1524,11 +1525,20 @@ class StaadModel:
                             self.add_member(u_right, nodes_ci[oddK], grp_diag)
                             
             # Largueros (Corren en Z) y Contravientos
-            if ext_larm > self.Lz:
-                chunks = max(2, round(ext_larm / self.Lz))
-            else:
-                chunks = 1
+            # Procurar ángulo máximo de 45°: si ext_larm crece respecto al joist (self.Lz), agregar más crucetas
+            chunks = max(1, math.ceil(ext_larm / self.Lz))
+            chunks = min(chunks, ext_subdiv)
             k_points = [int(round(c * ext_subdiv / chunks)) for c in range(chunks + 1)]
+            
+            # Asegurar puntos únicos y crecientes
+            clean_k = []
+            for p in k_points:
+                if not clean_k or p > clean_k[-1]:
+                    clean_k.append(p)
+            if len(clean_k) >= 2:
+                if clean_k[-1] != ext_subdiv:
+                    clean_k[-1] = ext_subdiv
+                k_points = clean_k
             
             for i_idx in range(len(i_range) - 1):
                 i_val1 = i_range[i_idx]
