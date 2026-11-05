@@ -309,14 +309,33 @@ def predisenar_grupo(nombre_grupo, model, usar_2w=False):
         
     # Peso propio estructural estimado (joists, armaduras, lámina, etc.)
     PP_est = 35.0 # kg/m2
+
+    # Consultar reglamento y método de diseño activo (ASD vs LRFD)
+    metodo_diseno = "ASD"
+    fc_cm, fc_cv, fc_viento = 1.0, 1.0, 1.0
+    try:
+        from reglamentos import obtener_factores_prediseno, normalizar_metodo
+        reg_sel = getattr(model, "reglamento_cargas", "Chihuahua / IBC (Actual)")
+        met_sel = getattr(model, "metodo_diseno", "ASD")
+        grp_sel = getattr(model, "grupo_importancia", "B")
+        metodo_diseno = normalizar_metodo(met_sel)
+        factores = obtener_factores_prediseno(reg_sel, metodo_diseno, grp_sel)
+        fc_cm = factores["fc_cm"]
+        fc_cv = factores["fc_cv"]
+        fc_viento = factores["fc_viento"]
+    except Exception:
+        pass
     
-    # Fuerzas estimadas (Axial)
-    P_kg = At_vert * (CM + CV + PP_est)
+    # Fuerzas estimadas (Axial de Servicio y Mayorada)
+    P_serv_kg = At_vert * (CM + CV + PP_est)
+    P_ult_kg = At_vert * (fc_cm * (CM + PP_est) + fc_cv * CV)
+    P_kg = P_ult_kg if metodo_diseno == "LRFD" else P_serv_kg
     
     # Momentos estimados (método aproximado)
     if "CV" in nombre_grupo:
         # Columna de viento (simplemente apoyada)
-        M_viento_kg_m = (viento * L_trib_viento * H**2) / 8.0
+        M_base_viento = (viento * L_trib_viento * H**2) / 8.0
+        M_viento_kg_m = M_base_viento * (fc_viento if metodo_diseno == "LRFD" else 1.0)
     else:
         # Marco Principal - Efecto de Desplazamiento Lateral (Sway)
         # Los marcos en los extremos (C-3, C-4) reciben la mitad de carga tributaria de viento
@@ -336,7 +355,8 @@ def predisenar_grupo(nombre_grupo, model, usar_2w=False):
         # Excentricidad mínima accidental (5 cm)
         M_grav = P_kg * 0.05
         
-        M_viento_kg_m = max(M_sway, M_local) + M_grav
+        factor_lat = fc_viento if metodo_diseno == "LRFD" else 1.0
+        M_viento_kg_m = max(M_sway, M_local) * factor_lat + M_grav
         
     M_viento_kg_cm = M_viento_kg_m * 100.0
     
@@ -353,39 +373,59 @@ def predisenar_grupo(nombre_grupo, model, usar_2w=False):
         K_val = 1.4 # Para columnas de viento
             
     KL = K_val * H * 100.0 # Altura efectiva en cm
+
+    def _calcular_ratio_interaccion(perfil_dict):
+        A = perfil_dict.get("area", perfil_dict.get("A", 0.0))
+        Sx = perfil_dict.get("Sx", 0.0)
+        r = min(perfil_dict.get("rx", perfil_dict.get("r", 5.0)), perfil_dict.get("ry", perfil_dict.get("r", 5.0)))
+        if A <= 0 or Sx <= 0 or r <= 0:
+            return None
+
+        klr = KL / r
+        if klr > 195:
+            return None
+
+        if metodo_diseno == "LRFD":
+            # Diseño AISC 360 LRFD (Capítulos E, F y H)
+            Fe = (math.pi ** 2 * E) / (klr ** 2)
+            lim_klr = 4.71 * math.sqrt(E / Fy)
+            if klr <= lim_klr:
+                Fcr = (0.658 ** (Fy / Fe)) * Fy
+            else:
+                Fcr = 0.877 * Fe
+            phi_Pn = 0.90 * Fcr * A
+            # Módulo plástico aproximado Zx ~ 1.15 Sx para HSS/W
+            Zx_aprox = Sx * 1.14
+            phi_Mn = 0.90 * Fy * Zx_aprox
+            if phi_Pn <= 0 or phi_Mn <= 0:
+                return None
+            pr_ratio = P_kg / phi_Pn
+            mr_ratio = M_viento_kg_cm / phi_Mn
+            # Ecuaciones AISC H1-1a y H1-1b
+            if pr_ratio >= 0.20:
+                return pr_ratio + (8.0 / 9.0) * mr_ratio
+            else:
+                return (pr_ratio / 2.0) + mr_ratio
+        else:
+            # Diseño clásico AISC ASD (Esfuerzos Permisibles)
+            fa = P_kg / A
+            fb = M_viento_kg_cm / Sx
+            Fb_adm = 0.6 * Fy
+            if klr < Cc:
+                FS = (5.0/3.0) + (3.0 * klr)/(8.0 * Cc) - (klr**3)/(8.0 * Cc**3)
+                Fa_adm = (1.0 - (klr**2)/(2.0 * Cc**2)) * Fy / FS
+            else:
+                Fa_adm = (12.0 * math.pi**2 * E) / (23.0 * klr**2)
+            if Fa_adm <= 0:
+                return None
+            return (fa / Fa_adm) + (fb / Fb_adm)
     
     resultados = []
     
     for perfil in perfiles:
-        A = perfil.get("area", perfil.get("A"))
-        Sx = perfil["Sx"]
-        # Tomar el radio de giro menor (min(rx, ry)) para la revisión de esbeltez general
-        r = min(perfil.get("rx", 5.0), perfil.get("ry", 5.0))
-        
-        # Revisión de esbeltez (ahora usamos la longitud total para viento también)
-        klr = KL / r
-            
-        if klr > 195:
-            continue # Se descarta por esbeltez excesiva
-            
-        # Esfuerzos actuantes
-        fa = P_kg / A if A > 0 else 0
-        fb = M_viento_kg_cm / Sx if Sx > 0 else 0
-        
-        # Esfuerzos permisibles (AISC ASD)
-        Fb_adm = 0.6 * Fy
-        
-        if klr < Cc:
-            FS = (5.0/3.0) + (3.0 * klr)/(8.0 * Cc) - (klr**3)/(8.0 * Cc**3)
-            Fa_adm = (1.0 - (klr**2)/(2.0 * Cc**2)) * Fy / FS
-        else:
-            Fa_adm = (12.0 * math.pi**2 * E) / (23.0 * klr**2)
-            
-        if Fa_adm <= 0: continue
-        
-        # Ratio de interacción
-        ratio = (fa / Fa_adm) + (fb / Fb_adm)
-        
+        ratio = _calcular_ratio_interaccion(perfil)
+        if ratio is None:
+            continue
         if 0.6 <= ratio <= 0.95:
             resultados.append({
                 "perfil": perfil,
@@ -395,25 +435,9 @@ def predisenar_grupo(nombre_grupo, model, usar_2w=False):
     # Si no hay resultados (cargas muy altas o muy bajas), relajar el límite
     if len(resultados) < 5:
         for perfil in perfiles:
-            A = perfil.get("area", perfil.get("A"))
-            Sx = perfil["Sx"]
-            r = min(perfil.get("rx", 5.0), perfil.get("ry", 5.0))
-            
-            klr = KL / r
-                
-            if klr > 195: continue
-                
-            fa = P_kg / A if A > 0 else 0
-            fb = M_viento_kg_cm / Sx if Sx > 0 else 0
-            
-            Fb_adm = 0.6 * Fy
-            if klr < Cc:
-                FS = (5.0/3.0) + (3.0 * klr)/(8.0 * Cc) - (klr**3)/(8.0 * Cc**3)
-                Fa_adm = (1.0 - (klr**2)/(2.0 * Cc**2)) * Fy / FS
-            else:
-                Fa_adm = (12.0 * math.pi**2 * E) / (23.0 * klr**2)
-                
-            ratio = (fa / Fa_adm) + (fb / Fb_adm)
+            ratio = _calcular_ratio_interaccion(perfil)
+            if ratio is None:
+                continue
             if 0.2 <= ratio <= 1.5:
                 resultados.append({"perfil": perfil, "ratio": ratio})
                 

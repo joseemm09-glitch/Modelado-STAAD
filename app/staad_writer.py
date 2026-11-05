@@ -856,6 +856,38 @@ def write_staad(model, selected_profiles=None):
     # Cambiar el tipo de carga sismica a Seismic-H según petición
     cargas_text = cargas_text.replace("LOADTYPE Seismic", "LOADTYPE Seismic-H")
     
+    # Reemplazar el bloque de combinaciones estáticas por el generador dinámico de reglamentos
+    start_comb_id = 17
+    end_comb_id = 54
+    code_lines = ["CODE AISC"]
+    try:
+        from reglamentos import generar_combinaciones_staad, obtener_comando_codigo_staad
+        reglamento_sel = getattr(model, "reglamento_cargas", "Chihuahua / IBC (Actual)")
+        metodo_sel = getattr(model, "metodo_diseno", "ASD")
+        grupo_sel = getattr(model, "grupo_importancia", "B")
+        sismo_bi = getattr(model, "sismo_bidireccional", False)
+        
+        comb_block, start_comb_id, end_comb_id = generar_combinaciones_staad(
+            reglamento=reglamento_sel,
+            metodo=metodo_sel,
+            grupo_importancia=grupo_sel,
+            incluir_sismo_bidireccional=sismo_bi,
+            start_comb_id=17
+        )
+        code_lines = obtener_comando_codigo_staad(metodo_sel)
+        
+        marker = "**************************************COMBINACIONES DE CARGAS****************************"
+        if marker in cargas_text:
+            idx_marker = cargas_text.find(marker)
+            prefix = cargas_text[:idx_marker].rstrip()
+            if prefix.endswith("*" * 89) or prefix.endswith("*" * 79):
+                last_nl = prefix.rfind("\n")
+                if last_nl != -1:
+                    prefix = prefix[:last_nl].rstrip()
+            cargas_text = prefix + "\n" + comb_block
+    except Exception:
+        pass
+
     # Append the base cargas text
     out.append(cargas_text.strip())
     
@@ -863,9 +895,10 @@ def write_staad(model, selected_profiles=None):
     # Analysis & Design
     # ------------------
     out.append("PERFORM ANALYSIS")
-    out.append("LOAD LIST 17 TO 54")
+    out.append(f"LOAD LIST {start_comb_id} TO {end_comb_id}")
     out.append("PARAMETER 1")
-    out.append("CODE AISC")
+    for cl in code_lines:
+        out.append(cl)
     
     if celosia_str:
         out.append("** CELOSÍA **")
@@ -873,9 +906,10 @@ def write_staad(model, selected_profiles=None):
         out.append(build_lines(["SELECT", "MEMB"] + celosia_str.split(" "), 72))
         
     out.append("PERFORM ANALYSIS")
-    out.append("LOAD LIST 17 TO 54")
+    out.append(f"LOAD LIST {start_comb_id} TO {end_comb_id}")
     out.append("PARAMETER 2")
-    out.append("CODE AISC")
+    for cl in code_lines:
+        out.append(cl)
     
     if col_str:
         out.append("** COLUMNAS **")

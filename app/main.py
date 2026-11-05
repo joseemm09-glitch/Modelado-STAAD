@@ -38,6 +38,10 @@ import staad_writer
 import visualizer
 import prediseno
 try:
+    import cimentacion_cad
+except Exception:
+    pass
+try:
     import Catalogo
     import Catalogo.catalogo_ui
     import Catalogo.catalogo_state
@@ -714,7 +718,11 @@ defaults = {
     "ext_subdiv": 10,
     "ext_depth": 2,
     "junta_constructiva_tipo": "Ninguna",
-    "junta_max_dist_ft": 600
+    "junta_max_dist_ft": 600,
+    "reglamento_cargas": "Chihuahua / IBC",
+    "metodo_diseno": "ASD",
+    "grupo_importancia": "Grupo B",
+    "sismo_bidireccional": False
 }
 
 for k, v in defaults.items():
@@ -927,6 +935,12 @@ except Exception as e:
     st.error(f"Error generando la geometría: {e}")
     st.stop()
 
+# Asignar atributos normativos y de método de diseño al modelo activo
+model.reglamento_cargas = st.session_state.get("reglamento_cargas", "Chihuahua / IBC (Actual)")
+model.metodo_diseno = "LRFD" if "LRFD" in st.session_state.get("metodo_diseno", "ASD").upper() else "ASD"
+model.grupo_importancia = "A" if "GRUPO A" in st.session_state.get("grupo_importancia", "Grupo B").upper() else "B"
+model.sismo_bidireccional = bool(st.session_state.get("sismo_bidireccional", False))
+
 
 def render_siblings_top(group, current):
     for name in group:
@@ -959,7 +973,7 @@ def render_siblings_bottom(group, current):
                 st.button(name, type="primary", use_container_width=True, on_click=go_panel, args=(name,), key=f"nav_bot_{name}", disabled=is_dis)
         if name == current: found = True
 
-nav_group1 = ["Geometría", "Cargas", "Prediseño"]
+nav_group1 = ["Geometría", "Cargas", "Prediseño", "Cimentación"]
 nav_group2 = ["Diseño", "Catálogo"]
 
 with st.sidebar:
@@ -975,6 +989,7 @@ with st.sidebar:
         st.button("Geometría", type="primary", use_container_width=True, on_click=go_panel, args=("Geometría",))
         st.button("Cargas", type="primary", use_container_width=True, on_click=go_panel, args=("Cargas",))
         st.button("Prediseño", type="primary", use_container_width=True, on_click=go_panel, args=("Prediseño",))
+        st.button("Cimentación", type="primary", use_container_width=True, on_click=go_panel, args=("Cimentación",))
         st.divider()
         is_disabled = not st.session_state.get("file_generated", False)
         st.markdown("<div class='grey-btn-marker'></div>", unsafe_allow_html=True)
@@ -1171,7 +1186,106 @@ with st.sidebar:
                 pass
         render_siblings_top(nav_group1, "Cargas")
         st.header("Cargas")
-        with st.expander("Gravitacionales", expanded=True):
+        with st.expander("Normativa y Método de Diseño", expanded=True):
+            from reglamentos import REGLAMENTOS_DISPONIBLES, METODOS_DISENO, GRUPOS_IMPORTANCIA
+
+            def _on_change_reglamento():
+                reg_val = st.session_state["_reglamento_cargas"]
+                st.session_state["reglamento_cargas"] = reg_val
+                if "NTC" in reg_val.upper() or "CFE" in reg_val.upper():
+                    st.session_state["sismo_bidireccional"] = True
+                    st.session_state["_sismo_bidireccional"] = True
+
+            reg_curr = st.session_state.get("reglamento_cargas", REGLAMENTOS_DISPONIBLES[0])
+            if reg_curr not in REGLAMENTOS_DISPONIBLES:
+                for r in REGLAMENTOS_DISPONIBLES:
+                    if r.split()[0] in reg_curr:
+                        reg_curr = r
+                        break
+                else:
+                    reg_curr = REGLAMENTOS_DISPONIBLES[0]
+                st.session_state["reglamento_cargas"] = reg_curr
+
+            reg_idx = REGLAMENTOS_DISPONIBLES.index(reg_curr)
+            
+            # Segmented Control / Toggle Buttons para Reglamentos
+            try:
+                st.segmented_control(
+                    "Reglamento de Cargas",
+                    options=REGLAMENTOS_DISPONIBLES,
+                    default=reg_curr,
+                    key="_reglamento_cargas",
+                    on_change=_on_change_reglamento
+                )
+            except AttributeError:
+                st.radio(
+                    "Reglamento de Cargas",
+                    options=REGLAMENTOS_DISPONIBLES,
+                    index=reg_idx,
+                    key="_reglamento_cargas",
+                    on_change=_on_change_reglamento
+                )
+
+            met_curr = st.session_state.get("metodo_diseno", "ASD")
+            met_curr = "LRFD" if "LRFD" in met_curr.upper() else "ASD"
+            st.session_state["metodo_diseno"] = met_curr
+            met_idx = METODOS_DISENO.index(met_curr) if met_curr in METODOS_DISENO else 0
+            
+            # Segmented Control / Toggle Buttons para ASD y LRFD
+            try:
+                st.segmented_control(
+                    "Método de Diseño en Acero",
+                    options=METODOS_DISENO,
+                    default=met_curr,
+                    key="_metodo_diseno",
+                    on_change=update_val,
+                    args=("metodo_diseno",)
+                )
+            except AttributeError:
+                st.radio(
+                    "Método de Diseño en Acero",
+                    options=METODOS_DISENO,
+                    index=met_idx,
+                    key="_metodo_diseno",
+                    on_change=update_val,
+                    args=("metodo_diseno",),
+                    horizontal=True
+                )
+
+            reg_up = st.session_state.get("reglamento_cargas", "").upper()
+            if "NTC" in reg_up or "CFE" in reg_up:
+                grp_curr = st.session_state.get("grupo_importancia", "Grupo B")
+                grp_curr = "Grupo A" if "GRUPO A" in grp_curr.upper() else "Grupo B"
+                grp_idx = GRUPOS_IMPORTANCIA.index(grp_curr) if grp_curr in GRUPOS_IMPORTANCIA else 0
+                try:
+                    st.segmented_control(
+                        "Grupo de Importancia",
+                        options=GRUPOS_IMPORTANCIA,
+                        default=grp_curr,
+                        key="_grupo_importancia",
+                        on_change=update_val,
+                        args=("grupo_importancia",)
+                    )
+                except AttributeError:
+                    st.radio(
+                        "Grupo de Importancia",
+                        options=GRUPOS_IMPORTANCIA,
+                        index=grp_idx,
+                        key="_grupo_importancia",
+                        on_change=update_val,
+                        args=("grupo_importancia",),
+                        horizontal=True
+                    )
+
+            st.checkbox(
+                "Incluir Sismo Bidireccional (100% + 30%)",
+                value=st.session_state.get("sismo_bidireccional", False),
+                key="_sismo_bidireccional",
+                on_change=update_val,
+                args=("sismo_bidireccional",)
+            )
+
+        with st.expander("Gravitacionales", expanded=False):
             st.number_input("Carga Muerta (kg/m²)", min_value=0.0, step=5.0, value=st.session_state.c_muerta, key="_c_muerta", on_change=update_c_muerta)
             st.number_input("Carga Viva (kg/m²)", min_value=0.0, step=5.0, value=st.session_state.c_viva, key="_c_viva", on_change=update_c_viva)
             st.number_input("Granizo (kg/m²)", min_value=0.0, step=5.0, value=st.session_state.c_granizo, key="_c_granizo", on_change=update_val, args=("c_granizo",))
@@ -1206,6 +1320,13 @@ with st.sidebar:
                 pass
         render_siblings_top(nav_group1, "Prediseño")
         st.header("Prediseño")
+        _met_badge = "LRFD (AISC 360)" if getattr(model, "metodo_diseno", "ASD") == "LRFD" else "ASD (AISC)"
+        _reg_badge = getattr(model, "reglamento_cargas", "Chihuahua / IBC (Actual)")
+        st.markdown(
+            f"<div style='font-size: 11.5px; color: #334155; background: #f8fafc; padding: 6px 10px; border-radius: 6px; border-left: 3px solid #005cb2; margin-bottom: 10px;'>"
+            f"<b>Norma:</b> {_reg_badge}<br><b>Método Activo:</b> {_met_badge}</div>",
+            unsafe_allow_html=True
+        )
         
         def reset_cv_selection():
             for k in list(st.session_state.keys()):
@@ -1240,6 +1361,115 @@ with st.sidebar:
                         st.checkbox("Usar perfiles 2W", key="usar_2w_checkbox", on_change=reset_cv_selection)
                         st.markdown("<div style='margin-top:-15px; font-size:12px; color:#888;'>(Requiere Base de Datos WD)</div>", unsafe_allow_html=True)
         render_siblings_bottom(nav_group1, "Prediseño")
+
+    elif panel == "Cimentación":
+        c1, c2 = st.columns([5, 3])
+        with c1:
+            st.button("⬅ Volver", type="secondary", use_container_width=True, on_click=go_panel, args=("Main",))
+        with c2:
+            try:
+                st.image(icono_small_path, use_container_width=True)
+            except:
+                pass
+        render_siblings_top(nav_group1, "Cimentación")
+        st.header("Cimentación")
+        st.markdown("<div style='font-size: 12px; color: #64748b; margin-top:-8px; margin-bottom: 12px;'>Prediseño de Cimentación</div>", unsafe_allow_html=True)
+
+        import cimentacion_cad
+
+        def _on_change_geotech():
+            st.session_state["q_adm_zapata"] = st.session_state["_q_adm_zapata"]
+            st.session_state["df_zapata"] = st.session_state["_df_zapata"]
+            st.session_state["gamma_s_zapata"] = st.session_state["_gamma_s_zapata"]
+            st.session_state["recalc_zapatas_flag"] = True
+
+        with st.expander("Parámetros Geotécnicos de Sitio", expanded=True):
+            q_adm = st.number_input(
+                "Capacidad Admisible q_adm (Ton/m²)",
+                min_value=5.0,
+                max_value=60.0,
+                value=float(st.session_state.get("q_adm_zapata", 15.0)),
+                step=1.0,
+                key="_q_adm_zapata",
+                on_change=_on_change_geotech
+            )
+            df_val = st.number_input(
+                "Profundidad de Desplante Df (m)",
+                min_value=0.80,
+                max_value=5.00,
+                value=float(st.session_state.get("df_zapata", 1.50)),
+                step=0.10,
+                key="_df_zapata",
+                on_change=_on_change_geotech
+            )
+            gamma_s = st.number_input(
+                "Peso Volumétrico Suelo (Ton/m³)",
+                min_value=1.0,
+                max_value=2.5,
+                value=float(st.session_state.get("gamma_s_zapata", 1.80)),
+                step=0.10,
+                key="_gamma_s_zapata",
+                on_change=_on_change_geotech
+            )
+
+        # Cálculo de Reacciones y Dimensiones
+        reacs_cim, modo_reac = cimentacion_cad.obtener_reacciones_envolventes(model)
+        
+        # Perfiles asignados en prediseño
+        perfiles_asignados = {}
+        import prediseno
+        for g in reacs_cim.keys():
+            ui_p = st.session_state.get(f"sel_{g}")
+            if not ui_p:
+                top_p = prediseno.predisenar_grupo(g, model, False)
+                if top_p:
+                    ui_p = top_p[0]['perfil']['nombre']
+            perfiles_asignados[g] = ui_p if ui_p else "Auto"
+
+        zaps_calculadas = cimentacion_cad.predimensionar_zapatas(
+            reacciones=reacs_cim,
+            q_adm_ton_m2=q_adm,
+            gamma_s_ton_m3=gamma_s,
+            df_m=df_val,
+            perfiles_por_grupo=perfiles_asignados
+        )
+
+        import pandas as pd
+        if "tabla_zapatas_df" not in st.session_state or st.session_state.get("recalc_zapatas_flag", False):
+            df_raw = pd.DataFrame(zaps_calculadas)
+            if "Tipo Zapata" in df_raw.columns:
+                df_raw["Z"] = df_raw["Tipo Zapata"]
+            st.session_state.tabla_zapatas_df = df_raw
+            st.session_state.recalc_zapatas_flag = False
+
+        st.markdown("<div style='font-size: 13px; font-weight: 600; color: #1e293b; margin-top: 10px; margin-bottom: 5px;'>Dimensiones de Zapatas y Dados:</div>", unsafe_allow_html=True)
+        
+        # Mostrar únicamente la columna Z y dimensiones, omitiendo columnas de superestructura
+        if "Z" not in st.session_state.tabla_zapatas_df.columns and "Tipo Zapata" in st.session_state.tabla_zapatas_df.columns:
+            st.session_state.tabla_zapatas_df["Z"] = st.session_state.tabla_zapatas_df["Tipo Zapata"]
+
+        cols_display = [c for c in ["Z", "B_ancho (m)", "L_largo (m)", "Hz_espesor (m)", "Dado_x (m)", "Dado_z (m)"] if c in st.session_state.tabla_zapatas_df.columns]
+        
+        edited_df = st.data_editor(
+            st.session_state.tabla_zapatas_df[cols_display],
+            num_rows="fixed",
+            use_container_width=True,
+            key="editor_zapatas_sidebar",
+            column_config={
+                "Z": st.column_config.TextColumn("Z", disabled=True),
+                "B_ancho (m)": st.column_config.NumberColumn("B (m)", format="%.2f"),
+                "L_largo (m)": st.column_config.NumberColumn("L (m)", format="%.2f"),
+                "Hz_espesor (m)": st.column_config.NumberColumn("Hz (m)", format="%.2f"),
+                "Dado_x (m)": st.column_config.NumberColumn("Dado X", format="%.2f"),
+                "Dado_z (m)": st.column_config.NumberColumn("Dado Z", format="%.2f"),
+            }
+        )
+        for col in edited_df.columns:
+            st.session_state.tabla_zapatas_df[col] = edited_df[col]
+        if "Z" in st.session_state.tabla_zapatas_df.columns:
+            st.session_state.tabla_zapatas_df["Tipo Zapata"] = st.session_state.tabla_zapatas_df["Z"]
+
+        render_siblings_bottom(nav_group1, "Cimentación")
 
     elif panel == "Diseño":
         c1, c2 = st.columns([5, 3])
@@ -1564,6 +1794,12 @@ if st.session_state.current_panel == "Diseño":
             grupos_v = {k: v for k, v in model.groups.items() if k.startswith('_CV') and len(v) > 0}
             render_group_results("Contravientos", grupos_v)
 
+        st.markdown("<div style='height: 15px;'></div>", unsafe_allow_html=True)
+        # =====================================================================
+        # MÓDULO ADITIVO: PREDISEÑO DE CIMENTACIÓN Y EXPORTACIÓN CAD (.DXF)
+        # =====================================================================
+
+
     with col_der:
         st.markdown("<b style='font-size: 14px;'>Visualizador 3D</b>", unsafe_allow_html=True)
         
@@ -1596,24 +1832,137 @@ else:
     col1, col2 = st.columns([3, 1])
     
     with col1:
-        st.markdown("<div style='margin-top: -15px;'></div>", unsafe_allow_html=True)
-        st.markdown("<div style='font-size: 20px; font-weight: 600; margin-bottom: 0.5rem;'>Visualizador 3D</div>", unsafe_allow_html=True)
-        show_sup = (st.session_state.current_panel == "Geometría")
-        highlight_col = st.session_state.get("highlight_grupo_col", "C-1") if st.session_state.current_panel == "Prediseño" else "Ninguno"
-        highlight_ids = None
-        if highlight_col != "Ninguno" and highlight_col in prediseno.clasificar_columnas(model):
-            highlight_ids = prediseno.clasificar_columnas(model).get(highlight_col, [])
-        fig = plot_model(model, show_supports=show_sup, highlight_ids=highlight_ids)
-        
-        if is_mobile_client:
-            fig.update_layout(
-                scene_camera=dict(eye=dict(x=-5.0, y=-5.0, z=4.0))
+        if st.session_state.current_panel == "Cargas":
+            st.markdown("<div style='margin-top: -15px;'></div>", unsafe_allow_html=True)
+            from reglamentos import construir_lista_combinaciones
+            _met_sh = "LRFD" if "LRFD" in st.session_state.get("metodo_diseno", "ASD").upper() else "ASD"
+            _grp_sh = "A" if "GRUPO A" in st.session_state.get("grupo_importancia", "Grupo B").upper() else "B"
+            _lista_c = construir_lista_combinaciones(
+                st.session_state.get("reglamento_cargas", "Chihuahua / IBC"),
+                _met_sh,
+                _grp_sh,
+                st.session_state.get("sismo_bidireccional", False)
             )
+
+            cargas_primarias = [
+                (1, "CM", "Carga Muerta"),
+                (2, "CMP", "Carga Muerta Disminuida (0.6 CM)"),
+                (3, "CV", "Carga Viva de Piso"),
+                (4, "CVR", "Carga Viva Reducida"),
+                (5, "CVT", "Carga Viva de Techo Máxima"),
+                (6, "CVRT", "Carga Viva Instantánea de Techo (0.7 CVT)"),
+                (7, "VX+", "Viento en X+"),
+                (8, "VX-", "Viento en X-"),
+                (9, "VZ+", "Viento en Z+"),
+                (10, "VZ-", "Viento en Z-"),
+                (11, "SX+", "Sismo en X+"),
+                (12, "SX-", "Sismo en X-"),
+                (13, "SZ+", "Sismo en Z+"),
+                (14, "SZ-", "Sismo en Z-"),
+                (15, "N", "Carga de Granizo / Nieve"),
+                (16, "MASA", "Masa de Sismo (1.0 CM + 1.0 CVR + 1.0 CVRT)")
+            ]
+
+            col_cargas_p, col_combs_p = st.columns([1, 1.45])
+
+            with col_cargas_p:
+                st.markdown(
+                    "<div style='font-family: Aptos Display, Segoe UI, sans-serif; font-size: 16px; font-weight: 700; color: #0f172a; margin-bottom: 10px;'>"
+                    "📋 Cargas Primarias (STAAD.Pro)"
+                    "</div>",
+                    unsafe_allow_html=True
+                )
+                html_cargas = "<div style='height: 72vh; max-height: 760px; overflow-y: auto; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 10px; padding: 12px 16px; font-size: 13px; line-height: 2.1; box-shadow: 0 1px 3px rgba(0,0,0,0.05);'>"
+                for cid, ccode, cdesc in cargas_primarias:
+                    html_cargas += f"<div style='border-bottom: 1px solid #f1f5f9; padding: 4px 0;'><span style='color: #005cb2; font-weight: 700; font-family: Consolas, monospace;'>LOAD {cid:02d}:</span> <b style='color: #1e293b; margin-left: 4px;'>{ccode}</b> <span style='color: #64748b; font-size: 12px;'>— {cdesc}</span></div>"
+                html_cargas += "</div>"
+                st.markdown(html_cargas, unsafe_allow_html=True)
+
+            with col_combs_p:
+                st.markdown(
+                    f"<div style='font-family: Aptos Display, Segoe UI, sans-serif; font-size: 16px; font-weight: 700; color: #0f172a; margin-bottom: 10px;'>"
+                    f"⚙️ Combinaciones de Diseño ({len(_lista_c)} Activas)"
+                    f"</div>",
+                    unsafe_allow_html=True
+                )
+                html_combs = "<div style='height: 72vh; max-height: 760px; overflow-y: auto; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 10px; padding: 12px 16px; font-size: 13px; line-height: 2.1; box-shadow: 0 1px 3px rgba(0,0,0,0.05);'>"
+                start_id = 17
+                for idx, (cat, title, pairs) in enumerate(_lista_c):
+                    cid = start_id + idx
+                    badge_color = "#0369a1" if cat == "GRAVITACIONALES" else ("#b45309" if cat == "VIENTO" else "#6d28d9")
+                    badge_bg = "#f0f9ff" if cat == "GRAVITACIONALES" else ("#fffbeb" if cat == "VIENTO" else "#f5f3ff")
+                    html_combs += (
+                        f"<div style='border-bottom: 1px solid #f1f5f9; padding: 4px 0; display: flex; justify-content: space-between; align-items: center;'>"
+                        f"<div><span style='color: #005cb2; font-weight: 700; font-family: Consolas, monospace;'>COMB {cid:02d}:</span> "
+                        f"<b style='color: #0f172a; margin-left: 4px;'>{title}</b></div>"
+                        f"<span style='font-size: 11px; font-weight: 600; color: {badge_color}; background: {badge_bg}; padding: 2px 8px; border-radius: 4px; border: 1px solid #e2e8f0; white-space: nowrap;'>{cat}</span>"
+                        f"</div>"
+                    )
+                html_combs += "</div>"
+                st.markdown(html_combs, unsafe_allow_html=True)
+        elif st.session_state.current_panel == "Cimentación":
+            st.markdown("<div style='margin-top: -15px;'></div>", unsafe_allow_html=True)
+            import cimentacion_cad
+
+            col_toggle, col_empty = st.columns([1.6, 2.4])
+            with col_toggle:
+                try:
+                    tipo_vista_cim = st.segmented_control(
+                        "Vista",
+                        options=["Cimentación Preliminar", "Corte por Marco"],
+                        default="Cimentación Preliminar",
+                        key="sel_vista_cim_2d",
+                        label_visibility="collapsed"
+                    )
+                except AttributeError:
+                    tipo_vista_cim = st.radio(
+                        "Vista",
+                        options=["Cimentación Preliminar", "Corte por Marco"],
+                        index=0,
+                        key="sel_vista_cim_2d",
+                        horizontal=True,
+                        label_visibility="collapsed"
+                    )
+
+            if tipo_vista_cim is None:
+                tipo_vista_cim = "Cimentación Preliminar"
+
+            if "tabla_zapatas_df" in st.session_state:
+                tabla_zaps_act = st.session_state.tabla_zapatas_df.to_dict(orient="records")
+            else:
+                reacs_tmp, _ = cimentacion_cad.obtener_reacciones_envolventes(model)
+                tabla_zaps_act = cimentacion_cad.predimensionar_zapatas(
+                    reacs_tmp,
+                    q_adm_ton_m2=float(st.session_state.get("q_adm_zapata", 15.0)),
+                    df_m=float(st.session_state.get("df_zapata", 1.50))
+                )
+
+            fig_cim = cimentacion_cad.generar_figura_previsualizacion_cimentacion(
+                model=model,
+                tabla_zapatas=tabla_zaps_act,
+                view_type=tipo_vista_cim,
+                df_m=float(st.session_state.get("df_zapata", 1.50))
+            )
+            st.plotly_chart(fig_cim, use_container_width=True, config={'displaylogo': False})
+        else:
+            st.markdown("<div style='margin-top: -15px;'></div>", unsafe_allow_html=True)
+            st.markdown("<div style='font-size: 20px; font-weight: 600; margin-bottom: 0.5rem;'>Visualizador 3D</div>", unsafe_allow_html=True)
+            show_sup = (st.session_state.current_panel == "Geometría")
+            highlight_col = st.session_state.get("highlight_grupo_col", "C-1") if st.session_state.current_panel == "Prediseño" else "Ninguno"
+            highlight_ids = None
+            if highlight_col != "Ninguno" and highlight_col in prediseno.clasificar_columnas(model):
+                highlight_ids = prediseno.clasificar_columnas(model).get(highlight_col, [])
+            fig = plot_model(model, show_supports=show_sup, highlight_ids=highlight_ids)
             
-        st.plotly_chart(fig, use_container_width=True, config={
-            'displaylogo': False,
-            'modeBarButtonsToRemove': ['resetCameraDefault3d', 'resetCameraLastSave3d', 'hoverClosest3d', 'tableRotation']
-        })
+            if is_mobile_client:
+                fig.update_layout(
+                    scene_camera=dict(eye=dict(x=-5.0, y=-5.0, z=4.0))
+                )
+                
+            st.plotly_chart(fig, use_container_width=True, config={
+                'displaylogo': False,
+                'modeBarButtonsToRemove': ['resetCameraDefault3d', 'resetCameraLastSave3d', 'hoverClosest3d', 'tableRotation']
+            })
 
     with col2:
         with st.container():
@@ -1622,11 +1971,12 @@ else:
             st.markdown("<div style=\"font-family: 'Aptos Display', 'Segoe UI', sans-serif; font-size: 1.1rem; font-weight: 700; color: #0f172a; margin-bottom: 0px; margin-top: -5px;\">Nombre Proyecto:</div>", unsafe_allow_html=True)
             
             # Contenedor para simular el sufijo
-            col_in1, col_in2 = st.columns([4, 1])
+            col_in1, col_in2 = st.columns([3.2, 1.2])
             with col_in1:
                 file_name_export = st.text_input("proj_name", value="Modelo", label_visibility="collapsed")
             with col_in2:
-                st.markdown("<div style='color: #aaa; margin-top: 8px; font-weight: 500; font-family: \"Aptos Display\", sans-serif;'>.std</div>", unsafe_allow_html=True)
+                _suf = ".dwg" if st.session_state.current_panel == "Cimentación" else ".std"
+                st.markdown(f"<div style='color: #aaa; margin-top: 8px; font-weight: 500; font-family: \"Aptos Display\", sans-serif; white-space: nowrap;'>{_suf}</div>", unsafe_allow_html=True)
                 
             # Detectar si estamos en entorno web (stlite/Pyodide) o escritorio
             _is_web = False
@@ -1810,36 +2160,84 @@ else:
                 """
                 components.html(web_ui, height=135)
             else:
-                # ─── Modo Escritorio: guardar al disco y abrir ───
-                if st.button("Guardar Archivo .std", type="primary"):
-                    # Limpiar el nombre del archivo para evitar caracteres inválidos
-                    clean_name = "".join(c for c in file_name_export if c.isalnum() or c in " ._-").strip()
-                    if not clean_name.endswith(".std"):
-                        clean_name += ".std"
-                    
-                    full_path = os.path.join(st.session_state.export_path, clean_name)
-                    try:
-                        with open(full_path, "w", encoding="windows-1252", errors="replace") as f:
-                            f.write(staad_text)
-                        st.success(f"Guardado exitosamente en:\n{full_path}")
-                    
-                        # Abrir archivo automáticamente (en Windows usa la app predeterminada para .std)
-                        if os.name == 'nt':
-                            os.startfile(full_path)
-                        else:
-                            import subprocess
-                            subprocess.call(('open', full_path))
-                            
-                        import time
-                        time.sleep(5)
-                        st.session_state.file_generated = True
-                        st.session_state.active_staad_file = clean_name
-                        st.session_state.current_panel = "Diseño"
-                        st.session_state.minimize_next = True
-                        st.rerun()
+                # ─── Modo Escritorio ───
+                if st.session_state.current_panel == "Cimentación":
+                    # Botón Exportar DWG / DXF (Azul) exclusivo de la pestaña Cimentación
+                    st.markdown("<div class='blue-btn-marker'></div>", unsafe_allow_html=True)
+                    if st.button("Exportar DWG", key="btn_export_dwg_cimentacion", use_container_width=True):
+                        try:
+                            clean_proj = "".join(c for c in file_name_export if c.isalnum() or c in " ._-").strip()
+                            if clean_proj.lower().endswith(".std"):
+                                clean_proj = clean_proj[:-4]
+                            if not clean_proj:
+                                clean_proj = "Modelo"
+
+                            cad_filename = f"[{clean_proj}] Cimentación Preliminar.dxf"
+                            export_dir = st.session_state.get("export_path", r"C:\Users\josee\OneDrive\Escritorio\MODELOS GENERADOS")
+                            os.makedirs(export_dir, exist_ok=True)
+                            full_cad_path = os.path.join(export_dir, cad_filename)
+
+                            import cimentacion_cad
+                            if "tabla_zapatas_df" in st.session_state:
+                                tabla_zaps_exp = st.session_state.tabla_zapatas_df.to_dict(orient="records")
+                            else:
+                                reacs_tmp, _ = cimentacion_cad.obtener_reacciones_envolventes(model)
+                                tabla_zaps_exp = cimentacion_cad.predimensionar_zapatas(
+                                    reacs_tmp,
+                                    q_adm_ton_m2=float(st.session_state.get("q_adm_zapata", 15.0)),
+                                    df_m=float(st.session_state.get("df_zapata", 1.50))
+                                )
+
+                            gen_dxf = cimentacion_cad.GeneradorPlanoEstructuralDXF(
+                                model=model,
+                                tabla_zapatas=tabla_zaps_exp,
+                                q_adm=float(st.session_state.get("q_adm_zapata", 15.0)),
+                                df=float(st.session_state.get("df_zapata", 1.50))
+                            )
+                            saved_path = gen_dxf.exportar(full_cad_path)
+                            saved_filename = os.path.basename(saved_path)
+
+                            if saved_filename.lower() != cad_filename.lower():
+                                st.warning(f"⚠️ El archivo anterior estaba abierto en AutoCAD. Se guardó una nueva versión:\n**{saved_filename}**")
+                            else:
+                                st.success(f"✅ Archivo exportado exitosamente:\n**{saved_filename}**")
+
+                            # Abrir inmediatamente en AutoCAD
+                            opened = cimentacion_cad.abrir_en_autocad(saved_path)
+                            if opened:
+                                st.info(f"Abriendo {saved_filename} en AutoCAD...")
+                        except Exception as e_cad_save:
+                            st.error(f"Error generando plano DWG/DXF: {e_cad_save}")
+                else:
+                    if st.button("Guardar Archivo .std", type="primary"):
+                        # Limpiar el nombre del archivo para evitar caracteres inválidos
+                        clean_name = "".join(c for c in file_name_export if c.isalnum() or c in " ._-").strip()
+                        if not clean_name.endswith(".std"):
+                            clean_name += ".std"
                         
-                    except Exception as e:
-                        st.error(f"Error al guardar o abrir en '{full_path}': {e}")
+                        full_path = os.path.join(st.session_state.export_path, clean_name)
+                        try:
+                            with open(full_path, "w", encoding="windows-1252", errors="replace") as f:
+                                f.write(staad_text)
+                            st.success(f"Guardado exitosamente en:\n{full_path}")
+                        
+                            # Abrir archivo automáticamente (en Windows usa la app predeterminada para .std)
+                            if os.name == 'nt':
+                                os.startfile(full_path)
+                            else:
+                                import subprocess
+                                subprocess.call(('open', full_path))
+                                
+                            import time
+                            time.sleep(5)
+                            st.session_state.file_generated = True
+                            st.session_state.active_staad_file = clean_name
+                            st.session_state.current_panel = "Diseño"
+                            st.session_state.minimize_next = True
+                            st.rerun()
+                            
+                        except Exception as e:
+                            st.error(f"Error al guardar o abrir en '{full_path}': {e}")
 
 
         with st.container():
