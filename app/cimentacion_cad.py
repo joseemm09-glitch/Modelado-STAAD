@@ -83,6 +83,22 @@ def map_base_nodes_to_groups(model) -> Dict[int, str]:
     return node_to_grp
 
 
+def _grp_sort_key(g: str) -> int:
+    """Ordena los grupos para numeración continua de zapatas (C-1 -> Z-1, C-2 -> Z-2, etc.)."""
+    if g == "C-1": return 1
+    if g == "C-2": return 2
+    if g == "C-3": return 3
+    if g == "C-4": return 4
+    if g == "CV-1": return 5
+    if g.startswith("C-"):
+        try: return 10 + int(g[2:])
+        except Exception: return 50
+    if g.startswith("CV-"):
+        try: return 60 + int(g[3:])
+        except Exception: return 90
+    return 100
+
+
 def obtener_reacciones_envolventes(model) -> Tuple[Dict[str, Dict[str, float]], str]:
     """
     Obtiene las reacciones envolventes críticas de diseño por grupo de columna.
@@ -217,7 +233,7 @@ def obtener_reacciones_envolventes(model) -> Tuple[Dict[str, Dict[str, float]], 
     for grp in node_to_grp.values():
         grp_counts[grp] = grp_counts.get(grp, 0) + 1
 
-    unique_grps = sorted(list(set(node_to_grp.values())))
+    unique_grps = sorted(list(set(node_to_grp.values())), key=_grp_sort_key)
     if not unique_grps:
         unique_grps = ["C-1", "C-2", "C-3", "C-4"]
 
@@ -351,21 +367,16 @@ def predimensionar_zapatas(
 
     filas_zapatas: List[Dict[str, Any]] = []
 
-    # Mapeo de nombre de zapata por grupo
-    nombre_zapata_map = {
-        "C-1": "Z-1",
-        "C-2": "Z-2",
-        "C-3": "Z-3",
-        "C-4": "Z-4",
-        "CV-1": "Z-CV"
-    }
-
     # Capacidad neta aproximada considerando sobrecarga de suelo
     q_net = max(q_adm_ton_m2 - (gamma_s_ton_m3 * df_m), q_adm_ton_m2 * 0.75)
     f_desf = max(float(factor_desfactorizacion), 1.0)
 
-    for grp, r in reacciones.items():
-        tipo_z = nombre_zapata_map.get(grp, f"Z-{grp}")
+    # Ordenar grupos para numeración continua de zapatas (Z-1, Z-2, Z-3, ...)
+    sorted_grps = sorted(list(reacciones.keys()), key=_grp_sort_key)
+
+    for idx, grp in enumerate(sorted_grps):
+        r = reacciones[grp]
+        tipo_z = f"Z-{idx + 1}"
         p_max = float(r.get('P_max', 10.0))
         perfil = perfiles_por_grupo.get(grp, "Auto")
 
@@ -679,10 +690,25 @@ class GeneradorPlanoEstructuralDXF:
             except Exception:
                 pass
 
-        # 3. Actualizar Nota 5 (Capacidad Admisible q_adm)
+        # 3. Actualizar Nota 5 (Capacidad Admisible q_adm) con salto de línea limpio
+        t_nota5 = None
         for t in self.msp.query('TEXT'):
-            if "PARA ZAPATAS AISLADAS" in t.dxf.text:
-                t.dxf.text = f"5.- LA CAPACIDAD DE CARGA DE DISENO ADMISIBLE DEL SUELO ES DE {self.q_adm:.1f} Ton/M2 PARA ZAPATAS AISLADAS,"
+            if "5.- LA RESISTENCIA" in t.dxf.text:
+                self.msp.delete_entity(t)
+            elif "PARA ZAPATAS AISLADAS" in t.dxf.text:
+                t_nota5 = t
+
+        if t_nota5:
+            t_nota5.dxf.text = f"5.- CAPACIDAD DE CARGA ADMISIBLE DEL SUELO ES DE {self.q_adm:.1f} Ton/M2"
+            self.msp.add_text(
+                "    PARA ZAPATAS AISLADAS.",
+                dxfattribs={
+                    'layer': t_nota5.dxf.layer,
+                    'style': t_nota5.dxf.style,
+                    'height': t_nota5.dxf.height,
+                    'insert': (t_nota5.dxf.insert.x, t_nota5.dxf.insert.y - 0.22, 0.0)
+                }
+            )
 
         # 4. Poblar dinámicamente la tabla ZAPATAS AISLADAS
         table_top_y = 1637.80 + dy_det
@@ -691,13 +717,17 @@ class GeneradorPlanoEstructuralDXF:
             if t in ('TEXT', 'MTEXT'):
                 ins = e.dxf.insert
                 if (2220 + dx_det) <= ins.x <= (2238 + dx_det) and ins.y < (table_top_y - 0.05):
-                    if e.dxf.text not in ("ZAPATA AISLADAS", "SIN ESCALA"):
-                        self.msp.delete_entity(e)
+                    self.msp.delete_entity(e)
             elif t == 'LINE' and e.dxf.layer == '0-TEXTO':
                 if abs(e.dxf.start.y - e.dxf.end.y) < 0.05 and e.dxf.start.y < (table_top_y - 0.05):
                     self.msp.delete_entity(e)
                 elif abs(e.dxf.start.x - e.dxf.end.x) < 0.05 and e.dxf.start.y >= (1638.30 + dy_det):
                     e.dxf.end = (e.dxf.end.x, table_top_y, e.dxf.end.z)
+            elif t == 'LWPOLYLINE':
+                # Eliminar subrayado residual viejo del título bajo la tabla
+                pts = list(e.get_points())
+                if len(pts) == 2 and (2223 + dx_det) <= pts[0][0] <= (2236 + dx_det) and pts[0][1] < (table_top_y - 0.05):
+                    self.msp.delete_entity(e)
 
         col_xs = [
             2221.24 + dx_det, 2223.16 + dx_det, 2224.47 + dx_det, 2225.78 + dx_det,
@@ -762,16 +792,61 @@ class GeneradorPlanoEstructuralDXF:
         for x in col_xs:
             self.msp.add_line((x, table_top_y), (x, curr_y), dxfattribs={'layer': '0-TEXTO'})
 
-        # Reposicionar título 'ZAPATA AISLADAS' y 'SIN ESCALA'
-        for t in self.msp.query('TEXT'):
-            if t.dxf.text == "ZAPATA AISLADAS":
-                t.dxf.insert = (col_centers[3], curr_y - 0.65, 0.0)
-                if hasattr(t.dxf, 'align_point') and t.dxf.align_point:
-                    t.dxf.align_point = (col_centers[3], curr_y - 0.65, 0.0)
-            elif t.dxf.text == "SIN ESCALA":
-                t.dxf.insert = (col_centers[6], curr_y - 0.65, 0.0)
-                if hasattr(t.dxf, 'align_point') and t.dxf.align_point:
-                    t.dxf.align_point = (col_centers[6], curr_y - 0.65, 0.0)
+        # Actualizar borde exterior redondeado de la tabla para que coincida exactamente con la última fila
+        table_border_poly = None
+        for e in self.msp:
+            if e.dxftype() == 'LWPOLYLINE' and e.dxf.layer == '0-TEXTO' and e.is_closed:
+                table_border_poly = e
+                break
+
+        if table_border_poly:
+            x_min_p = 2221.2446 + dx_det
+            x_max_p = 2237.3034 + dx_det
+            y_top_p = 1638.7790 + dy_det
+            y_bot_p = curr_y
+            r = 0.30
+            bulge = 0.4142135623730951
+            new_border_pts = [
+                (x_min_p + r, y_bot_p, 0.0, 0.0, 0.0),
+                (x_max_p - r, y_bot_p, 0.0, 0.0, bulge),
+                (x_max_p, y_bot_p + r, 0.0, 0.0, 0.0),
+                (x_max_p, y_top_p - r, 0.0, 0.0, bulge),
+                (x_max_p - r, y_top_p, 0.0, 0.0, 0.0),
+                (x_min_p + r, y_top_p, 0.0, 0.0, bulge),
+                (x_min_p, y_top_p - r, 0.0, 0.0, 0.0),
+                (x_min_p, y_bot_p + r, 0.0, 0.0, bulge),
+            ]
+            table_border_poly.set_points(new_border_pts, format='xyseb')
+
+        # Título 'ZAPATA AISLADAS' y único texto 'SIN ESCALA' bajo la tabla con margen constante
+        y_title_zap = curr_y - 0.70
+        y_sin_escala = curr_y - 1.20
+
+        self.msp.add_text(
+            "ZAPATA AISLADAS",
+            dxfattribs={
+                'layer': 'ARMADURA',
+                'color': 1,
+                'style': 'BOLD' if 'BOLD' in self.doc.styles else 'Standard',
+                'height': 0.50,
+                'insert': (col_centers[3], y_title_zap)
+            }
+        )
+        self.msp.add_line(
+            (col_xs[0] + 1.0, y_title_zap - 0.15),
+            (col_xs[-1] - 1.0, y_title_zap - 0.15),
+            dxfattribs={'layer': 'ARMADURA', 'color': 1, 'lineweight': 35}
+        )
+        self.msp.add_text(
+            "SIN ESCALA",
+            dxfattribs={
+                'layer': 'COTAS',
+                'color': 2,
+                'style': 'SIMPLEX' if 'SIMPLEX' in self.doc.styles else 'Standard',
+                'height': 0.24,
+                'insert': (col_centers[6], y_sin_escala)
+            }
+        )
 
         # ----------------------------------------------------------------------
         # 5. DIBUJAR PLANTA DE CIMENTACIÓN
@@ -1019,7 +1094,7 @@ class GeneradorPlanoEstructuralDXF:
         self.msp.add_line((title_x, title_y - 0.25), (title_x + 16.0, title_y - 0.25), dxfattribs={'layer': 'ARMADURA', 'color': 1, 'lineweight': 35})
         self.msp.add_line((title_x, title_y - 0.50), (title_x + 16.0, title_y - 0.50), dxfattribs={'layer': '0', 'color': 7, 'lineweight': 15})
         self.msp.add_text(
-            "ESCALA 1:100 (COTAS EN CENTIMETROS)",
+            "ESCALA 1:100",
             dxfattribs={
                 'layer': 'TEXTO',
                 'color': 7,
@@ -1241,6 +1316,7 @@ class GeneradorPlanoEstructuralDXF:
             _insertar_boya_cad(xc, y_axis_top_uniform + 1.45, lbl)
 
         # 6. Cotas Verticales en Centímetros (1 decimal) con DIM100VERTICAL_CORTE (0.60x)
+        # Separación adecuada de las columnas para evitar empalmes
         # Columna Izquierda Exterior
         xm_left = sorted_col_xs[0]
         xc_left, _ = to_corte_cad(xm_left, 0.0)
@@ -1250,7 +1326,7 @@ class GeneradorPlanoEstructuralDXF:
 
         try:
             dim_hl = self.msp.add_linear_dim(
-                base=(xc_left - 1.4, ground_y),
+                base=(xc_left - 2.8, ground_y),
                 p1=(xc_left, ground_y),
                 p2=(xc_left, yc_clear_l),
                 angle=90,
@@ -1263,7 +1339,7 @@ class GeneradorPlanoEstructuralDXF:
 
         try:
             dim_harm = self.msp.add_linear_dim(
-                base=(xc_left - 1.4, yc_clear_l),
+                base=(xc_left - 2.8, yc_clear_l),
                 p1=(xc_left, yc_clear_l),
                 p2=(xc_left, yc_top_l),
                 angle=90,
@@ -1276,7 +1352,7 @@ class GeneradorPlanoEstructuralDXF:
 
         try:
             dim_htot = self.msp.add_linear_dim(
-                base=(xc_left - 3.0, ground_y),
+                base=(xc_left - 4.6, ground_y),
                 p1=(xc_left, ground_y),
                 p2=(xc_left, yc_top_l),
                 angle=90,
@@ -1287,13 +1363,13 @@ class GeneradorPlanoEstructuralDXF:
         except Exception:
             pass
 
-        # Columnas Interiores: cota de altura libre
+        # Columnas Interiores: cota de altura libre separada para no empalmar
         for xm in sorted_col_xs[1:-1]:
             xc, _ = to_corte_cad(xm, 0.0)
             yc_c = ground_y + col_data[xm]['clear_y']
             try:
                 dim_int = self.msp.add_linear_dim(
-                    base=(xc + 0.9, ground_y),
+                    base=(xc + 2.0, ground_y),
                     p1=(xc, ground_y),
                     p2=(xc, yc_c),
                     angle=90,
@@ -1313,7 +1389,7 @@ class GeneradorPlanoEstructuralDXF:
 
         try:
             dim_hr = self.msp.add_linear_dim(
-                base=(xc_right + 1.4, ground_y),
+                base=(xc_right + 2.8, ground_y),
                 p1=(xc_right, ground_y),
                 p2=(xc_right, yc_clear_r),
                 angle=90,
@@ -1326,7 +1402,7 @@ class GeneradorPlanoEstructuralDXF:
 
         try:
             dim_harm_r = self.msp.add_linear_dim(
-                base=(xc_right + 1.4, yc_clear_r),
+                base=(xc_right + 2.8, yc_clear_r),
                 p1=(xc_right, yc_clear_r),
                 p2=(xc_right, yc_top_r),
                 angle=90,
@@ -1339,7 +1415,7 @@ class GeneradorPlanoEstructuralDXF:
 
         try:
             dim_htot_r = self.msp.add_linear_dim(
-                base=(xc_right + 3.0, ground_y),
+                base=(xc_right + 4.6, ground_y),
                 p1=(xc_right, ground_y),
                 p2=(xc_right, yc_top_r),
                 angle=90,
@@ -1397,7 +1473,7 @@ class GeneradorPlanoEstructuralDXF:
         self.msp.add_line((x_start, title_corte_y - 0.25), (x_start + 18.0, title_corte_y - 0.25), dxfattribs={'layer': 'ARMADURA', 'color': 1, 'lineweight': 35})
         self.msp.add_line((x_start, title_corte_y - 0.50), (x_start + 18.0, title_corte_y - 0.50), dxfattribs={'layer': '0', 'color': 7, 'lineweight': 15})
         self.msp.add_text(
-            "ESCALA 1:100 (COTAS EN CENTIMETROS)",
+            "ESCALA 1:100",
             dxfattribs={
                 'layer': 'TEXTO',
                 'color': 7,
