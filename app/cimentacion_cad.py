@@ -351,24 +351,39 @@ def estimar_dimension_dado(perfil_nombre: str) -> Tuple[float, float]:
 def predimensionar_zapatas(
     reacciones: Dict[str, Dict[str, float]],
     q_adm_ton_m2: float = 15.0,
-    gamma_s_ton_m3: float = 1.6,
+    gamma_s_ton_m3: float = 1.80,
     df_m: float = 1.50,
     perfiles_por_grupo: Optional[Dict[str, str]] = None,
-    factor_desfactorizacion: float = 1.0
+    factor_desfactorizacion: float = 1.0,
+    fc_kg_cm2: float = 250.0,
+    fy_kg_cm2: float = 4200.0
 ) -> List[Dict[str, Any]]:
     """
-    Calcula el predimensionamiento geotécnico de zapatas aisladas para cada grupo.
-    Si las reacciones provienen de combinaciones LRFD en STAAD.Pro, aplica
-    factor_desfactorizacion (~1.35 a 1.40) para dimensionar el área de contacto en servicio.
-    Retorna una lista de diccionarios apta para poblar el st.data_editor.
+    Calcula el predimensionamiento robusto de zapatas aisladas cuadradas y dados para cada grupo:
+    1. Dimensión en Planta (B x L):
+       - Revisa dos condiciones independientes y toma la mayor:
+         a) Aplastamiento (compresión): Carga gravitacional aumentada 25-30% para absorber
+            peso propio de zapata, relleno y momentos. Dividida entre la capacidad admisible neta.
+         b) Levantamiento (succión de viento): FS = 1.5 contra volteo/succión.
+            El peso combinado de la zapata y el relleno de tierra sobre ella debe equilibrar
+            la fuerza de succión amplificada (1.5 * P_uplift).
+       - Redondeo hacia arriba a múltiplos constructivos de 10 cm (mín. 1.00 x 1.00 m).
+    2. Espesor de la zapata (Hz):
+       - Rigidez: espesor efectivo entre un tercio y un cuarto del vuelo libre desde la cara del dado.
+       - Revisión rápida de cortante unidireccional (como viga) y bidireccional (punzonamiento).
+       - Recubrimiento inferior de 8 cm y redondeo a múltiplos de 5 cm (mín. 0.25 m, o 0.30 m en medianas/grandes).
+    3. Armado Comercial Realista (Lecho inferior y Lecho superior):
+       - Lecho inferior: flexión por presión hacia arriba en el vuelo + cuantía mínima por temperatura (0.0018 * b * h).
+       - Lecho superior: flexión inversa por peso propio del suelo/zapata bajo succión de viento, o acero mínimo por temperatura.
+       - Propuestas comerciales con varillas #4, #5 o #6 a separaciones de 15, 20 o 25 cm.
     """
     if perfiles_por_grupo is None:
         perfiles_por_grupo = {}
 
     filas_zapatas: List[Dict[str, Any]] = []
 
-    # Capacidad neta aproximada considerando sobrecarga de suelo
-    q_net = max(q_adm_ton_m2 - (gamma_s_ton_m3 * df_m), q_adm_ton_m2 * 0.75)
+    # Capacidad neta admisible del suelo
+    q_net = max(q_adm_ton_m2 - (gamma_s_ton_m3 * df_m), q_adm_ton_m2 * 0.70)
     f_desf = max(float(factor_desfactorizacion), 1.0)
 
     # Ordenar grupos para numeración continua de zapatas (Z-1, Z-2, Z-3, ...)
@@ -378,36 +393,144 @@ def predimensionar_zapatas(
         r = reacciones[grp]
         tipo_z = f"Z-{idx + 1}"
         p_max = float(r.get('P_max', 10.0))
+        p_up = float(r.get('P_uplift', 0.0))
         perfil = perfiles_por_grupo.get(grp, "Auto")
 
-        # Convertir a carga equivalente de servicio si proviene de combinaciones LRFD
-        p_base_serv = p_max / f_desf
-        # Carga de servicio con 15% de peso propio estimado de zapata y relleno
-        p_servicio = p_base_serv * 1.15
-        a_req = max(p_servicio / q_net, 0.81)
+        dado_x, dado_z = estimar_dimension_dado(perfil)
 
-        # Dimensión cuadrada redondeada al múltiplo superior de 0.10 m (mín. 1.00 m)
-        lado_calc = math.sqrt(a_req)
-        b_m = max(math.ceil(lado_calc * 10.0) / 10.0, 1.00)
+        # ----------------------------------------------------------------------
+        # 1. ANCHO Y LARGO (Zapata cuadrada, B = L)
+        # ----------------------------------------------------------------------
+        # Condición a) Aplastamiento / Compresión (+25% a 30% por peso propio y momentos)
+        p_base_serv = (p_max / f_desf)
+        p_comp = max(p_base_serv * 1.28, 1.0)
+        area_comp = p_comp / q_net
+        b_comp = math.sqrt(area_comp)
+
+        # Condición b) Levantamiento / Succión de Viento (FS = 1.5)
+        # Resistencia = peso combinado de concreto + tierra de relleno
+        hz_est = 0.35 if df_m >= 1.50 else 0.25
+        w_unit_resist = (hz_est * 2.40) + (max(df_m - hz_est, 0.0) * gamma_s_ton_m3)
+        f_uplift_amplificada = 1.50 * max(p_up / f_desf, 0.0)
+        area_succ = f_uplift_amplificada / max(w_unit_resist, 0.50)
+        b_succ = math.sqrt(area_succ) if p_up > 0 else 0.0
+
+        if b_succ > b_comp:
+            b_raw = b_succ
+            condicion_gob = "Succión"
+        else:
+            b_raw = b_comp
+            condicion_gob = "Compresión"
+
+        # Redondeo hacia arriba a múltiplos constructivos de 10 cm (mín. 1.00 m)
+        b_m = max(math.ceil(b_raw * 10.0) / 10.0, 1.00)
         l_m = b_m
 
-        # Espesor de zapata: criterio de rigidez flexional y penetración
-        # Hz >= (B - b_d) / 4 y mínimo 0.30 m, redondeado a 0.05 m
-        dado_x, dado_z = estimar_dimension_dado(perfil)
-        volado = max((b_m - dado_x) / 2.0, (l_m - dado_z) / 2.0, 0.20)
-        hz_calc = max(volado / 2.5, 0.30)
-        hz_m = max(math.ceil(hz_calc * 20.0) / 20.0, 0.30)
+        # ----------------------------------------------------------------------
+        # 2. ESPESOR DE LA ZAPATA (Peralte total Hz)
+        # ----------------------------------------------------------------------
+        vuelo_x = max((b_m - dado_x) / 2.0, 0.10)
+        vuelo_z = max((l_m - dado_z) / 2.0, 0.10)
+        vuelo_max = max(vuelo_x, vuelo_z)
+
+        # Regla práctica de rigidez: peralte efectivo d ~ 1/3 a 1/4 del vuelo libre
+        recub_m = 0.08  # 8 cm de recubrimiento inferior
+        d_rig = vuelo_max / 3.5
+        hz_rig = d_rig + recub_m
+
+        # Mínimo absoluto según tamaño: 0.25 m si B < 1.50 m, 0.30 m en zapatas medianas/grandes
+        hz_min = 0.30 if b_m >= 1.50 else 0.25
+        hz_candidatos = [0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80]
+
+        # Revisión rápida de cortante como viga y punzonamiento
+        fc = max(float(fc_kg_cm2), 200.0)
+        fy = max(float(fy_kg_cm2), 4000.0)
+        q_ult = (p_comp * 1000.0) / ((b_m * 100.0) ** 2)  # kg/cm²
+
+        hz_m = hz_min
+        for hz_c in hz_candidatos:
+            if hz_c < hz_min or hz_c < (math.ceil(hz_rig * 20.0) / 20.0):
+                continue
+            d_cm = (hz_c - recub_m) * 100.0
+            v_cm = vuelo_max * 100.0
+
+            # Cortante como viga a distancia d de la cara del dado
+            if v_cm > d_cm:
+                vu_viga = q_ult * (b_m * 100.0) * (v_cm - d_cm)
+                phi_vc_viga = 0.75 * 0.53 * math.sqrt(fc) * (b_m * 100.0) * d_cm
+                if vu_viga > phi_vc_viga:
+                    continue
+
+            # Punzonamiento en perímetro crítico bo
+            c_cm = min(dado_x, dado_z) * 100.0
+            bo = 4.0 * (c_cm + d_cm)
+            area_crit = (c_cm + d_cm) ** 2
+            vu_punz = q_ult * ((b_m * 100.0) ** 2 - area_crit)
+            phi_vc_punz = 0.75 * 1.10 * math.sqrt(fc) * bo * d_cm
+            if vu_punz > phi_vc_punz:
+                continue
+
+            hz_m = hz_c
+            break
+
+        hz_m = math.ceil(hz_m * 20.0) / 20.0
+
+        # ----------------------------------------------------------------------
+        # 3. ARMADO EN AMBOS SENTIDOS (Lecho inferior y Lecho superior)
+        # ----------------------------------------------------------------------
+        b_cm = b_m * 100.0
+        d_cm = max((hz_m - recub_m) * 100.0, 15.0)
+
+        # Flexión inferior por presión hacia arriba en el vuelo
+        mu_inf_kgcm = (q_ult * b_cm * (vuelo_max * 100.0) ** 2) / 2.0
+        as_inf_flex = mu_inf_kgcm / (0.90 * fy * 0.90 * d_cm)
+        as_min = 0.0018 * b_cm * (hz_m * 100.0)
+        as_inf = max(as_inf_flex, as_min)
+
+        # Flexión superior por succión y contrapeso hacia abajo en el vuelo
+        if p_up > 0:
+            q_down_ton_m2 = (hz_m * 2.40) + (max(df_m - hz_m, 0.0) * gamma_s_ton_m3)
+            q_down_kgcm2 = (q_down_ton_m2 * 1000.0 * 1.30) / 10000.0
+            mu_sup_kgcm = (q_down_kgcm2 * b_cm * (vuelo_max * 100.0) ** 2) / 2.0
+            as_sup_flex = mu_sup_kgcm / (0.90 * fy * 0.90 * d_cm)
+            as_sup = max(as_sup_flex, as_min)
+        else:
+            as_sup = as_min
+
+        def _seleccionar_rebar(as_req: float) -> str:
+            # Varillas comerciales #4 (1.27 cm²), #5 (1.98 cm²), #6 (2.85 cm²)
+            # Separaciones estándar cerradas a 15, 20 o 25 cm
+            candidatos = [('#4', 1.27), ('#5', 1.98), ('#6', 2.85)]
+            separaciones = [25.0, 20.0, 15.0]
+            for nom, ab in candidatos:
+                for s in separaciones:
+                    as_prov = ab * (b_cm / s)
+                    if as_prov >= as_req * 0.98:
+                        return f"{nom} @ {int(s)}"
+            return "#6 @ 15"
+
+        rfzo_inf_str = _seleccionar_rebar(as_inf)
+        rfzo_sup_str = _seleccionar_rebar(as_sup)
 
         filas_zapatas.append({
             "Tipo Zapata": tipo_z,
+            "Z": tipo_z,
             "Grupo Columna": grp,
             "Perfil Columna": perfil,
             "P_max (Ton)": round(p_max, 2),
+            "P_up (Ton)": round(p_up, 2),
             "B_ancho (m)": round(b_m, 2),
             "L_largo (m)": round(l_m, 2),
             "Hz_espesor (m)": round(hz_m, 2),
             "Dado_x (m)": round(dado_x, 2),
             "Dado_z (m)": round(dado_z, 2),
+            "Gobernó": condicion_gob,
+            "Lecho Inf": rfzo_inf_str,
+            "Lecho Sup": rfzo_sup_str,
+            "Rfzo_B": rfzo_inf_str,
+            "Rfzo_D": rfzo_inf_str,
+            "Rfzo_X": rfzo_sup_str,
+            "Rfzo_Y": rfzo_sup_str
         })
 
     return filas_zapatas
@@ -417,35 +540,45 @@ def predimensionar_zapatas(
 # PARTE 3: GENERADOR PROFESIONAL DE PLANOS EN AUTOCAD (.DXF) CON EZDXF
 # ==============================================================================
 
-def calcular_refuerzo_estimado(b_m: float, p_max: float) -> Tuple[str, str, str, str]:
+def calcular_refuerzo_estimado(b_m: float, p_max: float, p_up: float = 0.0, hz_m: float = 0.35) -> Tuple[str, str, str, str]:
     """
     Propone especificaciones estándar de armado para la tabla de zapatas aisladas.
     Retorna: (rfzo_b, rfzo_d, rfzo_sup_x, rfzo_sup_y)
     """
-    if b_m <= 1.30:
+    b_cm = b_m * 100.0
+    as_min = 0.0018 * b_cm * (hz_m * 100.0)
+
+    # Estimación de acero inferior
+    if b_m <= 1.20:
+        rfzo_inf = "#4 @ 25"
+    elif b_m <= 1.50:
         rfzo_inf = "#4 @ 20"
-    elif b_m <= 1.80:
+    elif b_m <= 2.00:
         rfzo_inf = "#4 @ 15"
-    elif b_m <= 2.30:
+    elif b_m <= 2.50:
         rfzo_inf = "#5 @ 18"
-    elif b_m <= 2.80:
+    elif b_m <= 3.00:
         rfzo_inf = "#5 @ 15"
     else:
         rfzo_inf = "#6 @ 15"
-    
-    # En zapatas cuadradas o cuasi-cuadradas el armado inferior en B y D es idéntico
+
     rfzo_b = rfzo_inf
     rfzo_d = rfzo_inf
-    
-    # Refuerzo superior por retracción / temperatura o levantamiento
-    if p_max > 45.0:
-        rfzo_sup_x = "#4 @ 20"
-        rfzo_sup_y = "#4 @ 20"
-    else:
-        rfzo_sup_x = "- "
-        rfzo_sup_y = "- "
 
-    return rfzo_b, rfzo_d, rfzo_sup_x, rfzo_sup_y
+    # Acero superior: si hay succión importante o zapata grande
+    if p_up > 3.0 or b_m >= 2.00:
+        if b_m <= 1.60:
+            rfzo_sup = "#4 @ 25"
+        elif b_m <= 2.20:
+            rfzo_sup = "#4 @ 20"
+        elif b_m <= 2.80:
+            rfzo_sup = "#5 @ 20"
+        else:
+            rfzo_sup = "#5 @ 15"
+    else:
+        rfzo_sup = "#4 @ 25"
+
+    return rfzo_b, rfzo_d, rfzo_sup, rfzo_sup
 
 
 class GeneradorPlanoEstructuralDXF:
@@ -748,16 +881,29 @@ class GeneradorPlanoEstructuralDXF:
 
         row_height = 0.50
         curr_y = table_top_y
+        total_rows = len(self.tabla_zapatas)
 
-        for item in self.tabla_zapatas:
+        for row_idx, item in enumerate(self.tabla_zapatas):
             tz = str(item.get("Tipo Zapata", item.get("Z", "Z-1")))
-            b_m = float(item.get("B_ancho (m)", 1.50))
-            l_m = float(item.get("L_largo (m)", 1.50))
-            hz_m = float(item.get("Hz_espesor (m)", 0.30))
+            b_m = float(item.get("B_ancho (m)", item.get("B (m)", 1.50)))
+            l_m = float(item.get("L_largo (m)", item.get("L (m)", 1.50)))
+            hz_m = float(item.get("Hz_espesor (m)", item.get("Hz (m)", 0.30)))
             dx_m = float(item.get("Dado_x (m)", 0.45))
-            p_max = float(item.get("P_max (Ton)", 15.0))
+            p_max = float(item.get("P_max (Ton)", item.get("P_max", 15.0)))
+            p_up = float(item.get("P_up (Ton)", item.get("P_uplift", 0.0)))
 
-            rfzo_b, rfzo_d, rfzo_x, rfzo_y = calcular_refuerzo_estimado(b_m, p_max)
+            # Usar armado calculado en el prediseño si está disponible, o estimarlo
+            rfzo_b = item.get("Rfzo_B", item.get("Lecho Inf"))
+            rfzo_d = item.get("Rfzo_D", item.get("Lecho Inf"))
+            rfzo_x = item.get("Rfzo_X", item.get("Lecho Sup"))
+            rfzo_y = item.get("Rfzo_Y", item.get("Lecho Sup"))
+
+            if not rfzo_b or not rfzo_x:
+                cb, cd, cx, cy = calcular_refuerzo_estimado(b_m, p_max, p_up=p_up, hz_m=hz_m)
+                rfzo_b = rfzo_b or cb
+                rfzo_d = rfzo_d or cd
+                rfzo_x = rfzo_x or cx
+                rfzo_y = rfzo_y or cy
 
             z_cm = int(round((self.df - hz_m) * 100))
             if z_cm <= 0: z_cm = 80
@@ -770,8 +916,9 @@ class GeneradorPlanoEstructuralDXF:
             bot_y = curr_y - row_height
             mid_y = curr_y - row_height / 2.0
 
-            # Línea horizontal de fila
-            self.msp.add_line((col_xs[0], bot_y), (col_xs[-1], bot_y), dxfattribs={'layer': '0-TEXTO'})
+            # Línea horizontal divisoria entre filas (omitir en la última fila para que el borde redondeado sea el extremo limpio)
+            if row_idx < total_rows - 1:
+                self.msp.add_line((col_xs[0], bot_y), (col_xs[-1], bot_y), dxfattribs={'layer': '0-TEXTO'})
 
             # Textos centrados
             for val, cx in zip(row_vals, col_centers):
@@ -788,9 +935,10 @@ class GeneradorPlanoEstructuralDXF:
                 )
             curr_y = bot_y
 
-        # Líneas verticales de columnas extendidas
-        for x in col_xs:
-            self.msp.add_line((x, table_top_y), (x, curr_y), dxfattribs={'layer': '0-TEXTO'})
+        # Líneas verticales interiores de columnas (no extender hasta el borde final redondeado para no intersectar la curva)
+        v_end_y = curr_y + 0.10
+        for x in col_xs[1:-1]:
+            self.msp.add_line((x, table_top_y), (x, v_end_y), dxfattribs={'layer': '0-TEXTO'})
 
         # Actualizar borde exterior redondeado de la tabla para que coincida exactamente con la última fila
         table_border_poly = None
@@ -818,33 +966,38 @@ class GeneradorPlanoEstructuralDXF:
             ]
             table_border_poly.set_points(new_border_pts, format='xyseb')
 
-        # Título 'ZAPATA AISLADAS' y único texto 'SIN ESCALA' bajo la tabla con margen constante
-        y_title_zap = curr_y - 0.70
-        y_sin_escala = curr_y - 1.20
+        # Título 'ZAPATA AISLADAS' formateado IDÉNTICO a 'DETALLE DE NIVEL DE DESPLANTE'
+        # y más separado de la tabla hacia abajo (mayor margen)
+        y_title_zap = curr_y - 1.15
+        y_line_zap = y_title_zap - 0.11
+        y_sin_escala = y_title_zap - 0.40
+        title_x = col_xs[0]
+        title_x_end = col_xs[-1]
 
         self.msp.add_text(
             "ZAPATA AISLADAS",
             dxfattribs={
                 'layer': 'ARMADURA',
-                'color': 1,
+                'color': 256,
                 'style': 'BOLD' if 'BOLD' in self.doc.styles else 'Standard',
                 'height': 0.50,
-                'insert': (col_centers[3], y_title_zap)
+                'insert': (title_x, y_title_zap)
             }
         )
-        self.msp.add_line(
-            (col_xs[0] + 1.0, y_title_zap - 0.15),
-            (col_xs[-1] - 1.0, y_title_zap - 0.15),
-            dxfattribs={'layer': 'ARMADURA', 'color': 1, 'lineweight': 35}
+        # Línea de subrayado idéntica (layer '0', color 256)
+        self.msp.add_lwpolyline(
+            [(title_x, y_line_zap), (title_x_end, y_line_zap)],
+            dxfattribs={'layer': '0', 'color': 256}
         )
+        # Texto 'SIN ESCALA' exactamente como el de Detalle de Desplante
         self.msp.add_text(
             "SIN ESCALA",
             dxfattribs={
-                'layer': 'COTAS',
-                'color': 2,
-                'style': 'SIMPLEX' if 'SIMPLEX' in self.doc.styles else 'Standard',
-                'height': 0.24,
-                'insert': (col_centers[6], y_sin_escala)
+                'layer': 'titulos',
+                'color': 7,
+                'style': 'TEXT' if 'TEXT' in self.doc.styles else ('SIMPLEX' if 'SIMPLEX' in self.doc.styles else 'Standard'),
+                'height': 0.20,
+                'insert': (title_x_end - 2.50, y_sin_escala)
             }
         )
 
@@ -1648,11 +1801,17 @@ def generar_figura_previsualizacion_cimentacion(
             x_label = "Ejes Transversales (Dirección X Nave - Metros)"
             y_label = "Ejes Longitudinales (Dirección Z Nave - Metros)"
 
-        # Extensión amplia para las boyas de ejes al doble de tamaño
-        ext_x = max(plot_span_x * 0.11, 7.5)
-        ext_y = max(plot_span_y * 0.14, 7.5)
+        # Responsive bubble size according to number of axes
+        max_axes = max(len(all_xs), len(all_zs), 1)
+        # Scale bubble between 14 and 26 px
+        b_size = max(min(int(300 / max_axes), 26), 14)
+        b_font_size = max(int(b_size * 0.45), 8)
 
-        # 1. Dibujar Ejes de la Nave con boyas amplias
+        # Extensión amplia para las boyas de ejes para que nunca se empalmen con las columnas
+        ext_x = max(plot_span_x * 0.12, 5.0)
+        ext_y = max(plot_span_y * 0.14, 5.0)
+
+        # 1. Dibujar Ejes de la Nave con boyas
         letras = [chr(65 + i) if i < 26 else f"A{i-25}" for i in range(len(all_xs))]
         
         if rotate_90:
@@ -1674,10 +1833,10 @@ def generar_figura_previsualizacion_cimentacion(
                         x=[xp],
                         y=[yp],
                         mode='markers+text',
-                        marker=dict(size=36, color='#fef08a', line=dict(color='#ca8a04', width=2.5)),
+                        marker=dict(size=b_size, color='#fef08a', line=dict(color='#ca8a04', width=2.0)),
                         text=[letra],
                         textposition='middle center',
-                        textfont=dict(size=14, color='#854d0e', family='Segoe UI, sans-serif'),
+                        textfont=dict(size=b_font_size, color='#854d0e', family='Segoe UI, sans-serif'),
                         hoverinfo='text',
                         hovertext=f"Eje {letra}",
                         showlegend=False
@@ -1701,10 +1860,10 @@ def generar_figura_previsualizacion_cimentacion(
                         x=[xp],
                         y=[yp],
                         mode='markers+text',
-                        marker=dict(size=36, color='#fef08a', line=dict(color='#ca8a04', width=2.5)),
+                        marker=dict(size=b_size, color='#fef08a', line=dict(color='#ca8a04', width=2.0)),
                         text=[str(idx)],
                         textposition='middle center',
-                        textfont=dict(size=14, color='#854d0e', family='Segoe UI, sans-serif'),
+                        textfont=dict(size=b_font_size, color='#854d0e', family='Segoe UI, sans-serif'),
                         hoverinfo='text',
                         hovertext=f"Eje {idx}",
                         showlegend=False
@@ -1725,10 +1884,10 @@ def generar_figura_previsualizacion_cimentacion(
                         x=[x_val],
                         y=[y_b],
                         mode='markers+text',
-                        marker=dict(size=36, color='#fef08a', line=dict(color='#ca8a04', width=2.5)),
+                        marker=dict(size=b_size, color='#fef08a', line=dict(color='#ca8a04', width=2.0)),
                         text=[letra],
                         textposition='middle center',
-                        textfont=dict(size=14, color='#854d0e', family='Segoe UI, sans-serif'),
+                        textfont=dict(size=b_font_size, color='#854d0e', family='Segoe UI, sans-serif'),
                         hoverinfo='text',
                         hovertext=f"Eje {letra}",
                         showlegend=False
@@ -1748,10 +1907,10 @@ def generar_figura_previsualizacion_cimentacion(
                         x=[x_b],
                         y=[z_val],
                         mode='markers+text',
-                        marker=dict(size=36, color='#fef08a', line=dict(color='#ca8a04', width=2.5)),
+                        marker=dict(size=b_size, color='#fef08a', line=dict(color='#ca8a04', width=2.0)),
                         text=[str(idx)],
                         textposition='middle center',
-                        textfont=dict(size=14, color='#854d0e', family='Segoe UI, sans-serif'),
+                        textfont=dict(size=b_font_size, color='#854d0e', family='Segoe UI, sans-serif'),
                         hoverinfo='text',
                         hovertext=f"Eje {idx}",
                         showlegend=False
@@ -1819,12 +1978,12 @@ def generar_figura_previsualizacion_cimentacion(
             zap_count += 1
 
         fig.update_layout(
-            title=None,
+            title=dict(text=""),
             xaxis=dict(title=x_label, zeroline=False, gridcolor="#e2e8f0"),
             yaxis=dict(title=y_label, zeroline=False, gridcolor="#e2e8f0", scaleanchor="x", scaleratio=1),
             plot_bgcolor="#f8fafc",
             paper_bgcolor="#ffffff",
-            margin=dict(l=30, r=30, t=30, b=30),
+            margin=dict(l=30, r=30, t=10, b=30),
             height=620,
             hovermode='closest'
         )
@@ -1907,6 +2066,11 @@ def generar_figura_previsualizacion_cimentacion(
         )
         y_axis_top_uniform = y_max_frame + 3.5
 
+        # Responsive bubble size for cross section view
+        num_corte_axes = max(len(col_bases), 1)
+        b_size_corte = max(min(int(260 / num_corte_axes), 28), 16)
+        b_font_corte = max(int(b_size_corte * 0.45), 9)
+
         for idx, (nid, x_col) in enumerate(col_bases):
             lbl = chr(65 + idx) if idx < 26 else f"A{idx-25}"
 
@@ -1925,10 +2089,10 @@ def generar_figura_previsualizacion_cimentacion(
                 x=[x_col],
                 y=[y_axis_top_uniform],
                 mode='markers+text',
-                marker=dict(size=36, color='#fef08a', line=dict(color='#ca8a04', width=2.5)),
+                marker=dict(size=b_size_corte, color='#fef08a', line=dict(color='#ca8a04', width=2.0)),
                 text=[lbl],
                 textposition='middle center',
-                textfont=dict(size=14, color='#854d0e', family='Segoe UI, sans-serif'),
+                textfont=dict(size=b_font_corte, color='#854d0e', family='Segoe UI, sans-serif'),
                 hoverinfo='text',
                 hovertext=f"Eje {lbl} (Columna X={x_col:.2f}m)",
                 showlegend=False
@@ -1976,12 +2140,12 @@ def generar_figura_previsualizacion_cimentacion(
             ))
 
         fig.update_layout(
-            title=None,
+            title=dict(text=""),
             xaxis=dict(title="Claro Transversal (Metros)", zeroline=False, gridcolor="#e2e8f0"),
             yaxis=dict(title="Elevación Y (Metros)", zeroline=False, gridcolor="#e2e8f0", scaleanchor="x", scaleratio=1),
             plot_bgcolor="#f8fafc",
             paper_bgcolor="#ffffff",
-            margin=dict(l=30, r=30, t=30, b=30),
+            margin=dict(l=30, r=30, t=10, b=30),
             height=620,
             hovermode='closest'
         )

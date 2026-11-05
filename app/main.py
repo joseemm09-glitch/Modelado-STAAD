@@ -594,6 +594,42 @@ st.markdown("""
         height: 0 !important;
     }
 
+    /* Marcador para botón café (Cimentación Preliminar) */
+    div.element-container:has(div.brown-btn-marker), div[data-testid="stElementContainer"]:has(div.brown-btn-marker) {
+        display: none !important;
+        margin: 0 !important;
+        height: 0 !important;
+    }
+
+    /* Botón de Cimentación Preliminar (Café) */
+    div.element-container:has(div.brown-btn-marker) + div.element-container button,
+    div[data-testid="stElementContainer"]:has(div.brown-btn-marker) + div[data-testid="stElementContainer"] button,
+    section[data-testid="stSidebar"] div.element-container:has(div.brown-btn-marker) + div.element-container button,
+    section[data-testid="stSidebar"] div[data-testid="stElementContainer"]:has(div.brown-btn-marker) + div[data-testid="stElementContainer"] button {
+        background: #854d0e !important;
+        color: white !important;
+        font-weight: 600 !important;
+        border-radius: 4px !important;
+        border: none !important;
+        width: 100% !important;
+        margin: 0 auto !important;
+        display: block !important;
+        text-align: center !important;
+        justify-content: center !important;
+        box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.1) !important;
+        transition: all 0.2s ease-in-out !important;
+        padding-top: 0.5rem !important;
+        padding-bottom: 0.5rem !important;
+    }
+    div.element-container:has(div.brown-btn-marker) + div.element-container button:hover:not(:disabled),
+    div[data-testid="stElementContainer"]:has(div.brown-btn-marker) + div[data-testid="stElementContainer"] button:hover:not(:disabled),
+    section[data-testid="stSidebar"] div.element-container:has(div.brown-btn-marker) + div.element-container button:hover:not(:disabled),
+    section[data-testid="stSidebar"] div[data-testid="stElementContainer"]:has(div.brown-btn-marker) + div[data-testid="stElementContainer"] button:hover:not(:disabled) {
+        background: #713f12 !important;
+        box-shadow: 0px 3px 6px rgba(0, 0, 0, 0.15) !important;
+        transform: translateY(-1px) !important;
+    }
+
     /* Botones de Diseño y Catálogo (Gris siempre) */
     div.element-container:has(div.grey-btn-marker) + div.element-container button,
     div[data-testid="stElementContainer"]:has(div.grey-btn-marker) + div[data-testid="stElementContainer"] button,
@@ -952,7 +988,11 @@ def render_siblings_top(group, current):
         with c2:
             if name in ["Diseño", "Catálogo"]:
                 st.markdown("<div class='grey-btn-marker'></div>", unsafe_allow_html=True)
-            st.button(name, type="primary", use_container_width=True, on_click=go_panel, args=(name,), key=f"nav_top_{name}", disabled=is_dis)
+            elif name in ["Cimentación", "Cimentación Preliminar"]:
+                st.markdown("<div class='brown-btn-marker'></div>", unsafe_allow_html=True)
+            btn_label = "Cimentación Preliminar" if name in ["Cimentación", "Cimentación Preliminar"] else name
+            target_panel = "Cimentación" if name in ["Cimentación", "Cimentación Preliminar"] else name
+            st.button(btn_label, type="primary", use_container_width=True, on_click=go_panel, args=(target_panel,), key=f"nav_top_{name}", disabled=is_dis)
 
 def render_siblings_bottom(group, current):
     found = False
@@ -970,11 +1010,15 @@ def render_siblings_bottom(group, current):
             with c2:
                 if name in ["Diseño", "Catálogo"]:
                     st.markdown("<div class='grey-btn-marker'></div>", unsafe_allow_html=True)
-                st.button(name, type="primary", use_container_width=True, on_click=go_panel, args=(name,), key=f"nav_bot_{name}", disabled=is_dis)
+                elif name in ["Cimentación", "Cimentación Preliminar"]:
+                    st.markdown("<div class='brown-btn-marker'></div>", unsafe_allow_html=True)
+                btn_label = "Cimentación Preliminar" if name in ["Cimentación", "Cimentación Preliminar"] else name
+                target_panel = "Cimentación" if name in ["Cimentación", "Cimentación Preliminar"] else name
+                st.button(btn_label, type="primary", use_container_width=True, on_click=go_panel, args=(target_panel,), key=f"nav_bot_{name}", disabled=is_dis)
         if name == current: found = True
 
-nav_group1 = ["Geometría", "Cargas", "Prediseño", "Cimentación"]
-nav_group2 = ["Diseño", "Catálogo"]
+nav_group1 = ["Geometría", "Cargas"]
+nav_group2 = ["Prediseño", "Cimentación", "Diseño", "Catálogo"]
 
 with st.sidebar:
     panel = st.session_state.current_panel
@@ -988,9 +1032,10 @@ with st.sidebar:
         st.markdown("<h3 style='text-align: center; margin-top: 10px;'>Menú Principal</h3>", unsafe_allow_html=True)
         st.button("Geometría", type="primary", use_container_width=True, on_click=go_panel, args=("Geometría",))
         st.button("Cargas", type="primary", use_container_width=True, on_click=go_panel, args=("Cargas",))
-        st.button("Prediseño", type="primary", use_container_width=True, on_click=go_panel, args=("Prediseño",))
-        st.button("Cimentación", type="primary", use_container_width=True, on_click=go_panel, args=("Cimentación",))
         st.divider()
+        st.button("Prediseño", type="primary", use_container_width=True, on_click=go_panel, args=("Prediseño",))
+        st.markdown("<div class='brown-btn-marker'></div>", unsafe_allow_html=True)
+        st.button("Cimentación Preliminar", type="primary", use_container_width=True, on_click=go_panel, args=("Cimentación",))
         is_disabled = not st.session_state.get("file_generated", False)
         st.markdown("<div class='grey-btn-marker'></div>", unsafe_allow_html=True)
         st.button("Diseño", type="primary", use_container_width=True, on_click=go_panel, args=("Diseño",), disabled=is_disabled)
@@ -1442,13 +1487,16 @@ with st.sidebar:
             st.session_state.tabla_zapatas_df = df_raw
             st.session_state.recalc_zapatas_flag = False
 
-        st.markdown("<div style='font-size: 13px; font-weight: 600; color: #1e293b; margin-top: 10px; margin-bottom: 5px;'>Dimensiones de Zapatas y Dados:</div>", unsafe_allow_html=True)
+        st.markdown("<div style='font-size: 13px; font-weight: 600; color: #1e293b; margin-top: 10px; margin-bottom: 5px;'>Dimensiones, Condición y Armado de Zapatas:</div>", unsafe_allow_html=True)
         
-        # Mostrar únicamente la columna Z y dimensiones, omitiendo columnas de superestructura
+        # Mostrar columnas clave: Z, dimensiones, condición que gobernó y armado
         if "Z" not in st.session_state.tabla_zapatas_df.columns and "Tipo Zapata" in st.session_state.tabla_zapatas_df.columns:
             st.session_state.tabla_zapatas_df["Z"] = st.session_state.tabla_zapatas_df["Tipo Zapata"]
 
-        cols_display = [c for c in ["Z", "B_ancho (m)", "L_largo (m)", "Hz_espesor (m)", "Dado_x (m)", "Dado_z (m)"] if c in st.session_state.tabla_zapatas_df.columns]
+        preferred_cols = ["Z", "B_ancho (m)", "L_largo (m)", "Hz_espesor (m)", "Gobernó", "Lecho Inf", "Lecho Sup"]
+        cols_display = [c for c in preferred_cols if c in st.session_state.tabla_zapatas_df.columns]
+        if not cols_display:
+            cols_display = [c for c in ["Z", "B_ancho (m)", "L_largo (m)", "Hz_espesor (m)"] if c in st.session_state.tabla_zapatas_df.columns]
         
         edited_df = st.data_editor(
             st.session_state.tabla_zapatas_df[cols_display],
@@ -1460,14 +1508,22 @@ with st.sidebar:
                 "B_ancho (m)": st.column_config.NumberColumn("B (m)", format="%.2f"),
                 "L_largo (m)": st.column_config.NumberColumn("L (m)", format="%.2f"),
                 "Hz_espesor (m)": st.column_config.NumberColumn("Hz (m)", format="%.2f"),
-                "Dado_x (m)": st.column_config.NumberColumn("Dado X", format="%.2f"),
-                "Dado_z (m)": st.column_config.NumberColumn("Dado Z", format="%.2f"),
+                "Gobernó": st.column_config.TextColumn("Gobernó", disabled=True),
+                "Lecho Inf": st.column_config.TextColumn("Lecho Inf (B, D)"),
+                "Lecho Sup": st.column_config.TextColumn("Lecho Sup (X, Y)"),
             }
         )
         for col in edited_df.columns:
             st.session_state.tabla_zapatas_df[col] = edited_df[col]
         if "Z" in st.session_state.tabla_zapatas_df.columns:
             st.session_state.tabla_zapatas_df["Tipo Zapata"] = st.session_state.tabla_zapatas_df["Z"]
+        # Mantener consistentes los refuerzos en B, D, X, Y
+        if "Lecho Inf" in edited_df.columns:
+            st.session_state.tabla_zapatas_df["Rfzo_B"] = edited_df["Lecho Inf"]
+            st.session_state.tabla_zapatas_df["Rfzo_D"] = edited_df["Lecho Inf"]
+        if "Lecho Sup" in edited_df.columns:
+            st.session_state.tabla_zapatas_df["Rfzo_X"] = edited_df["Lecho Sup"]
+            st.session_state.tabla_zapatas_df["Rfzo_Y"] = edited_df["Lecho Sup"]
 
         render_siblings_bottom(nav_group1, "Cimentación")
 
@@ -1909,7 +1965,7 @@ else:
                 try:
                     tipo_vista_cim = st.segmented_control(
                         "Vista",
-                        options=["Cimentación Preliminar", "Corte por Marco"],
+                        options=["Cimentación Preliminar", "Corte Transversal"],
                         default="Cimentación Preliminar",
                         key="sel_vista_cim_2d",
                         label_visibility="collapsed"
@@ -1917,7 +1973,7 @@ else:
                 except AttributeError:
                     tipo_vista_cim = st.radio(
                         "Vista",
-                        options=["Cimentación Preliminar", "Corte por Marco"],
+                        options=["Cimentación Preliminar", "Corte Transversal"],
                         index=0,
                         key="sel_vista_cim_2d",
                         horizontal=True,
