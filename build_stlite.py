@@ -12,6 +12,8 @@ FILES_TO_INCLUDE = [
     ("app/visualizer.py", "text"),
     ("app/prediseno.py", "text"),
     ("app/templates.py", "text"),
+    ("app/reglamentos.py", "text"),
+    ("app/cimentacion_cad.py", "text"),
     ("app/perfiles_w.py", "text"),
     ("app/staad_link/__init__.py", "text"),
     ("app/staad_link/link.py", "text"),

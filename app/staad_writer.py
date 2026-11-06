@@ -103,11 +103,16 @@ def parse_upt_to_user_table(file_path, table_number):
                 out.append(stripped)
     return "\n".join(out)
 
-def write_staad(model, selected_profiles=None):
+def write_staad(model, selected_profiles=None, cvh_props=None):
     """
     Generates STAAD.Pro input file text from a StaadModel instance.
     If selected_profiles is provided, maps {'C-1': 'HSS10X10X0.250', ...} to the respective members.
     """
+    # FIX DE COMPATIBILIDAD DE FIRMA: app/main.py (rama de re-escritura en Diseño) llama a
+    # write_staad(..., cvh_props=...). Se acepta el parámetro opcional para evitar TypeError.
+    # Hoy no altera la salida: el escritor aún no define cómo mapear diámetros por miembro a _CVH.
+    # Con cvh_props=None (llamadas existentes) el comportamiento es idéntico al anterior.
+    _cvh_props = cvh_props if cvh_props is not None else {}
     date_str = datetime.now().strftime("%d-%b-%y")
     
     out = []
