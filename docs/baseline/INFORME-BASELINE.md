@@ -21,9 +21,9 @@ El encabezado `ENGINEER DATE` usa `datetime.now()` (`staad_writer.py:111`); por 
 ## Conteo del modelo por defecto
 618 nodos, 1539 miembros. Grupos: `_COL` 80, `_COLVIENTO` 22, `_CS` 160, `_CI` 96, `_MONTANTES` 80, `_DIAG` 160, `_LARGUEROS` 315, `_CVH` 88, `_JOISTGRAL` 210, `_JPUNTAL` 105.
 
-Discrepancias con el conteo del prompt (a confirmar contigo, no se corrigió nada):
-- El prompt indica 40 columnas principales y 32 armaduras; el modelo da `_COL` = 80 y no hay un grupo único de "armaduras" (se reparte en `_CS/_CI/_MONTANTES/_DIAG`). Coinciden 22 viento, 88 contravientos y 315 largueros.
-- Perfiles elegidos por defecto: solo `CV-1` y `_CVH` → `W12X65`. `prediseno.clasificar_columnas` no devuelve selección para C-1..C-4 en el modelo por defecto sin análisis.
+Equivalencia de conteos (aclarada, no es un error y no se corrige nada):
+- **40 columnas físicas = 80 miembros `_COL`.** En `app/model.py:554-555` cada columna física se genera como dos miembros (`nL1→nL2` base→alero y `nL2→nL3` alero→cumbrera), ambos en el grupo `_COL`. Con 7 bahías (8 ejes) × 4 entre-ejes (5 ejes) = 8 × 5 = 40 columnas físicas → 80 miembros. Coinciden además 22 de viento, 88 contravientos y 315 largueros. No hay un grupo único de "armaduras": se reparte en `_CS/_CI/_MONTANTES/_DIAG`.
+- Perfiles elegidos por defecto: solo `CV-1` y `_CVH` → `W12X65`. `prediseno.clasificar_columnas` no devuelve selección para C-1..C-4 en el modelo por defecto sin análisis (observación, sin cambios).
 
 ## Qué funciona en local
 Los 5 paneles abren con 0 excepciones y 0 errores de UI: Main, Geometría, Cargas, Prediseño, Cimentación (probado con AppTest). Solo aparecen avisos de deprecación de Streamlit (`use_container_width`, `st.components.v1.html`), no son errores.
@@ -31,3 +31,24 @@ Los 5 paneles abren con 0 excepciones y 0 errores de UI: Main, Geometría, Carga
 ## Qué no se pudo comprobar
 - Captura visual del visor 3D (AppTest no renderiza Plotly en pantalla).
 - Comportamiento en web (stlite/Vercel): se verifica en la Fase 2.
+
+
+## Aclaración: código de salida del AppTest
+
+**Conclusión:** el código de salida 1 que se vio en dos corridas **no viene de Python ni de la app**; viene de cómo PowerShell/el ejecutor interpreta el texto que Streamlit escribe en stderr. No hubo excepciones.
+
+Cómo se comprobó (2026-11-05, misma máquina, mismos comandos):
+
+| Forma de ejecutar | Código de salida de Python (`$LASTEXITCODE`) | `$?` de PowerShell | Salida del script |
+|---|---|---|---|
+| `python docs/baseline/apptest_panels.py > out.txt 2> err.txt` (stdout y stderr a archivos) | **0** | verdadero | 5 paneles con `excepciones=0 errores_ui=0` |
+| `python … 2>&1 \| Select-Object -First 3` (forma de la 1.ª corrida original) | -1 | falso | el `Select -First` cierra la tubería antes de que Python termine; stderr se convierte en `NativeCommandError` |
+| `python … 2>$null \| Select-String …` (forma de la 2.ª corrida original) | 0 | falso | stderr redirigido a `$null` marca `$?` como falso |
+
+El ejecutor de comandos informó "exit code 1" cuando `$?` era falso o la tubería se cortó, no el código real de Python. La corrida con redirección a archivos da 0.
+
+Evidencia concreta en `err.txt` (142 líneas): 0 apariciones de `Traceback`; 12 líneas `WARNING streamlit.runtime.scriptrunner_utils.script_run_context: … missing ScriptRunContext! This warning can be ignored when running in bare mode`; 20 líneas `Please replace …` (avisos de deprecación: `st.components.v1.html` → `st.iframe` y `use_container_width` → `width`); y 1 aviso `label got an empty value` (con un "Stack" informativo del logger, no una excepción). Además, `at.exception` y `at.error` de AppTest estuvieron vacíos en los 5 paneles. Estos avisos ya existían en el código antes de la limpieza.
+
+Aclaración sobre un `exit code 0` posterior: en la corrida de la Fase 2 el comando combinaba AppTest + `git commit` + `git push`; el código reportado fue el del último comando, no el de AppTest. Por eso no se debe usar ese 0 como evidencia: la evidencia válida es la tabla de arriba.
+
+Limitación: no se pudo ver si Streamlit sale con 1 en otros entornos (CI, Linux); solo se verificó en esta máquina con Python 3.14 y streamlit 1.59.0.
